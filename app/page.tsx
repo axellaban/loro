@@ -420,16 +420,14 @@ export default function Page() {
   const connecting = status === "connecting";
 
   return (
-    <main style={S.main}>
-      <header style={S.header}>
-        <div style={S.brand}>
-          <span className="cotorra-float" style={{ fontSize: 26, marginRight: 2 }}>🦜</span>
-          <span style={S.brandText}>
-            <span className="cotorra-title-gradient" style={{ fontSize: 22 }}>CotorreadoAI</span>
-            <span style={{ color: "var(--loro-cyan)", fontSize: 13, marginLeft: 4, fontWeight: "600" }}>/es</span>
-          </span>
+    <main className="app-container">
+      <header className="header">
+        <div className="brand">
+          <span style={{ fontSize: 24 }}>🦜</span>
+          <span className="brand-title">CotorreadoAI</span>
+          <span style={{ color: "var(--loro-cyan)", fontSize: 13, fontWeight: "600" }}>/es</span>
         </div>
-        <span className={`mono ${status === "live" ? "pulse-badge" : ""}`} style={S.statusChip(status)}>
+        <span className={`mono status-chip ${live ? "status-chip-live" : ""}`}>
           {status === "idle" && "en espera"}
           {connecting && "conectando…"}
           {live && "en vivo"}
@@ -438,73 +436,75 @@ export default function Page() {
       </header>
 
       {!live && (
-        <p className="mono" style={S.tagline}>
-          🌴 El loro tropical que te sopla las respuestas en vivo para tus entrevistas.
+        <p className="mono tagline">
+          El loro tropical que te sopla las respuestas en vivo para tus entrevistas.
         </p>
       )}
 
       {/* Selector de modo */}
       {!live && (
-        <div style={{ ...S.modeRow, ...(isIOS ? S.modeRowSingle : {}) }}>
+        <div className="grid-responsive">
           <button
-            className={`mono interactive-btn ${mode === "mic" ? "interactive-btn-on" : ""}`}
+            className={`mono btn-select ${mode === "mic" ? "btn-select-active" : ""}`}
             onClick={() => setMode("mic")}
             disabled={connecting}
-            style={{ width: "100%" }}
           >
             🎙️ Micrófono
-            <span style={S.modeSub}>celular escuchando la sala</span>
+            <span className="btn-select-sub">celular escuchando la sala</span>
           </button>
           {!isIOS && (
             <button
-              className={`mono interactive-btn ${mode === "tab" ? "interactive-btn-on" : ""}`}
+              className={`mono btn-select ${mode === "tab" ? "btn-select-active" : ""}`}
               onClick={() => setMode("tab")}
               disabled={connecting}
-              style={{ width: "100%" }}
             >
               🖥️ Pestaña
-              <span style={S.modeSub}>audio directo del Meet · desktop</span>
+              <span className="btn-select-sub">audio directo del Meet · desktop</span>
             </button>
           )}
         </div>
       )}
       {!live && isIOS && (
-        <p className="mono" style={S.contextHint}>
+        <p className="mono form-hint" style={{ color: "var(--loro-red)" }}>
           📱 En iPhone solo está disponible el modo micrófono — Safari no permite compartir el audio de una pestaña.
         </p>
       )}
 
       {error && (
-        <div className="mono" style={S.errorBar}>
-          {error}
+        <div className="mono" style={{
+          fontSize: "13px",
+          color: "#fda4af",
+          background: "rgba(244, 63, 94, 0.08)",
+          border: "1px solid rgba(244, 63, 94, 0.3)",
+          borderRadius: "8px",
+          padding: "12px 14px",
+          lineHeight: 1.5,
+        }}>
+          ⚠️ {error}
         </div>
       )}
 
       {/* Contexto de la entrevista (solo antes de arrancar) */}
       {!live && (
-        <div className="glass-panel" style={S.panel}>
-          <label className="mono" style={S.label}>
-            🌴 contexto de la entrevista
+        <div className="panel">
+          <label className="mono form-label">
+            Contexto de la entrevista
           </label>
-          <div style={S.contextRow}>
-            <div style={S.contextField}>
-              <label className="mono" style={S.miniLabel}>
-                empresa
-              </label>
+          <div className="grid-responsive">
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label className="mono form-mini-label">Empresa</label>
               <input
-                className="cotorra-input"
+                className="form-input"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Ej: Mercado Libre"
                 disabled={connecting}
               />
             </div>
-            <div style={S.contextField}>
-              <label className="mono" style={S.miniLabel}>
-                puesto / rol
-              </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label className="mono form-mini-label">Puesto / Rol</label>
               <input
-                className="cotorra-input"
+                className="form-input"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Ej: Frontend Sr."
@@ -512,37 +512,37 @@ export default function Page() {
               />
             </div>
           </div>
-          <label className="mono" style={{ ...S.miniLabel, marginTop: 4 }}>
-            tu perfil / cv
-          </label>
-          <textarea
-            className="cotorra-textarea"
-            value={profile}
-            onChange={(e) => setProfile(e.target.value)}
-            placeholder="Pegá tu CV, experiencia o notas. El loro se anclará en esto para no inventar nada."
-            disabled={connecting}
-          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+            <label className="mono form-mini-label">Tu Perfil / CV</label>
+            <textarea
+              className="form-textarea"
+              value={profile}
+              onChange={(e) => setProfile(e.target.value)}
+              placeholder="Pegá tu CV, experiencia o notas. El loro se anclará en esto para no inventar nada."
+              disabled={connecting}
+            />
+          </div>
           {(!company.trim() || !role.trim()) && (
-            <p className="mono" style={S.contextHint}>
-              Completá empresa y puesto para que el loro prepare respuestas mejor orientadas.
+            <p className="mono form-hint">
+              💡 Completá empresa y puesto para que el loro prepare respuestas mejor orientadas.
             </p>
           )}
         </div>
       )}
 
-      {/* Tabs móviles */}
+      {/* Tabs móviles / en vivo */}
       {live && (
-        <div style={S.tabsRow}>
+        <div className="grid-responsive">
           <button
-            className={`mono interactive-btn ${tab === "answer" ? "interactive-btn-on" : ""}`}
-            style={{ width: "100%", padding: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
+            className={`mono btn-select ${tab === "answer" ? "btn-select-active" : ""}`}
+            style={{ padding: "10px", alignItems: "center", justifyContent: "center" }}
             onClick={() => setTab("answer")}
           >
             🪶 Respuestas sugeridas
           </button>
           <button
-            className={`mono interactive-btn ${tab === "transcript" ? "interactive-btn-on" : ""}`}
-            style={{ width: "100%", padding: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
+            className={`mono btn-select ${tab === "transcript" ? "btn-select-active" : ""}`}
+            style={{ padding: "10px", alignItems: "center", justifyContent: "center" }}
             onClick={() => setTab("transcript")}
           >
             📝 Transcripción
@@ -550,30 +550,30 @@ export default function Page() {
         </div>
       )}
 
-      {/* Contenido */}
-      <section style={S.content}>
+      {/* Contenido principal */}
+      <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {(!live || tab === "answer") && (
-          <div className={`glass-panel ${live ? "glass-panel-active" : ""}`} style={{ ...S.panel, ...S.answerPanel }}>
+          <div className="panel" style={{ flex: 1, minHeight: 0 }}>
             {!live && (
-              <label className="mono" style={S.label}>
-                🟢 respuestas sugeridas por el loro
+              <label className="mono form-label">
+                Respuestas sugeridas por el loro
               </label>
             )}
-            <div ref={scrollA} style={S.answerBody}>
+            <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
-                <p style={S.placeholder}>
+                <p className="placeholder">
                   🦜 Silencio en la selva... Cuando el entrevistador termine de preguntar, tu respuesta sugerida aparecerá acá en ~1-2s.
                 </p>
               ) : (
-                answers.map((a) => (
-                  <div key={a.id} className="answer-card-animate" style={S.answerCard}>
-                    <div className="mono" style={S.answerQ}>
+                answers.map((a, index) => (
+                  <div key={a.id} className={`answer-card ${index === 0 ? "answer-card-first" : ""}`}>
+                    <div className="mono answer-card-question">
                       ❓ {a.question}
                     </div>
-                    <div style={S.answerText}>
+                    <div className="answer-card-text">
                       {a.text || (
-                        <span style={{ ...S.gen }} className="mono">
-                          el loro está pensando… 🦜
+                        <span className="mono answer-card-loading">
+                          el loro está cotorreando respuestas… 🦜
                         </span>
                       )}
                     </div>
@@ -585,15 +585,16 @@ export default function Page() {
         )}
 
         {live && tab === "transcript" && (
-          <div className="glass-panel" style={{ ...S.panel, ...S.answerPanel }}>
-            <div ref={scrollT} style={S.transcript}>
+          <div className="panel" style={{ flex: 1, minHeight: 0 }}>
+            <div ref={scrollT} className="transcript-container">
               {lines.length === 0 ? (
-                <p style={S.placeholder}>El loro está escuchando lo que dicen... 🦜</p>
+                <p className="placeholder">El loro está escuchando lo que dicen... 🦜</p>
               ) : (
                 lines.map((l) => (
                   <p
                     key={l.id}
-                    style={{ ...S.line, color: l.final ? "var(--ink)" : "var(--ink-dim)" }}
+                    className="transcript-line"
+                    style={{ color: l.final ? "var(--ink)" : "var(--ink-dim)" }}
                   >
                     {l.text}
                   </p>
@@ -605,18 +606,18 @@ export default function Page() {
       </section>
 
       {/* Footer */}
-      <footer style={S.footer}>
+      <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
         {!live ? (
-          <button onClick={start} disabled={connecting} style={S.primaryBtn} className="mono">
+          <button onClick={start} disabled={connecting} className="mono btn-action btn-primary">
             {connecting ? "Trayendo al loro... 🦜" : mode === "mic" ? "▶ Soltar loro (activar micrófono)" : "▶ Soltar loro (compartir pestaña)"}
           </button>
         ) : (
-          <button onClick={stop} style={S.stopBtn} className="mono">
+          <button onClick={stop} className="mono btn-action btn-stop">
             ■ Guardar loro en la jaula (detener)
           </button>
         )}
         {!live && (
-          <p className="mono" style={S.hint}>
+          <p className="mono btn-hint">
             {mode === "mic"
               ? "Apoyá el celular cerca de los parlantes de la notebook."
               : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
@@ -626,119 +627,3 @@ export default function Page() {
     </main>
   );
 }
-
-const S: Record<string, any> = {
-  main: {
-    minHeight: "100dvh",
-    display: "flex",
-    flexDirection: "column",
-    padding:
-      "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))",
-    gap: 14,
-    maxWidth: 760,
-    margin: "0 auto",
-  },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between" },
-  brand: { display: "flex", alignItems: "center", gap: 8 },
-  brandText: { fontSize: 20, fontWeight: 700, display: "flex", alignItems: "center" },
-  tagline: { fontSize: 13, color: "var(--ink-dim)", lineHeight: 1.5, marginTop: -4 },
-  statusChip: (s: Status) => ({
-    fontSize: 11,
-    padding: "5px 12px",
-    borderRadius: 999,
-    border: "1px solid var(--line)",
-    color: s === "live" ? "var(--loro-red)" : s === "error" ? "var(--loro-red)" : "var(--ink-dim)",
-    background: "rgba(9, 29, 21, 0.6)",
-  }),
-  modeRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  modeRowSingle: { gridTemplateColumns: "1fr" },
-  modeSub: { fontSize: 10.5, color: "var(--ink-faint)", fontWeight: 400, letterSpacing: 0, marginTop: 2 },
-  errorBar: {
-    fontSize: 13,
-    color: "#fda4af",
-    background: "rgba(244, 63, 94, 0.08)",
-    border: "1px solid rgba(244, 63, 94, 0.3)",
-    borderRadius: 12,
-    padding: "12px 16px",
-    lineHeight: 1.5,
-  },
-  panel: {
-    background: "var(--panel)",
-    border: "1px solid var(--line)",
-    borderRadius: "var(--radius)",
-    padding: 16,
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  label: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    color: "var(--loro-yellow)",
-    fontWeight: "700",
-  },
-  contextRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
-  contextField: { display: "flex", flexDirection: "column", gap: 4 },
-  miniLabel: {
-    fontSize: 10,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: "var(--ink-faint)",
-  },
-  contextHint: { fontSize: 11.5, color: "var(--ink-faint)", lineHeight: 1.4 },
-  tabsRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  content: { flex: 1, minHeight: 0, display: "flex" },
-  answerPanel: { flex: 1, minHeight: 0 },
-  answerBody: {
-    flex: 1,
-    minHeight: 250,
-    overflowY: "auto",
-    WebkitOverflowScrolling: "touch",
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-  },
-  answerCard: {
-    background: "var(--panel-2)",
-    border: "1px solid var(--line)",
-    borderRadius: 12,
-    padding: 16,
-    transition: "all 0.3s ease",
-  },
-  answerQ: { fontSize: 12, color: "var(--loro-cyan)", marginBottom: 8, lineHeight: 1.4, fontWeight: "600" },
-  answerText: { fontSize: 16, lineHeight: 1.65, whiteSpace: "pre-wrap", color: "var(--ink)" },
-  gen: { fontSize: 13, color: "var(--loro-yellow)" },
-  transcript: { flex: 1, minHeight: 250, overflowY: "auto", WebkitOverflowScrolling: "touch" },
-  line: { fontSize: 15, lineHeight: 1.6, marginBottom: 8 },
-  placeholder: { fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.6, padding: 8, textAlign: "center", fontStyle: "italic" },
-  footer: { display: "flex", flexDirection: "column", gap: 10, position: "sticky", bottom: 0, paddingTop: 8 },
-  primaryBtn: {
-    background: "linear-gradient(135deg, var(--loro-green) 0%, var(--loro-yellow) 100%)",
-    color: "#040d0a",
-    border: "none",
-    borderRadius: 14,
-    padding: "16px",
-    fontSize: 16,
-    fontWeight: "800",
-    width: "100%",
-    boxShadow: "0 4px 20px rgba(16, 185, 129, 0.25)",
-    transition: "all 0.2s ease",
-    cursor: "pointer",
-  },
-  stopBtn: {
-    background: "linear-gradient(135deg, var(--loro-red) 0%, #b91c1c 100%)",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: 14,
-    padding: "16px",
-    fontSize: 16,
-    fontWeight: "800",
-    width: "100%",
-    boxShadow: "0 4px 20px rgba(244, 63, 94, 0.25)",
-    transition: "all 0.2s ease",
-    cursor: "pointer",
-  },
-  hint: { fontSize: 12, color: "var(--ink-faint)", textAlign: "center", lineHeight: 1.5 },
-};
-
