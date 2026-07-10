@@ -228,6 +228,19 @@ export default function Page() {
     fireIfNew(q, true);
   }, [fireIfNew]);
 
+  // Disparo manual: responde YA con lo que haya, sin esperar al endpointing.
+  // Si el buffer del turno ya se vació (la pregunta ya se disparó), usa la
+  // cola de la transcripción para poder re-pedir sobre lo último dicho.
+  const answerNow = useCallback(() => {
+    if (specTimerRef.current) {
+      clearTimeout(specTimerRef.current);
+      specTimerRef.current = null;
+    }
+    const q = questionBufRef.current.trim() || transcriptRef.current.trim().slice(-300);
+    questionBufRef.current = "";
+    fireIfNew(q, true);
+  }, [fireIfNew]);
+
   // ---------- Mensajes Deepgram ----------
   const onDgMessage = useCallback(
     (raw: string) => {
@@ -433,10 +446,10 @@ export default function Page() {
           <span className="mono brand-title">CotorreadoAI 🦜</span>
         </div>
         <span className={`status-chip ${live ? "status-chip-live" : ""}`}>
-          {status === "idle" && "jaula cerrada"}
-          {connecting && "trayendo loro…"}
-          {live && "loro suelto"}
-          {status === "error" && "error de vuelo"}
+          {status === "idle" && "en espera"}
+          {connecting && "conectando…"}
+          {live && "en vivo"}
+          {status === "error" && "error"}
         </span>
       </header>
 
@@ -547,15 +560,25 @@ export default function Page() {
             onClick={() => setTab("answer")}
             style={{ alignItems: "center", justifyContent: "center", padding: "10px" }}
           >
-            Sugerencias 🦜
+            Respuestas
           </button>
           <button
             className={`btn-select ${tab === "transcript" ? "btn-select-active" : ""}`}
             onClick={() => setTab("transcript")}
             style={{ alignItems: "center", justifyContent: "center", padding: "10px" }}
           >
-            Transcripción 📝
+            Transcripción
           </button>
+        </div>
+      )}
+
+      {/* Escucha en vivo: última línea transcripta, siempre visible en la tab de respuestas */}
+      {live && tab === "answer" && (
+        <div className="listen-bar mono">
+          <span className="listen-dot" />
+          <span className="listen-text">
+            {lines.length ? lines[lines.length - 1].text : "escuchando…"}
+          </span>
         </div>
       )}
 
@@ -571,18 +594,20 @@ export default function Page() {
             <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
                 <p className="placeholder" style={{ fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", padding: "8px" }}>
-                  🦜 Silencio en la selva... Cuando el entrevistador termine de preguntar, tu respuesta sugerida aparecerá acá en ~1-2s.
+                  {live
+                    ? "Cuando el entrevistador termine de preguntar, tu respuesta aparece acá en ~1-2s."
+                    : "🦜 Acá vas a ver las respuestas que el loro te sopla durante la entrevista."}
                 </p>
               ) : (
                 answers.map((a, index) => (
                   <div key={a.id} className={`answer-card ${index === 0 ? "answer-card-first" : ""}`}>
                     <div className="mono answer-card-question">
-                      ❓ {a.question}
+                      {a.question}
                     </div>
                     <div className="answer-card-text">
                       {a.text || (
                         <span className="mono answer-card-loading">
-                          el loro está cotorreando respuestas… 🦜
+                          generando…
                         </span>
                       )}
                     </div>
@@ -598,7 +623,7 @@ export default function Page() {
             <div ref={scrollT} className="transcript-container">
               {lines.length === 0 ? (
                 <p className="placeholder" style={{ fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", padding: "8px" }}>
-                  El loro está escuchando lo que dicen... 🦜
+                  Escuchando… la transcripción aparece acá.
                 </p>
               ) : (
                 lines.map((l) => (
@@ -620,12 +645,17 @@ export default function Page() {
       <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
         {!live ? (
           <button onClick={start} disabled={connecting} className="mono btn-action btn-primary">
-            {connecting ? "Trayendo al loro... 🦜" : mode === "mic" ? "▶ Soltar loro (activar micrófono)" : "▶ Soltar loro (compartir pestaña)"}
+            {connecting ? "Conectando… 🦜" : mode === "mic" ? "▶ Soltar loro (activar micrófono)" : "▶ Soltar loro (compartir pestaña)"}
           </button>
         ) : (
-          <button onClick={stop} className="mono btn-action btn-stop">
-            ■ Guardar loro en la jaula (detener)
-          </button>
+          <div className="grid-responsive" style={{ gap: 10 }}>
+            <button onClick={answerNow} className="mono btn-action btn-primary">
+              Responder ahora
+            </button>
+            <button onClick={stop} className="mono btn-action btn-stop">
+              ■ Detener
+            </button>
+          </div>
         )}
         {!live && (
           <p className="mono btn-hint">
