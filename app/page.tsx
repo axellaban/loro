@@ -23,32 +23,6 @@ const DG_URL = `wss://api.deepgram.com/v1/listen?${DG_PARAMS}`;
 
 const LS_KEY = "copiloto:context:v1";
 
-// ---------- Endpointing semántico ----------
-// Deepgram avisa fin de turno por silencio (speech_final/UtteranceEnd), pero
-// eso tarda 500-800ms igual. Si el texto acumulado YA suena a pregunta
-// completa, disparamos antes (speculativo) y si la persona sigue hablando,
-// cancelamos y volvemos a disparar con el texto completo.
-const HANGING_WORDS = [
-  "y", "o", "pero", "que", "porque", "aunque", "si", "como", "cuando", "mientras",
-  "en", "a", "de", "del", "al", "con", "sobre", "para", "por", "sin", "entre", "hacia", "desde", "hasta",
-  "el", "la", "los", "las", "un", "una", "unos", "unas", "mi", "tu", "su",
-  "así que", "ya que", "es decir", "por ejemplo", "o sea",
-];
-const HANGING_RE = new RegExp(
-  "(^|\\s)(" + HANGING_WORDS.map((w) => w.replace(/\s+/g, "\\s+")).join("|") + ")[.,]?\\s*$",
-  "i"
-);
-const QUESTION_END_RE = /[?¿]\s*$/;
-const SPEC_DEBOUNCE_MS = 180;
-
-function looksLikeCompleteQuestion(raw: string): boolean {
-  const t = raw.trim();
-  if (t.length < 6) return false;
-  if (QUESTION_END_RE.test(t)) return true;
-  if (HANGING_RE.test(t)) return false;
-  return t.split(/\s+/).filter(Boolean).length >= 6;
-}
-
 export default function Page() {
   const [status, setStatus] = useState<Status>("idle");
   const [mode, setMode] = useState<Mode>("mic");
@@ -71,10 +45,7 @@ export default function Page() {
   const questionBufRef = useRef(""); // acumula segmentos finales hasta el fin de utterance
   const lineId = useRef(0);
   const ansId = useRef(0);
-  const specTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Turno de pregunta en curso: permite cancelar un disparo especulativo y
-  // reemplazarlo si la persona sigue hablando, reusando la misma tarjeta.
-  const turnRef = useRef<{ id: number; sentText: string; controller: AbortController | null } | null>(null);
+  const genLock = useRef(false);
 
   const scrollT = useRef<HTMLDivElement | null>(null);
   const scrollA = useRef<HTMLDivElement | null>(null);
@@ -124,18 +95,13 @@ export default function Page() {
   }, [company, role, profile]);
 
   // ---------- Generación ----------
-  // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
-  // decididos por fireIfNew). Si un fireIfNew posterior cancela este
-  // controller, el AbortError se ignora en silencio: ya hay una versión
-  // mejor en camino para la misma tarjeta.
-  const runGenerate = useCallback(
-    async (id: number, question: string, controller: AbortController) => {
-      setAnswers((prev) => {
-        const card: Answer = { id, question, text: "", done: false };
-        return prev.some((a) => a.id === id)
-          ? prev.map((a) => (a.id === id ? card : a))
-          : [card, ...prev].slice(0, 20);
-      });
+  const generate = useCallback(
+    async (question: string) => {
+      const q = question.trim();
+      if (!q || q.length < 4 || genLock.current) return;
+      genLock.current = true;
+      const id = ++ansId.current;
+      setAnswers((prev) => [{ id, question: q, text: "", done: false }, ...prev].slice(0, 20));
       setTab("answer");
       try {
         const res = await fetch("/api/answer", {
@@ -146,9 +112,8 @@ export default function Page() {
             company,
             role,
             transcript: transcriptRef.current.slice(-4000),
-            question,
+            question: q,
           }),
-          signal: controller.signal,
         });
         if (!res.ok || !res.body) {
           setAnswers((prev) =>
@@ -166,64 +131,22 @@ export default function Page() {
           setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, text: acc } : a)));
         }
         setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, done: true } : a)));
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
+      } catch {
         setAnswers((prev) =>
           prev.map((a) => (a.id === id ? { ...a, text: "· Error de red.", done: true } : a))
         );
+      } finally {
+        genLock.current = false;
       }
     },
     [profile, company, role]
   );
 
-  // Decide si vale la pena disparar: evita pedir dos veces lo mismo y, si el
-  // turno creció (la persona siguió hablando), cancela el request viejo y
-  // relanza con el texto completo reusando la misma tarjeta.
-  const fireIfNew = useCallback(
-    (question: string, closeTurn: boolean) => {
-      const q = question.trim();
-      const turn = turnRef.current;
-      if (!q || q.length < 4) {
-        if (closeTurn) turnRef.current = null;
-        return;
-      }
-      if (turn && turn.sentText === q) {
-        if (closeTurn) turnRef.current = null;
-        return; // ya cubierto por un disparo especulativo previo idéntico
-      }
-      turn?.controller?.abort();
-
-      const id = turn ? turn.id : ++ansId.current;
-      const controller = new AbortController();
-      turnRef.current = closeTurn ? null : { id, sentText: q, controller };
-      runGenerate(id, q, controller);
-    },
-    [runGenerate]
-  );
-
-  // Reevalúa el buffer acumulado cada vez que llega texto nuevo: si ya
-  // "suena completo", programa un disparo especulativo tras un debounce
-  // corto (para no disparar en cada micro-fragmento).
-  const scheduleSpeculative = useCallback(() => {
-    if (specTimerRef.current) clearTimeout(specTimerRef.current);
-    specTimerRef.current = null;
-    const buf = questionBufRef.current;
-    if (!looksLikeCompleteQuestion(buf)) return;
-    specTimerRef.current = setTimeout(() => {
-      specTimerRef.current = null;
-      fireIfNew(questionBufRef.current, false);
-    }, SPEC_DEBOUNCE_MS);
-  }, [fireIfNew]);
-
   const flushQuestion = useCallback(() => {
-    if (specTimerRef.current) {
-      clearTimeout(specTimerRef.current);
-      specTimerRef.current = null;
-    }
-    const q = questionBufRef.current;
+    const q = questionBufRef.current.trim();
     questionBufRef.current = "";
-    fireIfNew(q, true);
-  }, [fireIfNew]);
+    if (q) generate(q);
+  }, [generate]);
 
   // ---------- Mensajes Deepgram ----------
   const onDgMessage = useCallback(
@@ -260,13 +183,11 @@ export default function Page() {
       if (isFinal) {
         transcriptRef.current += " " + text;
         questionBufRef.current += " " + text;
-        // speech_final = Deepgram detectó fin de frase por endpointing (silencio).
-        // Si no, evaluamos si el texto ya "suena completo" para disparar antes.
+        // speech_final = Deepgram detectó fin de frase por endpointing.
         if (msg.speech_final) flushQuestion();
-        else scheduleSpeculative();
       }
     },
-    [flushQuestion, scheduleSpeculative]
+    [flushQuestion]
   );
 
   // ---------- Captura ----------
@@ -294,12 +215,6 @@ export default function Page() {
     setError("");
     setStatus("connecting");
     questionBufRef.current = "";
-    if (specTimerRef.current) {
-      clearTimeout(specTimerRef.current);
-      specTimerRef.current = null;
-    }
-    turnRef.current?.controller?.abort();
-    turnRef.current = null;
     try {
       const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
       if (!tokRes.ok) {
@@ -363,10 +278,6 @@ export default function Page() {
   const cleanup = useCallback(() => {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     keepAliveRef.current = null;
-    if (specTimerRef.current) clearTimeout(specTimerRef.current);
-    specTimerRef.current = null;
-    turnRef.current?.controller?.abort();
-    turnRef.current = null;
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN)
         wsRef.current.send(JSON.stringify({ type: "CloseStream" }));
@@ -420,14 +331,15 @@ export default function Page() {
   const connecting = status === "connecting";
 
   return (
-    <main className="app-container">
-      <header className="header">
-        <div className="brand">
-          <span style={{ fontSize: 24 }}>🦜</span>
-          <span className="brand-title">CotorreadoAI</span>
-          <span style={{ color: "var(--loro-cyan)", fontSize: 13, fontWeight: "600" }}>/es</span>
+    <main style={S.main}>
+      <header style={S.header}>
+        <div style={S.brand}>
+          <span style={{ ...S.dot, ...(live ? S.dotLive : {}) }} />
+          <span className="mono" style={S.brandText}>
+            copiloto<span style={{ color: "var(--ink-faint)" }}>/es</span>
+          </span>
         </div>
-        <span className={`mono status-chip ${live ? "status-chip-live" : ""}`}>
+        <span className="mono" style={S.statusChip(status)}>
           {status === "idle" && "en espera"}
           {connecting && "conectando…"}
           {live && "en vivo"}
@@ -436,144 +348,142 @@ export default function Page() {
       </header>
 
       {!live && (
-        <p className="mono tagline">
-          El loro tropical que te sopla las respuestas en vivo para tus entrevistas.
+        <p className="mono" style={S.tagline}>
+          Escucha la entrevista y te sugiere qué responder, en vivo.
         </p>
       )}
 
       {/* Selector de modo */}
       {!live && (
-        <div className="grid-responsive">
+        <div style={{ ...S.modeRow, ...(isIOS ? S.modeRowSingle : {}) }}>
           <button
-            className={`mono btn-select ${mode === "mic" ? "btn-select-active" : ""}`}
+            className="mono"
+            style={{ ...S.modeBtn, ...(mode === "mic" ? S.modeOn : {}) }}
             onClick={() => setMode("mic")}
             disabled={connecting}
           >
-            🎙️ Micrófono
-            <span className="btn-select-sub">celular escuchando la sala</span>
+            🎙 Micrófono
+            <span style={S.modeSub}>celular escuchando la sala</span>
           </button>
           {!isIOS && (
             <button
-              className={`mono btn-select ${mode === "tab" ? "btn-select-active" : ""}`}
+              className="mono"
+              style={{ ...S.modeBtn, ...(mode === "tab" ? S.modeOn : {}) }}
               onClick={() => setMode("tab")}
               disabled={connecting}
             >
-              🖥️ Pestaña
-              <span className="btn-select-sub">audio directo del Meet · desktop</span>
+              🖥 Pestaña
+              <span style={S.modeSub}>audio directo del Meet · desktop</span>
             </button>
           )}
         </div>
       )}
       {!live && isIOS && (
-        <p className="mono form-hint" style={{ color: "var(--loro-red)" }}>
+        <p className="mono" style={S.contextHint}>
           📱 En iPhone solo está disponible el modo micrófono — Safari no permite compartir el audio de una pestaña.
         </p>
       )}
 
       {error && (
-        <div className="mono" style={{
-          fontSize: "13px",
-          color: "#fda4af",
-          background: "rgba(244, 63, 94, 0.08)",
-          border: "1px solid rgba(244, 63, 94, 0.3)",
-          borderRadius: "8px",
-          padding: "12px 14px",
-          lineHeight: 1.5,
-        }}>
-          ⚠️ {error}
+        <div className="mono" style={S.errorBar}>
+          {error}
         </div>
       )}
 
       {/* Contexto de la entrevista (solo antes de arrancar) */}
       {!live && (
-        <div className="panel">
-          <label className="mono form-label">
-            Contexto de la entrevista
+        <div style={S.panel}>
+          <label className="mono" style={S.label}>
+            contexto de la entrevista
           </label>
-          <div className="grid-responsive">
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label className="mono form-mini-label">Empresa</label>
+          <div style={S.contextRow}>
+            <div style={S.contextField}>
+              <label className="mono" style={S.miniLabel}>
+                empresa
+              </label>
               <input
-                className="form-input"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Ej: Mercado Libre"
+                style={S.input}
                 disabled={connecting}
               />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label className="mono form-mini-label">Puesto / Rol</label>
+            <div style={S.contextField}>
+              <label className="mono" style={S.miniLabel}>
+                puesto / rol
+              </label>
               <input
-                className="form-input"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Ej: Frontend Sr."
+                style={S.input}
                 disabled={connecting}
               />
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
-            <label className="mono form-mini-label">Tu Perfil / CV</label>
-            <textarea
-              className="form-textarea"
-              value={profile}
-              onChange={(e) => setProfile(e.target.value)}
-              placeholder="Pegá tu CV, experiencia o notas. El loro se anclará en esto para no inventar nada."
-              disabled={connecting}
-            />
-          </div>
+          <label className="mono" style={{ ...S.miniLabel, marginTop: 4 }}>
+            tu perfil / cv
+          </label>
+          <textarea
+            value={profile}
+            onChange={(e) => setProfile(e.target.value)}
+            placeholder="Pegá tu CV, experiencia o notas. La respuesta se ancla en esto."
+            style={S.textarea}
+            disabled={connecting}
+          />
           {(!company.trim() || !role.trim()) && (
-            <p className="mono form-hint">
-              💡 Completá empresa y puesto para que el loro prepare respuestas mejor orientadas.
+            <p className="mono" style={S.contextHint}>
+              Completá empresa y puesto para respuestas mejor dirigidas.
             </p>
           )}
         </div>
       )}
 
-      {/* Tabs móviles / en vivo */}
+      {/* Tabs móviles */}
       {live && (
-        <div className="grid-responsive">
+        <div style={S.tabsRow}>
           <button
-            className={`mono btn-select ${tab === "answer" ? "btn-select-active" : ""}`}
-            style={{ padding: "10px", alignItems: "center", justifyContent: "center" }}
+            className="mono"
+            style={{ ...S.tabBtn, ...(tab === "answer" ? S.tabOn : {}) }}
             onClick={() => setTab("answer")}
           >
-            🪶 Respuestas sugeridas
+            Respuestas
           </button>
           <button
-            className={`mono btn-select ${tab === "transcript" ? "btn-select-active" : ""}`}
-            style={{ padding: "10px", alignItems: "center", justifyContent: "center" }}
+            className="mono"
+            style={{ ...S.tabBtn, ...(tab === "transcript" ? S.tabOn : {}) }}
             onClick={() => setTab("transcript")}
           >
-            📝 Transcripción
+            Transcripción
           </button>
         </div>
       )}
 
-      {/* Contenido principal */}
-      <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      {/* Contenido */}
+      <section style={S.content}>
         {(!live || tab === "answer") && (
-          <div className="panel" style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ ...S.panel, ...S.answerPanel }}>
             {!live && (
-              <label className="mono form-label">
-                Respuestas sugeridas por el loro
+              <label className="mono" style={S.label}>
+                respuestas sugeridas
               </label>
             )}
-            <div ref={scrollA} className="answers-container">
+            <div ref={scrollA} style={S.answerBody}>
               {answers.length === 0 ? (
-                <p className="placeholder">
-                  🦜 Silencio en la selva... Cuando el entrevistador termine de preguntar, tu respuesta sugerida aparecerá acá en ~1-2s.
+                <p style={S.placeholder}>
+                  Cuando el entrevistador termine de preguntar, tu respuesta aparece acá en ~1-2s.
                 </p>
               ) : (
-                answers.map((a, index) => (
-                  <div key={a.id} className={`answer-card ${index === 0 ? "answer-card-first" : ""}`}>
-                    <div className="mono answer-card-question">
-                      ❓ {a.question}
+                answers.map((a) => (
+                  <div key={a.id} style={S.answerCard}>
+                    <div className="mono" style={S.answerQ}>
+                      {a.question}
                     </div>
-                    <div className="answer-card-text">
+                    <div style={S.answerText}>
                       {a.text || (
-                        <span className="mono answer-card-loading">
-                          el loro está cotorreando respuestas… 🦜
+                        <span style={{ ...S.gen }} className="mono">
+                          generando…
                         </span>
                       )}
                     </div>
@@ -585,16 +495,15 @@ export default function Page() {
         )}
 
         {live && tab === "transcript" && (
-          <div className="panel" style={{ flex: 1, minHeight: 0 }}>
-            <div ref={scrollT} className="transcript-container">
+          <div style={{ ...S.panel, ...S.answerPanel }}>
+            <div ref={scrollT} style={S.transcript}>
               {lines.length === 0 ? (
-                <p className="placeholder">El loro está escuchando lo que dicen... 🦜</p>
+                <p style={S.placeholder}>La transcripción aparece acá.</p>
               ) : (
                 lines.map((l) => (
                   <p
                     key={l.id}
-                    className="transcript-line"
-                    style={{ color: l.final ? "var(--ink)" : "var(--ink-dim)" }}
+                    style={{ ...S.line, color: l.final ? "var(--ink)" : "var(--ink-dim)" }}
                   >
                     {l.text}
                   </p>
@@ -606,18 +515,18 @@ export default function Page() {
       </section>
 
       {/* Footer */}
-      <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
+      <footer style={S.footer}>
         {!live ? (
-          <button onClick={start} disabled={connecting} className="mono btn-action btn-primary">
-            {connecting ? "Trayendo al loro... 🦜" : mode === "mic" ? "▶ Soltar loro (activar micrófono)" : "▶ Soltar loro (compartir pestaña)"}
+          <button onClick={start} disabled={connecting} style={S.primaryBtn} className="mono">
+            {connecting ? "conectando…" : mode === "mic" ? "▶ activar micrófono" : "▶ compartir pestaña"}
           </button>
         ) : (
-          <button onClick={stop} className="mono btn-action btn-stop">
-            ■ Guardar loro en la jaula (detener)
+          <button onClick={stop} style={S.stopBtn} className="mono">
+            ■ detener
           </button>
         )}
         {!live && (
-          <p className="mono btn-hint">
+          <p className="mono" style={S.hint}>
             {mode === "mic"
               ? "Apoyá el celular cerca de los parlantes de la notebook."
               : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
@@ -627,3 +536,159 @@ export default function Page() {
     </main>
   );
 }
+
+const S: Record<string, any> = {
+  main: {
+    minHeight: "100dvh",
+    display: "flex",
+    flexDirection: "column",
+    padding:
+      "calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom))",
+    gap: 12,
+    maxWidth: 760,
+    margin: "0 auto",
+  },
+  header: { display: "flex", alignItems: "center", justifyContent: "space-between" },
+  brand: { display: "flex", alignItems: "center", gap: 9 },
+  brandText: { fontSize: 15, letterSpacing: "-0.02em", fontWeight: 600 },
+  tagline: { fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.4, marginTop: -4 },
+  dot: { width: 9, height: 9, borderRadius: "50%", background: "var(--ink-faint)" },
+  dotLive: { background: "var(--live)", boxShadow: "0 0 0 4px rgba(240,82,75,0.15)", animation: "pulse 1.6s ease-in-out infinite" },
+  statusChip: (s: Status) => ({
+    fontSize: 11.5,
+    padding: "5px 11px",
+    borderRadius: 999,
+    border: "1px solid var(--line)",
+    color: s === "live" ? "var(--accent)" : s === "error" ? "var(--live)" : "var(--ink-dim)",
+    background: "var(--panel)",
+  }),
+  modeRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+  modeRowSingle: { gridTemplateColumns: "1fr" },
+  modeBtn: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    alignItems: "flex-start",
+    background: "var(--panel)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius)",
+    padding: "12px 13px",
+    color: "var(--ink-dim)",
+    fontSize: 14,
+    fontWeight: 600,
+    textAlign: "left",
+  },
+  modeOn: { borderColor: "var(--accent)", color: "var(--ink)", background: "var(--panel-2)" },
+  modeSub: { fontSize: 10.5, color: "var(--ink-faint)", fontWeight: 400, letterSpacing: 0 },
+  errorBar: {
+    fontSize: 12.5,
+    color: "#ffb4b0",
+    background: "rgba(240,82,75,0.08)",
+    border: "1px solid rgba(240,82,75,0.3)",
+    borderRadius: 8,
+    padding: "10px 13px",
+    lineHeight: 1.4,
+  },
+  panel: {
+    background: "var(--panel)",
+    border: "1px solid var(--line)",
+    borderRadius: "var(--radius)",
+    padding: 13,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  label: {
+    fontSize: 10.5,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "var(--ink-faint)",
+  },
+  textarea: {
+    resize: "none",
+    height: 110,
+    background: "var(--panel-2)",
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    color: "var(--ink)",
+    padding: 10,
+    fontSize: 16,
+    lineHeight: 1.5,
+    outline: "none",
+  },
+  contextRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+  contextField: { display: "flex", flexDirection: "column", gap: 4 },
+  miniLabel: {
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: "var(--ink-faint)",
+  },
+  input: {
+    background: "var(--panel-2)",
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    color: "var(--ink)",
+    padding: "9px 10px",
+    fontSize: 16,
+    outline: "none",
+    width: "100%",
+  },
+  contextHint: { fontSize: 11, color: "var(--ink-faint)", lineHeight: 1.4 },
+  tabsRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+  tabBtn: {
+    background: "var(--panel)",
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    padding: "9px",
+    color: "var(--ink-dim)",
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  tabOn: { borderColor: "var(--accent)", color: "var(--ink)", background: "var(--panel-2)" },
+  content: { flex: 1, minHeight: 0, display: "flex" },
+  answerPanel: { flex: 1, minHeight: 0 },
+  answerBody: {
+    flex: 1,
+    minHeight: 220,
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+  answerCard: {
+    background: "var(--panel-2)",
+    border: "1px solid var(--accent-dim)",
+    borderRadius: 8,
+    padding: 12,
+  },
+  answerQ: { fontSize: 11, color: "var(--ink-faint)", marginBottom: 7, lineHeight: 1.35 },
+  answerText: { fontSize: 16.5, lineHeight: 1.65, whiteSpace: "pre-wrap", color: "var(--ink)" },
+  gen: { fontSize: 12, color: "var(--accent)" },
+  transcript: { flex: 1, minHeight: 220, overflowY: "auto", WebkitOverflowScrolling: "touch" },
+  line: { fontSize: 14.5, lineHeight: 1.55, marginBottom: 6 },
+  placeholder: { fontSize: 13, color: "var(--ink-faint)", lineHeight: 1.5, padding: 6 },
+  footer: { display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0 },
+  primaryBtn: {
+    background: "var(--accent)",
+    color: "#08160d",
+    border: "none",
+    borderRadius: 10,
+    padding: "15px",
+    fontSize: 15,
+    fontWeight: 800,
+    width: "100%",
+  },
+  stopBtn: {
+    background: "transparent",
+    color: "var(--live)",
+    border: "1px solid var(--live)",
+    borderRadius: 10,
+    padding: "15px",
+    fontSize: 15,
+    fontWeight: 800,
+    width: "100%",
+  },
+  hint: { fontSize: 11.5, color: "var(--ink-faint)", textAlign: "center", lineHeight: 1.4 },
+};

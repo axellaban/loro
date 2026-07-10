@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CotorreadoAI 🦜",
-  description: "El loro que te sopla las respuestas en vivo para tus entrevistas",
+  title: "Copiloto en vivo",
+  description: "Asistente de respuestas en tiempo real para llamadas",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "CotorreadoAI",
+    title: "Copiloto",
   },
 };
 
@@ -16,7 +16,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#040d0a",
+  themeColor: "#0c0d10",
 };
 
 export default function RootLayout({
@@ -30,4 +30,3 @@ export default function RootLayout({
     </html>
   );
 }
-
