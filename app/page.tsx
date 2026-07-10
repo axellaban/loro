@@ -251,13 +251,17 @@ export default function Page() {
         }, 7000);
       };
       ws.onmessage = (e) => onDgMessage(e.data);
-      ws.onerror = () => {
-        setError("Error en la conexión con Deepgram.");
-        setStatus("error");
+      ws.onerror = (err) => {
+        console.error("Deepgram WebSocket error:", err);
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         cleanup();
-        setStatus((s) => (s === "error" ? s : "idle"));
+        if (event.code !== 1000 && event.code !== 1001) {
+          setError(`Conexión cerrada por Deepgram (Código ${event.code}): ${event.reason || "Revisa tus credenciales o saldo en Deepgram"}`);
+          setStatus("error");
+        } else {
+          setStatus((s) => (s === "error" ? s : "idle"));
+        }
       };
 
       stream.getAudioTracks()[0].onended = () => stop();
