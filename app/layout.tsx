@@ -4,12 +4,18 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Copiloto en vivo",
   description: "Asistente de respuestas en tiempo real para llamadas",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Copiloto",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
   themeColor: "#0c0d10",
 };
 

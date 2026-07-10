@@ -50,6 +50,33 @@ export default function Page() {
   const scrollT = useRef<HTMLDivElement | null>(null);
   const scrollA = useRef<HTMLDivElement | null>(null);
 
+  // ---------- Detección iOS/Safari ----------
+  // iOS Safari no soporta getDisplayMedia (captura de pestaña): solo mic.
+  const [isIOS, setIsIOS] = useState(false);
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+    const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    setIsIOS(iOS);
+    if (iOS) setMode("mic");
+  }, []);
+
+  // iOS suspende el AudioContext al bloquear pantalla o cambiar de app.
+  // Al volver, lo reactivamos y reintentamos el wake lock.
+  useEffect(() => {
+    const onResume = () => {
+      if (document.visibilityState !== "visible") return;
+      if (audioCtxRef.current?.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
+  }, []);
+
   // ---------- Contexto persistido (empresa / puesto / perfil) ----------
   useEffect(() => {
     try {
@@ -279,6 +306,20 @@ export default function Page() {
   }, [cleanup]);
 
   useEffect(() => () => cleanup(), [cleanup]);
+
+  // Re-adquiere el wake lock al volver a la app: iOS lo libera solo al perder foco.
+  useEffect(() => {
+    const reacquire = async () => {
+      if (document.visibilityState !== "visible" || status !== "live" || wakeLockRef.current) return;
+      try {
+        // @ts-ignore
+        if (navigator.wakeLock) wakeLockRef.current = await navigator.wakeLock.request("screen");
+      } catch {}
+    };
+    document.addEventListener("visibilitychange", reacquire);
+    return () => document.removeEventListener("visibilitychange", reacquire);
+  }, [status]);
+
   useEffect(() => {
     scrollT.current?.scrollTo({ top: scrollT.current.scrollHeight });
   }, [lines]);
@@ -306,9 +347,15 @@ export default function Page() {
         </span>
       </header>
 
+      {!live && (
+        <p className="mono" style={S.tagline}>
+          Escucha la entrevista y te sugiere qué responder, en vivo.
+        </p>
+      )}
+
       {/* Selector de modo */}
       {!live && (
-        <div style={S.modeRow}>
+        <div style={{ ...S.modeRow, ...(isIOS ? S.modeRowSingle : {}) }}>
           <button
             className="mono"
             style={{ ...S.modeBtn, ...(mode === "mic" ? S.modeOn : {}) }}
@@ -318,16 +365,23 @@ export default function Page() {
             🎙 Micrófono
             <span style={S.modeSub}>celular escuchando la sala</span>
           </button>
-          <button
-            className="mono"
-            style={{ ...S.modeBtn, ...(mode === "tab" ? S.modeOn : {}) }}
-            onClick={() => setMode("tab")}
-            disabled={connecting}
-          >
-            🖥 Pestaña
-            <span style={S.modeSub}>audio directo del Meet · desktop</span>
-          </button>
+          {!isIOS && (
+            <button
+              className="mono"
+              style={{ ...S.modeBtn, ...(mode === "tab" ? S.modeOn : {}) }}
+              onClick={() => setMode("tab")}
+              disabled={connecting}
+            >
+              🖥 Pestaña
+              <span style={S.modeSub}>audio directo del Meet · desktop</span>
+            </button>
+          )}
         </div>
+      )}
+      {!live && isIOS && (
+        <p className="mono" style={S.contextHint}>
+          📱 En iPhone solo está disponible el modo micrófono — Safari no permite compartir el audio de una pestaña.
+        </p>
       )}
 
       {error && (
@@ -488,7 +542,8 @@ const S: Record<string, any> = {
     minHeight: "100dvh",
     display: "flex",
     flexDirection: "column",
-    padding: "14px 14px calc(14px + env(safe-area-inset-bottom))",
+    padding:
+      "calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom))",
     gap: 12,
     maxWidth: 760,
     margin: "0 auto",
@@ -496,6 +551,7 @@ const S: Record<string, any> = {
   header: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   brand: { display: "flex", alignItems: "center", gap: 9 },
   brandText: { fontSize: 15, letterSpacing: "-0.02em", fontWeight: 600 },
+  tagline: { fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.4, marginTop: -4 },
   dot: { width: 9, height: 9, borderRadius: "50%", background: "var(--ink-faint)" },
   dotLive: { background: "var(--live)", boxShadow: "0 0 0 4px rgba(240,82,75,0.15)", animation: "pulse 1.6s ease-in-out infinite" },
   statusChip: (s: Status) => ({
@@ -507,6 +563,7 @@ const S: Record<string, any> = {
     background: "var(--panel)",
   }),
   modeRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+  modeRowSingle: { gridTemplateColumns: "1fr" },
   modeBtn: {
     display: "flex",
     flexDirection: "column",
@@ -555,7 +612,7 @@ const S: Record<string, any> = {
     borderRadius: 8,
     color: "var(--ink)",
     padding: 10,
-    fontSize: 14,
+    fontSize: 16,
     lineHeight: 1.5,
     outline: "none",
   },
@@ -573,7 +630,7 @@ const S: Record<string, any> = {
     borderRadius: 8,
     color: "var(--ink)",
     padding: "9px 10px",
-    fontSize: 14,
+    fontSize: 16,
     outline: "none",
     width: "100%",
   },
@@ -591,7 +648,15 @@ const S: Record<string, any> = {
   tabOn: { borderColor: "var(--accent)", color: "var(--ink)", background: "var(--panel-2)" },
   content: { flex: 1, minHeight: 0, display: "flex" },
   answerPanel: { flex: 1, minHeight: 0 },
-  answerBody: { flex: 1, minHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 },
+  answerBody: {
+    flex: 1,
+    minHeight: 220,
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
   answerCard: {
     background: "var(--panel-2)",
     border: "1px solid var(--accent-dim)",
@@ -599,9 +664,9 @@ const S: Record<string, any> = {
     padding: 12,
   },
   answerQ: { fontSize: 11, color: "var(--ink-faint)", marginBottom: 7, lineHeight: 1.35 },
-  answerText: { fontSize: 15, lineHeight: 1.6, whiteSpace: "pre-wrap", color: "var(--ink)" },
+  answerText: { fontSize: 16.5, lineHeight: 1.65, whiteSpace: "pre-wrap", color: "var(--ink)" },
   gen: { fontSize: 12, color: "var(--accent)" },
-  transcript: { flex: 1, minHeight: 220, overflowY: "auto" },
+  transcript: { flex: 1, minHeight: 220, overflowY: "auto", WebkitOverflowScrolling: "touch" },
   line: { fontSize: 14.5, lineHeight: 1.55, marginBottom: 6 },
   placeholder: { fontSize: 13, color: "var(--ink-faint)", lineHeight: 1.5, padding: 6 },
   footer: { display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0 },
