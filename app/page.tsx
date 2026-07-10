@@ -23,6 +23,32 @@ const DG_URL = `wss://api.deepgram.com/v1/listen?${DG_PARAMS}`;
 
 const LS_KEY = "copiloto:context:v1";
 
+// ---------- Endpointing semántico ----------
+// Deepgram avisa fin de turno por silencio (speech_final/UtteranceEnd), pero
+// eso tarda 500-800ms igual. Si el texto acumulado YA suena a pregunta
+// completa, disparamos antes (speculativo) y si la persona sigue hablando,
+// cancelamos y volvemos a disparar con el texto completo.
+const HANGING_WORDS = [
+  "y", "o", "pero", "que", "porque", "aunque", "si", "como", "cuando", "mientras",
+  "en", "a", "de", "del", "al", "con", "sobre", "para", "por", "sin", "entre", "hacia", "desde", "hasta",
+  "el", "la", "los", "las", "un", "una", "unos", "unas", "mi", "tu", "su",
+  "así que", "ya que", "es decir", "por ejemplo", "o sea",
+];
+const HANGING_RE = new RegExp(
+  "(^|\\s)(" + HANGING_WORDS.map((w) => w.replace(/\s+/g, "\\s+")).join("|") + ")[.,]?\\s*$",
+  "i"
+);
+const QUESTION_END_RE = /[?¿]\s*$/;
+const SPEC_DEBOUNCE_MS = 180;
+
+function looksLikeCompleteQuestion(raw: string): boolean {
+  const t = raw.trim();
+  if (t.length < 6) return false;
+  if (QUESTION_END_RE.test(t)) return true;
+  if (HANGING_RE.test(t)) return false;
+  return t.split(/\s+/).filter(Boolean).length >= 6;
+}
+
 export default function Page() {
   const [status, setStatus] = useState<Status>("idle");
   const [mode, setMode] = useState<Mode>("mic");
@@ -45,7 +71,10 @@ export default function Page() {
   const questionBufRef = useRef(""); // acumula segmentos finales hasta el fin de utterance
   const lineId = useRef(0);
   const ansId = useRef(0);
-  const genLock = useRef(false);
+  const specTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Turno de pregunta en curso: permite cancelar un disparo especulativo y
+  // reemplazarlo si la persona sigue hablando, reusando la misma tarjeta.
+  const turnRef = useRef<{ id: number; sentText: string; controller: AbortController | null } | null>(null);
 
   const scrollT = useRef<HTMLDivElement | null>(null);
   const scrollA = useRef<HTMLDivElement | null>(null);
@@ -95,13 +124,18 @@ export default function Page() {
   }, [company, role, profile]);
 
   // ---------- Generación ----------
-  const generate = useCallback(
-    async (question: string) => {
-      const q = question.trim();
-      if (!q || q.length < 4 || genLock.current) return;
-      genLock.current = true;
-      const id = ++ansId.current;
-      setAnswers((prev) => [{ id, question: q, text: "", done: false }, ...prev].slice(0, 20));
+  // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
+  // decididos por fireIfNew). Si un fireIfNew posterior cancela este
+  // controller, el AbortError se ignora en silencio: ya hay una versión
+  // mejor en camino para la misma tarjeta.
+  const runGenerate = useCallback(
+    async (id: number, question: string, controller: AbortController) => {
+      setAnswers((prev) => {
+        const card: Answer = { id, question, text: "", done: false };
+        return prev.some((a) => a.id === id)
+          ? prev.map((a) => (a.id === id ? card : a))
+          : [card, ...prev].slice(0, 20);
+      });
       setTab("answer");
       try {
         const res = await fetch("/api/answer", {
@@ -112,8 +146,9 @@ export default function Page() {
             company,
             role,
             transcript: transcriptRef.current.slice(-4000),
-            question: q,
+            question,
           }),
+          signal: controller.signal,
         });
         if (!res.ok || !res.body) {
           setAnswers((prev) =>
@@ -131,22 +166,64 @@ export default function Page() {
           setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, text: acc } : a)));
         }
         setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, done: true } : a)));
-      } catch {
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
         setAnswers((prev) =>
           prev.map((a) => (a.id === id ? { ...a, text: "· Error de red.", done: true } : a))
         );
-      } finally {
-        genLock.current = false;
       }
     },
     [profile, company, role]
   );
 
+  // Decide si vale la pena disparar: evita pedir dos veces lo mismo y, si el
+  // turno creció (la persona siguió hablando), cancela el request viejo y
+  // relanza con el texto completo reusando la misma tarjeta.
+  const fireIfNew = useCallback(
+    (question: string, closeTurn: boolean) => {
+      const q = question.trim();
+      const turn = turnRef.current;
+      if (!q || q.length < 4) {
+        if (closeTurn) turnRef.current = null;
+        return;
+      }
+      if (turn && turn.sentText === q) {
+        if (closeTurn) turnRef.current = null;
+        return; // ya cubierto por un disparo especulativo previo idéntico
+      }
+      turn?.controller?.abort();
+
+      const id = turn ? turn.id : ++ansId.current;
+      const controller = new AbortController();
+      turnRef.current = closeTurn ? null : { id, sentText: q, controller };
+      runGenerate(id, q, controller);
+    },
+    [runGenerate]
+  );
+
+  // Reevalúa el buffer acumulado cada vez que llega texto nuevo: si ya
+  // "suena completo", programa un disparo especulativo tras un debounce
+  // corto (para no disparar en cada micro-fragmento).
+  const scheduleSpeculative = useCallback(() => {
+    if (specTimerRef.current) clearTimeout(specTimerRef.current);
+    specTimerRef.current = null;
+    const buf = questionBufRef.current;
+    if (!looksLikeCompleteQuestion(buf)) return;
+    specTimerRef.current = setTimeout(() => {
+      specTimerRef.current = null;
+      fireIfNew(questionBufRef.current, false);
+    }, SPEC_DEBOUNCE_MS);
+  }, [fireIfNew]);
+
   const flushQuestion = useCallback(() => {
-    const q = questionBufRef.current.trim();
+    if (specTimerRef.current) {
+      clearTimeout(specTimerRef.current);
+      specTimerRef.current = null;
+    }
+    const q = questionBufRef.current;
     questionBufRef.current = "";
-    if (q) generate(q);
-  }, [generate]);
+    fireIfNew(q, true);
+  }, [fireIfNew]);
 
   // ---------- Mensajes Deepgram ----------
   const onDgMessage = useCallback(
@@ -183,11 +260,13 @@ export default function Page() {
       if (isFinal) {
         transcriptRef.current += " " + text;
         questionBufRef.current += " " + text;
-        // speech_final = Deepgram detectó fin de frase por endpointing.
+        // speech_final = Deepgram detectó fin de frase por endpointing (silencio).
+        // Si no, evaluamos si el texto ya "suena completo" para disparar antes.
         if (msg.speech_final) flushQuestion();
+        else scheduleSpeculative();
       }
     },
-    [flushQuestion]
+    [flushQuestion, scheduleSpeculative]
   );
 
   // ---------- Captura ----------
@@ -215,6 +294,12 @@ export default function Page() {
     setError("");
     setStatus("connecting");
     questionBufRef.current = "";
+    if (specTimerRef.current) {
+      clearTimeout(specTimerRef.current);
+      specTimerRef.current = null;
+    }
+    turnRef.current?.controller?.abort();
+    turnRef.current = null;
     try {
       const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
       if (!tokRes.ok) {
@@ -278,6 +363,10 @@ export default function Page() {
   const cleanup = useCallback(() => {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     keepAliveRef.current = null;
+    if (specTimerRef.current) clearTimeout(specTimerRef.current);
+    specTimerRef.current = null;
+    turnRef.current?.controller?.abort();
+    turnRef.current = null;
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN)
         wsRef.current.send(JSON.stringify({ type: "CloseStream" }));
