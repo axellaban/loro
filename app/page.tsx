@@ -69,6 +69,15 @@ export default function Page() {
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const wakeLockRef = useRef<any>(null);
   const keepAliveRef = useRef<any>(null);
+  // Reconexión: distingue cierres pedidos por el usuario (stop/cleanup) de
+  // caídas inesperadas del WS en medio de la entrevista.
+  const intentionalCloseRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // El presupuesto de reintentos solo se renueva si la conexión se mantuvo
+  // estable un rato — así una conexión que "flapea" (abre y cae al instante)
+  // igual agota los 3 intentos y se rinde, en vez de reconectar para siempre.
+  const stableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const transcriptRef = useRef("");
   const questionBufRef = useRef(""); // acumula segmentos finales hasta el fin de utterance
@@ -310,6 +319,8 @@ export default function Page() {
     setError("");
     setStatus("connecting");
     questionBufRef.current = "";
+    intentionalCloseRef.current = false;
+    reconnectAttemptsRef.current = 0;
     if (specTimerRef.current) {
       clearTimeout(specTimerRef.current);
       specTimerRef.current = null;
@@ -317,13 +328,6 @@ export default function Page() {
     turnRef.current?.controller?.abort();
     turnRef.current = null;
     try {
-      const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
-      if (!tokRes.ok) {
-        const e = await tokRes.json().catch(() => ({}));
-        throw new Error(e.error || "No se pudo obtener token de Deepgram.");
-      }
-      const { token } = await tokRes.json();
-
       const stream = await acquireStream(mode);
       streamRef.current = stream;
 
@@ -334,36 +338,91 @@ export default function Page() {
       const source = audioCtx.createMediaStreamSource(stream);
       const worklet = new AudioWorkletNode(audioCtx, "pcm-worklet");
       workletRef.current = worklet;
-
-      const ws = new WebSocket(DG_URL, ["token", token]);
-      ws.binaryType = "arraybuffer";
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setStatus("live");
-        worklet.port.onmessage = (e) => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(e.data);
-        };
-        source.connect(worklet);
-        // Keepalive: Deepgram cierra tras ~10s de silencio sin datos.
-        keepAliveRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN)
-            ws.send(JSON.stringify({ type: "KeepAlive" }));
-        }, 7000);
+      // El handler apunta siempre al socket vigente vía wsRef: tras una
+      // reconexión el audio fluye solo al socket nuevo, sin re-cablear nada.
+      worklet.port.onmessage = (e) => {
+        const w = wsRef.current;
+        if (w && w.readyState === WebSocket.OPEN) w.send(e.data);
       };
-      ws.onmessage = (e) => onDgMessage(e.data);
-      ws.onerror = (err) => {
-        console.error("Deepgram WebSocket error:", err);
-      };
-      ws.onclose = (event) => {
-        cleanup();
-        if (event.code !== 1000 && event.code !== 1001) {
-          setError(`Conexión cerrada por Deepgram (Código ${event.code}): ${event.reason || "Revisa tus credenciales o saldo en Deepgram"}`);
-          setStatus("error");
-        } else {
-          setStatus((s) => (s === "error" ? s : "idle"));
+      source.connect(worklet);
+
+      // Abre (o reabre) el WebSocket contra Deepgram reusando el mismo
+      // stream/worklet: en una reconexión NO se vuelve a pedir permiso de
+      // micrófono ni de pestaña, solo se reconstruye el socket.
+      const connectWs = async () => {
+        const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
+        if (!tokRes.ok) {
+          const e = await tokRes.json().catch(() => ({}));
+          throw new Error(e.error || "No se pudo obtener token de Deepgram.");
         }
+        const { token } = await tokRes.json();
+
+        const ws = new WebSocket(DG_URL, ["token", token]);
+        ws.binaryType = "arraybuffer";
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          setError("");
+          setStatus("live");
+          // Renueva el presupuesto de reintentos solo si la conexión aguanta
+          // 10s estable (no apenas abre): evita el loop infinito de flapping.
+          if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
+          stableTimerRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current = 0;
+          }, 10000);
+          // Keepalive: Deepgram cierra tras ~10s de silencio sin datos.
+          if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+          keepAliveRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN)
+              ws.send(JSON.stringify({ type: "KeepAlive" }));
+          }, 7000);
+        };
+        ws.onmessage = (e) => onDgMessage(e.data);
+        ws.onerror = (err) => {
+          console.error("Deepgram WebSocket error:", err);
+        };
+        ws.onclose = (event) => {
+          if (stableTimerRef.current) {
+            clearTimeout(stableTimerRef.current);
+            stableTimerRef.current = null;
+          }
+          if (intentionalCloseRef.current) return; // stop()/cleanup() maneja el estado
+          if (scheduleReconnect()) return;
+          cleanup();
+          if (event.code !== 1000 && event.code !== 1001) {
+            setError(`Conexión cerrada por Deepgram (Código ${event.code}): ${event.reason || "Revisa tus credenciales o saldo en Deepgram"}`);
+            setStatus("error");
+          } else {
+            setStatus((s) => (s === "error" ? s : "idle"));
+          }
+        };
       };
+
+      // Caída inesperada en medio de la sesión: reintenta hasta 3 veces con
+      // backoff corto, mientras el audio siga vivo. Devuelve false si ya no
+      // corresponde reintentar (el llamador decide el estado final).
+      const scheduleReconnect = (): boolean => {
+        const trackAlive = stream.getAudioTracks()[0]?.readyState === "live";
+        if (intentionalCloseRef.current || !trackAlive || reconnectAttemptsRef.current >= 3) return false;
+        reconnectAttemptsRef.current += 1;
+        setError(`Se cortó la conexión — reconectando (intento ${reconnectAttemptsRef.current}/3)…`);
+        const delay = 600 * 2 ** (reconnectAttemptsRef.current - 1); // 600ms, 1.2s, 2.4s
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null;
+          connectWs().catch(() => {
+            // Falló antes de abrir el socket (p.ej. el fetch del token):
+            // reintenta por el mismo camino o rinde el turno con error.
+            if (!scheduleReconnect()) {
+              cleanup();
+              setError("Se perdió la conexión con Deepgram y no se pudo reconectar. Tocá para reintentar.");
+              setStatus("error");
+            }
+          });
+        }, delay);
+        return true;
+      };
+
+      await connectWs();
 
       stream.getAudioTracks()[0].onended = () => stop();
 
@@ -381,6 +440,13 @@ export default function Page() {
   }, [mode, acquireStream, onDgMessage]);
 
   const cleanup = useCallback(() => {
+    // Marca el cierre como intencional ANTES de cerrar el WS: su onclose no
+    // debe disparar una reconexión.
+    intentionalCloseRef.current = true;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = null;
+    if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
+    stableTimerRef.current = null;
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     keepAliveRef.current = null;
     if (specTimerRef.current) clearTimeout(specTimerRef.current);
@@ -660,8 +726,8 @@ export default function Page() {
         {!live && (
           <p className="mono btn-hint">
             {mode === "mic"
-              ? "Apoyá el celular cerca de los parlantes de la notebook."
-              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
+              ? "Apoyá el celular cerca de los parlantes. Sin auriculares: el micrófono tiene que poder oír al entrevistador."
+              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”. Con auriculares funciona igual."}
           </p>
         )}
       </footer>
