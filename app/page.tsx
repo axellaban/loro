@@ -78,6 +78,9 @@ export default function Page() {
   // estable un rato — así una conexión que "flapea" (abre y cae al instante)
   // igual agota los 3 intentos y se rinde, en vez de reconectar para siempre.
   const stableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Recuperación al volver de segundo plano: reconecta si el socket murió
+  // mientras la app estaba en background (Deepgram corta a los ~10s sin audio).
+  const resumeRef = useRef<(() => void) | null>(null);
 
   const transcriptRef = useRef("");
   const questionBufRef = useRef(""); // acumula segmentos finales hasta el fin de utterance
@@ -109,6 +112,9 @@ export default function Page() {
       if (audioCtxRef.current?.state === "suspended") {
         audioCtxRef.current.resume().catch(() => {});
       }
+      // Da un instante a que el AudioContext y el micrófono se reactiven antes
+      // de chequear si hay que reconectar el socket.
+      setTimeout(() => resumeRef.current?.(), 300);
     };
     document.addEventListener("visibilitychange", onResume);
     window.addEventListener("pageshow", onResume);
@@ -390,7 +396,7 @@ export default function Page() {
           if (scheduleReconnect()) return;
           cleanup();
           if (event.code !== 1000 && event.code !== 1001) {
-            setError(`Conexión cerrada por Deepgram (Código ${event.code}): ${event.reason || "Revisa tus credenciales o saldo en Deepgram"}`);
+            setError("Se cortó la conexión. Revisá tu internet y tocá para reanudar.");
             setStatus("error");
           } else {
             setStatus((s) => (s === "error" ? s : "idle"));
@@ -414,12 +420,34 @@ export default function Page() {
             // reintenta por el mismo camino o rinde el turno con error.
             if (!scheduleReconnect()) {
               cleanup();
-              setError("Se perdió la conexión con Deepgram y no se pudo reconectar. Tocá para reintentar.");
+              setError("Se perdió la conexión y no se pudo reanudar. Tocá para reintentar.");
               setStatus("error");
             }
           });
         }, delay);
         return true;
+      };
+
+      // Al volver de segundo plano: si el socket murió mientras la app estaba
+      // en background (Deepgram corta a los ~10s sin audio) pero el micrófono
+      // sigue vivo, reconectamos solos en vez de dejar el error en pantalla.
+      resumeRef.current = () => {
+        if (intentionalCloseRef.current) return;
+        const w = wsRef.current;
+        const socketDead = !w || w.readyState === WebSocket.CLOSING || w.readyState === WebSocket.CLOSED;
+        const trackAlive = stream.getAudioTracks()[0]?.readyState === "live";
+        if (!socketDead || !trackAlive) return;
+        if (reconnectTimerRef.current) return; // ya hay una reconexión en curso
+        reconnectAttemptsRef.current = 0;
+        setError("Reconectando…");
+        setStatus("connecting");
+        connectWs().catch(() => {
+          if (!scheduleReconnect()) {
+            cleanup();
+            setError("Se perdió la conexión y no se pudo reanudar. Tocá para reintentar.");
+            setStatus("error");
+          }
+        });
       };
 
       await connectWs();
@@ -443,6 +471,7 @@ export default function Page() {
     // Marca el cierre como intencional ANTES de cerrar el WS: su onclose no
     // debe disparar una reconexión.
     intentionalCloseRef.current = true;
+    resumeRef.current = null;
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     reconnectTimerRef.current = null;
     if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
