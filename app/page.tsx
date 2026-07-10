@@ -12,8 +12,8 @@ const DG_PARAMS = new URLSearchParams({
   language: "es",
   smart_format: "true",
   interim_results: "true",
-  endpointing: "800",
-  utterance_end_ms: "1000",
+  endpointing: "500",
+  utterance_end_ms: "800",
   vad_events: "true",
   encoding: "linear16",
   sample_rate: "16000",
@@ -21,10 +21,14 @@ const DG_PARAMS = new URLSearchParams({
 }).toString();
 const DG_URL = `wss://api.deepgram.com/v1/listen?${DG_PARAMS}`;
 
+const LS_KEY = "copiloto:context:v1";
+
 export default function Page() {
   const [status, setStatus] = useState<Status>("idle");
   const [mode, setMode] = useState<Mode>("mic");
   const [error, setError] = useState("");
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
   const [profile, setProfile] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -46,6 +50,23 @@ export default function Page() {
   const scrollT = useRef<HTMLDivElement | null>(null);
   const scrollA = useRef<HTMLDivElement | null>(null);
 
+  // ---------- Contexto persistido (empresa / puesto / perfil) ----------
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved.company) setCompany(saved.company);
+      if (saved.role) setRole(saved.role);
+      if (saved.profile) setProfile(saved.profile);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile }));
+    } catch {}
+  }, [company, role, profile]);
+
   // ---------- Generación ----------
   const generate = useCallback(
     async (question: string) => {
@@ -61,6 +82,8 @@ export default function Page() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             profile,
+            company,
+            role,
             transcript: transcriptRef.current.slice(-4000),
             question: q,
           }),
@@ -89,7 +112,7 @@ export default function Page() {
         genLock.current = false;
       }
     },
-    [profile]
+    [profile, company, role]
   );
 
   const flushQuestion = useCallback(() => {
@@ -313,11 +336,40 @@ export default function Page() {
         </div>
       )}
 
-      {/* Perfil (solo antes de arrancar) */}
+      {/* Contexto de la entrevista (solo antes de arrancar) */}
       {!live && (
         <div style={S.panel}>
           <label className="mono" style={S.label}>
-            tu perfil / contexto
+            contexto de la entrevista
+          </label>
+          <div style={S.contextRow}>
+            <div style={S.contextField}>
+              <label className="mono" style={S.miniLabel}>
+                empresa
+              </label>
+              <input
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Ej: Mercado Libre"
+                style={S.input}
+                disabled={connecting}
+              />
+            </div>
+            <div style={S.contextField}>
+              <label className="mono" style={S.miniLabel}>
+                puesto / rol
+              </label>
+              <input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Ej: Frontend Sr."
+                style={S.input}
+                disabled={connecting}
+              />
+            </div>
+          </div>
+          <label className="mono" style={{ ...S.miniLabel, marginTop: 4 }}>
+            tu perfil / cv
           </label>
           <textarea
             value={profile}
@@ -326,6 +378,11 @@ export default function Page() {
             style={S.textarea}
             disabled={connecting}
           />
+          {(!company.trim() || !role.trim()) && (
+            <p className="mono" style={S.contextHint}>
+              Completá empresa y puesto para respuestas mejor dirigidas.
+            </p>
+          )}
         </div>
       )}
 
@@ -361,7 +418,7 @@ export default function Page() {
             <div ref={scrollA} style={S.answerBody}>
               {answers.length === 0 ? (
                 <p style={S.placeholder}>
-                  Cuando el otro termine de hablar, la sugerencia aparece acá en ~2s.
+                  Cuando el entrevistador termine de preguntar, tu respuesta aparece acá en ~1-2s.
                 </p>
               ) : (
                 answers.map((a) => (
@@ -502,6 +559,25 @@ const S: Record<string, any> = {
     lineHeight: 1.5,
     outline: "none",
   },
+  contextRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+  contextField: { display: "flex", flexDirection: "column", gap: 4 },
+  miniLabel: {
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: "var(--ink-faint)",
+  },
+  input: {
+    background: "var(--panel-2)",
+    border: "1px solid var(--line)",
+    borderRadius: 8,
+    color: "var(--ink)",
+    padding: "9px 10px",
+    fontSize: 14,
+    outline: "none",
+    width: "100%",
+  },
+  contextHint: { fontSize: 11, color: "var(--ink-faint)", lineHeight: 1.4 },
   tabsRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
   tabBtn: {
     background: "var(--panel)",

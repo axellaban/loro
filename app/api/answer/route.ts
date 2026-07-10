@@ -2,20 +2,29 @@ export const runtime = "edge";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-const SYSTEM_PROMPT = `Sos un copiloto en tiempo real que asiste a una persona durante una llamada en vivo (entrevista, discovery call o reunión).
+const SYSTEM_PROMPT = `Sos EL ENTREVISTADO. No sos un asistente que aconseja: sos la persona que está en la llamada respondiendo en primera persona, en vivo, ahora mismo.
 
 Recibís:
-1. El PERFIL de la persona a la que asistís (su CV, experiencia, notas, contexto).
-2. La transcripción reciente de la conversación.
-3. La última pregunta o punto detectado, marcado como [PREGUNTA].
+1. EMPRESA y PUESTO al que se está postulando (el contexto de la entrevista).
+2. El PERFIL de la persona (su CV, experiencia, logros, notas).
+3. La transcripción reciente de la conversación.
+4. La última pregunta detectada, marcada como [PREGUNTA].
 
-Tu tarea: generar una respuesta sugerida que la persona pueda decir, en primera persona, apoyada en su perfil real. Nunca inventes datos que no estén en el perfil.
+Tu tarea: responder esa pregunta como si fueras vos el candidato, de la mejor forma posible — una respuesta "10/10" para ESE puesto en ESA empresa específicamente. Usá el perfil para anclar todo en hechos reales (proyectos, resultados, números, tecnologías) y conectalo con lo que la empresa y el rol necesitan. Nunca inventes datos, títulos, empresas o números que no estén en el perfil — si falta un dato concreto, respondé en términos generales pero igual de seguros, sin inventar.
 
-Formato de salida:
-- 3 a 5 bullets cortos, cada uno una idea que la persona puede desarrollar al hablar.
-- Directo, sin preámbulo, sin "aquí está tu respuesta".
-- En el mismo idioma que la conversación.
-- Si no hay una pregunta clara todavía, devolvé un solo bullet: "· (esperando pregunta)".`;
+Criterios de una respuesta 10/10:
+- Directa: contesta lo que se preguntó, sin rodeos ni relleno.
+- Específica: con ejemplos o números reales del perfil, no genérica.
+- Relevante al puesto y a la empresa: si la pregunta es técnica, foco técnico; si es de comportamiento, usá estructura STAR (situación breve, acción, resultado); si es "por qué esta empresa" o "por qué este rol", conectá el perfil con lo que la empresa hace.
+- Segura y natural: como si el candidato lo tuviera clarísimo, sin sonar ensayado.
+- Cerrada: termina con una idea fuerte, no se queda a medias.
+
+Formato de salida (esto es CLAVE para que sirva en vivo, con el candidato leyendo mientras habla):
+- 3 a 5 bullets cortos.
+- Cada bullet es una frase completa, lista para decir en voz alta tal cual, en primera persona ("Lideré...", "Implementé...", "Elegiría..."). No son "ideas para desarrollar", son la respuesta misma.
+- Sin preámbulo, sin "Podrías decir", sin "aquí está tu respuesta": arrancá directo con el primer bullet.
+- Mismo idioma que la conversación.
+- Si todavía no hay pregunta clara, devolvé un solo bullet: "· (esperando pregunta)".`;
 
 export async function POST(req: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -25,7 +34,13 @@ export async function POST(req: Request) {
     });
   }
 
-  let body: { profile?: string; transcript?: string; question?: string };
+  let body: {
+    profile?: string;
+    company?: string;
+    role?: string;
+    transcript?: string;
+    question?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -33,10 +48,18 @@ export async function POST(req: Request) {
   }
 
   const profile = (body.profile || "").slice(0, 8000);
+  const company = (body.company || "").slice(0, 200);
+  const role = (body.role || "").slice(0, 200);
   const transcript = (body.transcript || "").slice(0, 6000);
   const question = (body.question || "").slice(0, 1000);
 
-  const userContent = `## PERFIL DE LA PERSONA
+  const userContent = `## EMPRESA
+${company || "(sin especificar)"}
+
+## PUESTO AL QUE SE POSTULA
+${role || "(sin especificar)"}
+
+## PERFIL DEL CANDIDATO
 ${profile || "(sin perfil cargado)"}
 
 ## TRANSCRIPCIÓN RECIENTE
@@ -51,21 +74,25 @@ ${transcript || "(vacío)"}
         role: "user",
         parts: [
           {
-            text: userContent
-          }
-        ]
-      }
+            text: userContent,
+          },
+        ],
+      },
     ],
     systemInstruction: {
       parts: [
         {
-          text: SYSTEM_PROMPT
-        }
-      ]
+          text: SYSTEM_PROMPT,
+        },
+      ],
     },
     generationConfig: {
-      temperature: 0.3
-    }
+      temperature: 0.4,
+      maxOutputTokens: 400,
+      // Desactiva el "thinking" extendido de 2.5 Flash: sin esto Gemini piensa
+      // varios cientos de ms antes del primer token, y en vivo eso se nota.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   };
 
   const upstream = await fetch(
@@ -125,4 +152,3 @@ ${transcript || "(vacío)"}
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }
-
