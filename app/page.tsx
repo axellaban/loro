@@ -13,7 +13,7 @@ const DG_PARAMS = new URLSearchParams({
   smart_format: "true",
   interim_results: "true",
   endpointing: "500",
-  utterance_end_ms: "800",
+  utterance_end_ms: "1000",
   vad_events: "true",
   encoding: "linear16",
   sample_rate: "16000",
