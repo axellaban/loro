@@ -31,15 +31,20 @@ const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en" };
 // pueden pisar por env var en el backend (ANTHROPIC_MODEL / OPENAI_MODEL).
 type Provider = "gemini" | "anthropic" | "openai";
 type ModelOption = { id: string; label: string; provider: Provider; model: string; tag: string };
+// Misma lista que Parakeet (mismo orden y tags). Los `model` son los IDs reales
+// de API: para Claude va el ID canónico (claude-haiku-4-5) y para Gemini los IDs
+// que funcionan con la key actual; el resto usa el ID que matchea el nombre.
+// Cualquiera se puede pisar por env en el backend (OPENAI_MODEL/ANTHROPIC_MODEL/GEMINI_MODEL).
 const MODELS: ModelOption[] = [
-  { id: "gemini-flash", label: "Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Rápido · default" },
-  { id: "gemini-pro", label: "Gemini 2.5 Pro", provider: "gemini", model: "gemini-2.5-pro", tag: "Más preciso" },
-  { id: "claude-opus", label: "Claude Opus 4.8", provider: "anthropic", model: "claude-opus-4-8", tag: "Máxima calidad" },
-  { id: "claude-sonnet", label: "Claude Sonnet 5", provider: "anthropic", model: "claude-sonnet-5", tag: "Equilibrado" },
-  { id: "claude-haiku", label: "Claude Haiku 4.5", provider: "anthropic", model: "claude-haiku-4-5", tag: "Rápido" },
-  { id: "gpt", label: "GPT (OpenAI)", provider: "openai", model: "gpt-4o", tag: "OpenAI" },
+  { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
+  { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
+  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
+  { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-5.5-mini", tag: "Recomendado" },
+  { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
+  { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Smart" },
 ];
-const DEFAULT_MODEL_ID = MODELS[0].id;
+const DEFAULT_MODEL_ID = "gpt-5.5-mini";
 
 function buildDgUrl(sttLang: string): string {
   const params = new URLSearchParams({
@@ -112,6 +117,12 @@ export default function Page() {
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [tab, setTab] = useState<"answer" | "transcript">("answer");
+  // Autocompletar desde el aviso: pegás el post de trabajo y el LLM extrae
+  // empresa + descripción del puesto (como "Fill fields from Job Post").
+  const [showFill, setShowFill] = useState(false);
+  const [fillText, setFillText] = useState("");
+  const [filling, setFilling] = useState(false);
+  const [fillError, setFillError] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -353,6 +364,34 @@ export default function Page() {
     fireIfNew(q, true);
     if (micModeRef.current) bumpCandidateTurn();
   }, [fireIfNew, bumpCandidateTurn]);
+
+  // Autocompletar empresa + descripción del puesto desde un aviso pegado.
+  const fillFromJobPost = useCallback(async () => {
+    const text = fillText.trim();
+    if (!text) return;
+    setFilling(true);
+    setFillError("");
+    try {
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        setFillError(await res.text().catch(() => "No se pudo autocompletar."));
+        return;
+      }
+      const data = await res.json();
+      if (data.company) setCompany(String(data.company).slice(0, 200));
+      if (data.role) setRole(String(data.role).slice(0, 2000));
+      setShowFill(false);
+      setFillText("");
+    } catch {
+      setFillError("No se pudo autocompletar. Probá de nuevo.");
+    } finally {
+      setFilling(false);
+    }
+  }, [fillText]);
 
   // Limpia respuestas y transcripción en pantalla (como el "Clear" de Parakeet),
   // sin cortar la sesión: el Loro sigue escuchando.
@@ -733,7 +772,8 @@ export default function Page() {
             </div>
           </div>
           <p className="mono form-hint" style={{ marginTop: 6 }}>
-            {selectedModel.label} · {selectedModel.tag}
+            {selectedModel.label}
+            {selectedModel.tag ? ` · ${selectedModel.tag}` : ""}
             {selectedModel.provider === "anthropic"
               ? " — requiere ANTHROPIC_API_KEY en Vercel."
               : selectedModel.provider === "openai"
@@ -769,9 +809,9 @@ export default function Page() {
       {error && (
         <div className="mono error-box" style={{
           fontSize: 13,
-          color: "#fda4af",
-          background: "rgba(244, 63, 94, 0.08)",
-          border: "1px solid rgba(244, 63, 94, 0.3)",
+          color: "var(--loro-red-deep)",
+          background: "rgba(239, 68, 68, 0.07)",
+          border: "1px solid rgba(239, 68, 68, 0.3)",
           borderRadius: 12,
           padding: "12px 16px",
           lineHeight: 1.5
@@ -783,9 +823,53 @@ export default function Page() {
       {/* Contexto de la entrevista (solo antes de arrancar) */}
       {!live && (
         <div className="panel">
-          <label className="mono form-label">
-            Contexto de la entrevista
-          </label>
+          <div className="context-head">
+            <label className="mono form-label">
+              Contexto de la entrevista
+            </label>
+            <button
+              className="fill-link"
+              onClick={() => { setShowFill((v) => !v); setFillError(""); }}
+              disabled={connecting}
+              type="button"
+            >
+              <SparkleIcon />
+              Autocompletar desde aviso
+            </button>
+          </div>
+
+          {showFill && (
+            <div className="fill-box">
+              <textarea
+                value={fillText}
+                onChange={(e) => setFillText(e.target.value)}
+                placeholder="Pegá acá el aviso de trabajo completo (título, empresa, responsabilidades, requisitos) y lo separo en los campos."
+                className="form-textarea"
+                style={{ height: 110 }}
+                disabled={filling}
+              />
+              {fillError && <p className="mono form-hint" style={{ color: "var(--loro-red-deep)" }}>{fillError}</p>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  className="btn-action btn-primary"
+                  style={{ padding: "10px 14px", fontSize: 13.5 }}
+                  onClick={fillFromJobPost}
+                  disabled={filling || !fillText.trim()}
+                >
+                  {filling ? "Leyendo aviso…" : "Completar campos"}
+                </button>
+                <button
+                  className="clear-pill mono"
+                  onClick={() => { setShowFill(false); setFillError(""); }}
+                  disabled={filling}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label className="mono form-mini-label">
               Empresa
