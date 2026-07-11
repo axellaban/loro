@@ -135,10 +135,20 @@ ${transcript || "(vacío)"}
 ## ÚLTIMO PUNTO DETECTADO
 [PREGUNTA] ${question || "(ninguna aún)"}`;
 
+  // Fallbacks: si el modelo pedido fallara (ID inválido, no habilitado en la
+  // cuenta, etc.), se reintenta con uno estable para no quedar sin respuesta
+  // en plena entrevista.
+  const FALLBACK: Record<Provider, string> = {
+    openai: "gpt-4.1-mini",
+    anthropic: "claude-haiku-4-5",
+    gemini: "gemini-2.5-flash",
+  };
+  const candidates = model === FALLBACK[provider] ? [model] : [model, FALLBACK[provider]];
+
   try {
-    if (provider === "anthropic") return await streamAnthropic(model, userContent);
-    if (provider === "openai") return await streamOpenAI(model, userContent);
-    return await streamGemini(model, userContent);
+    if (provider === "anthropic") return await streamAnthropic(candidates, userContent);
+    if (provider === "openai") return await streamOpenAI(candidates, userContent);
+    return await streamGemini(candidates, userContent);
   } catch (err: any) {
     return new Response(`Error del modelo: ${err?.message || "desconocido"}`, { status: 502 });
   }
@@ -191,7 +201,7 @@ function sseTextStream(
 }
 
 // ---------- Gemini ----------
-async function streamGemini(model: string, userContent: string): Promise<Response> {
+async function streamGemini(models: string[], userContent: string): Promise<Response> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return new Response("Falta GEMINI_API_KEY en las variables de entorno.", { status: 500 });
@@ -202,33 +212,37 @@ async function streamGemini(model: string, userContent: string): Promise<Respons
     generationConfig: {
       temperature: 0.4,
       maxOutputTokens: 512,
-      // Desactiva el "thinking" extendido de 2.5 Flash: sin esto piensa varios
-      // cientos de ms antes del primer token, y en vivo eso se nota.
+      // Desactiva el "thinking" extendido: sin esto piensa varios cientos de ms
+      // antes del primer token, y en vivo eso se nota.
       thinkingConfig: { thinkingBudget: 0 },
     },
   };
-  const upstream = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+  let detail = "";
+  for (const model of models) {
+    if (!model) continue;
+    const upstream = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (upstream.ok && upstream.body) {
+      return textStreamResponse(
+        sseTextStream(upstream.body, (json) => {
+          const evt = JSON.parse(json);
+          return evt.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        })
+      );
     }
-  );
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => "");
-    return new Response(`Gemini error: ${detail}`, { status: 502 });
+    detail = await upstream.text().catch(() => "");
   }
-  return textStreamResponse(
-    sseTextStream(upstream.body, (json) => {
-      const evt = JSON.parse(json);
-      return evt.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-    })
-  );
+  return new Response(`Gemini error: ${detail}`, { status: 502 });
 }
 
 // ---------- Anthropic (Claude) ----------
-async function streamAnthropic(model: string, userContent: string): Promise<Response> {
+async function streamAnthropic(models: string[], userContent: string): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response(
@@ -236,40 +250,44 @@ async function streamAnthropic(model: string, userContent: string): Promise<Resp
       { status: 500 }
     );
   }
-  const upstream = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 512,
-      temperature: 0.4,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }],
-      stream: true,
-    }),
-  });
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => "");
-    return new Response(`Claude error: ${detail}`, { status: 502 });
+  let detail = "";
+  for (const model of models) {
+    if (!model) continue;
+    const upstream = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 512,
+        temperature: 0.4,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }],
+        stream: true,
+      }),
+    });
+    if (upstream.ok && upstream.body) {
+      return textStreamResponse(
+        sseTextStream(upstream.body, (json) => {
+          const evt = JSON.parse(json);
+          // Solo nos interesan los deltas de texto del bloque de contenido.
+          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+            return evt.delta.text ?? null;
+          }
+          return null;
+        })
+      );
+    }
+    detail = await upstream.text().catch(() => "");
   }
-  return textStreamResponse(
-    sseTextStream(upstream.body, (json) => {
-      const evt = JSON.parse(json);
-      // Solo nos interesan los deltas de texto del bloque de contenido.
-      if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-        return evt.delta.text ?? null;
-      }
-      return null;
-    })
-  );
+  return new Response(`Claude error: ${detail}`, { status: 502 });
 }
 
 // ---------- OpenAI (GPT) ----------
-async function streamOpenAI(model: string, userContent: string): Promise<Response> {
+async function streamOpenAI(models: string[], userContent: string): Promise<Response> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(
@@ -277,31 +295,35 @@ async function streamOpenAI(model: string, userContent: string): Promise<Respons
       { status: 500 }
     );
   }
-  const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.4,
-      max_tokens: 512,
-      stream: true,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent },
-      ],
-    }),
-  });
-  if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text().catch(() => "");
-    return new Response(`GPT error: ${detail}`, { status: 502 });
+  let detail = "";
+  for (const model of models) {
+    if (!model) continue;
+    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.4,
+        max_tokens: 512,
+        stream: true,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userContent },
+        ],
+      }),
+    });
+    if (upstream.ok && upstream.body) {
+      return textStreamResponse(
+        sseTextStream(upstream.body, (json) => {
+          const evt = JSON.parse(json);
+          return evt.choices?.[0]?.delta?.content ?? null;
+        })
+      );
+    }
+    detail = await upstream.text().catch(() => "");
   }
-  return textStreamResponse(
-    sseTextStream(upstream.body, (json) => {
-      const evt = JSON.parse(json);
-      return evt.choices?.[0]?.delta?.content ?? null;
-    })
-  );
+  return new Response(`GPT error: ${detail}`, { status: 502 });
 }

@@ -160,15 +160,17 @@ type ModelOption = { id: string; label: string; provider: Provider; model: strin
 // de API: para Claude va el ID canónico (claude-haiku-4-5) y para Gemini los IDs
 // que funcionan con la key actual; el resto usa el ID que matchea el nombre.
 // Cualquiera se puede pisar por env en el backend (OPENAI_MODEL/ANTHROPIC_MODEL/GEMINI_MODEL).
+// IDs reales de API (verificados, julio 2026). Nota: OpenAI no tiene un
+// "gpt-5.5-mini" — el mini vigente de esa línea es gpt-5-mini. El backend
+// además cae a un modelo estable si alguno fallara, así nunca queda sin respuesta.
 const MODELS: ModelOption[] = [
   { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
   { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
-  // "GPT-5.5" no existe como ID de OpenAI → se mapea al modelo real más cercano.
-  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-4o", tag: "" },
-  { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-4o-mini", tag: "Recomendado" },
+  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
+  { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-5-mini", tag: "Recomendado" },
   { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
-  { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
-  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Smart" },
+  { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-3.1-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-3.5-flash", tag: "Smart" },
 ];
 const DEFAULT_MODEL_ID = "gpt-5.5-mini";
 
