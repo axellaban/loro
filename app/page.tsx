@@ -8,12 +8,11 @@ type Line = { id: number; text: string; final: boolean };
 type Answer = { id: number; question: string; text: string; done: boolean };
 
 // ---------- Idioma ----------
-// "es"    → entrevista en español, respuesta en español.
-// "en"    → entrevista en inglés, respuesta en inglés.
-// "en-es" → entrevista en inglés (STT), respuesta en español (modo táctico).
-type Lang = "es" | "en" | "en-es";
-const STT_LANG: Record<Lang, string> = { es: "es", en: "en", "en-es": "en" };
-const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en", "en-es": "es" };
+// "es" → entrevista y respuesta en español.
+// "en" → entrevista y respuesta en inglés.
+type Lang = "es" | "en";
+const STT_LANG: Record<Lang, string> = { es: "es", en: "en" };
+const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en" };
 
 function buildDgUrl(sttLang: string): string {
   const params = new URLSearchParams({
@@ -151,7 +150,7 @@ export default function Page() {
       if (saved.company) setCompany(saved.company);
       if (saved.role) setRole(saved.role);
       if (saved.profile) setProfile(saved.profile);
-      if (saved.lang === "es" || saved.lang === "en" || saved.lang === "en-es") setLang(saved.lang);
+      if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
     } catch {}
   }, []);
   useEffect(() => {
@@ -584,30 +583,22 @@ export default function Page() {
           <label className="mono form-label" style={{ display: "block", marginBottom: 8 }}>
             Idioma de la entrevista
           </label>
-          <div className="lang-grid">
+          <div className="seg" role="tablist">
             <button
-              className={`btn-select ${lang === "es" ? "btn-select-active" : ""}`}
+              className={`mono seg-btn ${lang === "es" ? "seg-active" : ""}`}
               onClick={() => setLang("es")}
               disabled={connecting}
+              aria-selected={lang === "es"}
             >
               🇪🇸 Español
-              <span className="btn-select-sub">entrevista en español</span>
             </button>
             <button
-              className={`btn-select ${lang === "en" ? "btn-select-active" : ""}`}
+              className={`mono seg-btn ${lang === "en" ? "seg-active" : ""}`}
               onClick={() => setLang("en")}
               disabled={connecting}
+              aria-selected={lang === "en"}
             >
               🇺🇸 English
-              <span className="btn-select-sub">interview in English</span>
-            </button>
-            <button
-              className={`btn-select ${lang === "en-es" ? "btn-select-active" : ""}`}
-              onClick={() => setLang("en-es")}
-              disabled={connecting}
-            >
-              🇺🇸→🇪🇸 Inglés
-              <span className="btn-select-sub">pregunta en inglés · respondés en español</span>
             </button>
           </div>
         </div>
