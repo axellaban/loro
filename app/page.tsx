@@ -150,14 +150,14 @@ export default function Page() {
       if (saved.company) setCompany(saved.company);
       if (saved.role) setRole(saved.role);
       if (saved.profile) setProfile(saved.profile);
-      if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
+      // El idioma NO se restaura: el default siempre es español (se elige por sesión).
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile, lang }));
+      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile }));
     } catch {}
-  }, [company, role, profile, lang]);
+  }, [company, role, profile]);
 
   // ---------- Generación ----------
   // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
