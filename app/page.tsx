@@ -697,7 +697,12 @@ export default function Page() {
         <div className="listen-bar mono">
           {tab === "answer" ? (
             <>
-              <span className="listen-dot" />
+              <span className="eq" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+              </span>
               <span className="listen-text">
                 {lines.length ? lines[lines.length - 1].text : "escuchando…"}
               </span>
