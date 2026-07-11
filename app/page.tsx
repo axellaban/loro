@@ -163,8 +163,9 @@ type ModelOption = { id: string; label: string; provider: Provider; model: strin
 const MODELS: ModelOption[] = [
   { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
   { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
-  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
-  { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-5.5-mini", tag: "Recomendado" },
+  // "GPT-5.5" no existe como ID de OpenAI → se mapea al modelo real más cercano.
+  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-4o", tag: "" },
+  { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-4o-mini", tag: "Recomendado" },
   { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
   { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
   { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Smart" },
