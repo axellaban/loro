@@ -670,62 +670,54 @@ export default function Page() {
         </p>
       )}
 
-      {/* Selector de idioma */}
+      {/* Selectores de idioma + modelo, en una misma línea (estilo Parakeet) */}
       {!live && (
         <div>
-          <label className="mono form-label" style={{ display: "block", marginBottom: 8 }}>
-            Idioma de la entrevista
-          </label>
-          <div className="seg" role="tablist">
-            <button
-              className={`seg-btn ${lang === "es" ? "seg-active" : ""}`}
-              onClick={() => setLang("es")}
-              disabled={connecting}
-              aria-selected={lang === "es"}
-            >
-              🇪🇸 Español
-            </button>
-            <button
-              className={`seg-btn ${lang === "en" ? "seg-active" : ""}`}
-              onClick={() => setLang("en")}
-              disabled={connecting}
-              aria-selected={lang === "en"}
-            >
-              🇺🇸 English
-            </button>
+          <div className="selectors-row">
+            <div className="field">
+              <label className="mono form-label">Idioma</label>
+              <div className="select-wrap">
+                <select
+                  className="model-select"
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as Lang)}
+                  disabled={connecting}
+                  aria-label="Idioma de la entrevista"
+                >
+                  <option value="es">🇪🇸 Español</option>
+                  <option value="en">🇺🇸 English</option>
+                </select>
+                <span className="select-caret" aria-hidden="true">▾</span>
+              </div>
+            </div>
+            <div className="field">
+              <label className="mono form-label">Modelo de IA</label>
+              <div className="select-wrap">
+                <select
+                  className="model-select"
+                  value={modelId}
+                  onChange={(e) => setModelId(e.target.value)}
+                  disabled={connecting}
+                  aria-label="Modelo de IA"
+                >
+                  {MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="select-caret" aria-hidden="true">▾</span>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Selector de modelo de LLM */}
-      {!live && (
-        <div>
-          <label className="mono form-label" style={{ display: "block", marginBottom: 8 }}>
-            Modelo de IA
-          </label>
-          <div className="select-wrap">
-            <select
-              className="model-select"
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-              disabled={connecting}
-              aria-label="Modelo de IA"
-            >
-              {MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label} — {m.tag}
-                </option>
-              ))}
-            </select>
-            <span className="select-caret" aria-hidden="true">▾</span>
-          </div>
-          {selectedModel.provider !== "gemini" && (
-            <p className="mono form-hint" style={{ marginTop: 6 }}>
-              {selectedModel.provider === "anthropic"
-                ? "Requiere ANTHROPIC_API_KEY cargada en Vercel."
-                : "Requiere OPENAI_API_KEY cargada en Vercel."}
-            </p>
-          )}
+          <p className="mono form-hint" style={{ marginTop: 6 }}>
+            {selectedModel.label} · {selectedModel.tag}
+            {selectedModel.provider === "anthropic"
+              ? " — requiere ANTHROPIC_API_KEY en Vercel."
+              : selectedModel.provider === "openai"
+              ? " — requiere OPENAI_API_KEY en Vercel."
+              : ""}
+          </p>
         </div>
       )}
 

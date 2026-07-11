@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "Asistente de respuestas en tiempo real para llamadas",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "Loreado.ia",
   },
 };
@@ -16,7 +16,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#040d0a",
+  themeColor: "#f4f5f7",
 };
 
 export default function RootLayout({

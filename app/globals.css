@@ -1,23 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Paleta 11/10: negro con profundidad + UN solo acento esmeralda.
-     El verde es lo único cromático, así resalta. Rojo solo para stop/error. */
-  --bg: #070a09;          /* Casi negro, apenas cálido-verde */
-  --panel: #0f1512;       /* Panel levantado */
-  --panel-2: #171e1a;     /* Panel secundario */
-  --line: #222c27;        /* Hairline sutil */
-  --ink: #f0f4f2;         /* Texto claro */
-  --ink-dim: #90a099;     /* Texto secundario */
-  --ink-faint: #5a6a63;   /* Texto tenue */
+  /* Tema claro estilo Parakeet: fondo casi blanco, tarjetas blancas,
+     acción principal oscura, y un acento esmeralda para la marca / "en vivo". */
+  --bg: #f4f5f7;          /* Fondo de app (gris muy claro) */
+  --panel: #ffffff;       /* Tarjeta */
+  --panel-2: #ffffff;     /* Tarjeta secundaria */
+  --line: #e4e7ec;        /* Borde hairline */
+  --line-strong: #d4d8de; /* Borde un poco más marcado */
+  --ink: #17181a;         /* Texto casi negro */
+  --ink-dim: #5b6470;     /* Texto secundario */
+  --ink-faint: #98a1ad;   /* Texto tenue */
 
-  --loro-green: #10b981;         /* Esmeralda: acento único (fills) */
-  --loro-green-bright: #34d399;  /* Esmeralda vívido (acento sobre negro) */
-  --loro-red: #ef4444;           /* Solo stop / error */
+  --loro-green: #10b981;         /* Esmeralda: acento (fills) */
+  --loro-green-bright: #059669;  /* Esmeralda para texto sobre blanco */
+  --loro-green-deep: #047857;    /* Esmeralda oscuro (labels) */
+  --loro-red: #ef4444;           /* Stop / error */
+  --loro-red-deep: #dc2626;
 
-  /* Legacy (ya no se usan como decoración, se mantienen por compatibilidad) */
-  --loro-yellow: #f59e0b;
-  --loro-cyan: #06b6d4;
+  /* Acción principal: botón oscuro (como el "Answer" de Parakeet). */
+  --btn-dark: #17181a;
+  --btn-dark-hover: #2a2c30;
 
   --radius: 12px;
 }
@@ -39,28 +42,12 @@ body {
 body {
   background: var(--bg);
   color: var(--ink);
-  /* Sans humanista para el contenido (la voz del producto). */
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Glow ambiental: un único bloom esmeralda tenue arriba, da foco y
-   profundidad sin ruido. */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 140%;
-  height: 55%;
-  background: radial-gradient(50% 60% at 50% 0%, rgba(16, 185, 129, 0.09), transparent 72%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Mono solo para la "telemetría": chip de estado, labels, barra de escucha. */
+/* Mono solo para "telemetría": chip de estado, labels, barra de escucha. */
 .mono {
   font-family: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 }
@@ -89,7 +76,7 @@ input {
   font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--loro-green) 10%, var(--loro-green-bright) 90%);
+  background: linear-gradient(135deg, var(--loro-green-deep) 10%, var(--loro-green) 90%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -102,7 +89,7 @@ input {
   margin-top: -6px;
 }
 
-/* Responsive Grid Helper to fix Mobile overlap */
+/* Grid responsive genérico */
 .grid-responsive {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -115,45 +102,17 @@ input {
   }
 }
 
-/* Selector de idioma: control segmentado (toggle) de 2 opciones */
-.seg {
+/* Fila de selectores (idioma + modelo en una misma línea, como Parakeet). */
+.selectors-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  background: rgba(4, 13, 10, 0.5);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 4px;
+  gap: 10px;
 }
 
-.seg-btn {
-  background: transparent;
-  border: none;
-  border-radius: 9px;
-  padding: 12px 10px;
-  color: var(--ink-dim);
-  font-size: 14.5px;
-  font-weight: 600;
+.field {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.seg-btn:hover:not(:disabled):not(.seg-active) {
-  color: var(--ink);
-}
-
-.seg-active {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.08));
-  color: #fff;
-  box-shadow: inset 0 0 0 1px var(--loro-green);
-}
-
-.seg-btn:disabled {
-  cursor: default;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* Translucent Flat Panels */
@@ -165,15 +124,16 @@ input {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
-/* Custom interactive buttons (mode buttons) */
+/* Botones de modo (Micrófono / Pestaña) */
 .btn-select {
   display: flex;
   flex-direction: column;
   gap: 2px;
   align-items: flex-start;
-  background: rgba(17, 26, 22, 0.4);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px 14px;
@@ -186,29 +146,29 @@ input {
 }
 
 .btn-select:hover:not(:disabled) {
-  background: var(--panel-2);
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: var(--loro-green);
   color: var(--ink);
 }
 
 .btn-select-active {
-  background: var(--panel-2) !important;
+  background: #f0fdf9 !important;
   border-color: var(--loro-green) !important;
-  color: #fff !important;
+  color: var(--ink) !important;
+  box-shadow: inset 0 0 0 1px var(--loro-green);
 }
 
 .btn-select-sub {
   font-size: 10.5px;
-  color: #52645a;
+  color: var(--ink-faint);
   font-weight: 400;
 }
 
-/* Clear form styles */
+/* Labels de formulario */
 .form-label {
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--loro-green);
+  color: var(--loro-green-deep);
   font-weight: 700;
 }
 
@@ -216,25 +176,30 @@ input {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #52645a;
+  color: var(--ink-faint);
   font-weight: 600;
 }
 
 .form-input, .form-textarea {
-  background: rgba(4, 13, 10, 0.6);
-  border: 1px solid var(--line);
+  background: #fff;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
-  color: #fff;
+  color: var(--ink);
   padding: 10px 12px;
   font-size: 15px;
   outline: none;
   font-family: inherit;
   width: 100%;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input::placeholder, .form-textarea::placeholder {
+  color: var(--ink-faint);
 }
 
 .form-input:focus, .form-textarea:focus {
   border-color: var(--loro-green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
 .form-textarea {
@@ -242,35 +207,36 @@ input {
   height: 100px;
 }
 
-/* Variante más baja para la descripción del puesto (no necesita tanto alto). */
 .form-textarea-sm {
   height: 72px;
 }
 
-/* Selector de modelo: dropdown estilizado a juego con los inputs. */
+/* Selectores (idioma y modelo): dropdown estilizado a juego con los inputs. */
 .select-wrap {
   position: relative;
 }
 
 .model-select {
   width: 100%;
-  background: rgba(4, 13, 10, 0.6);
-  border: 1px solid var(--line);
+  background: #fff;
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
-  color: #fff;
-  padding: 12px 38px 12px 12px;
-  font-size: 15px;
+  color: var(--ink);
+  padding: 12px 30px 12px 12px;
+  font-size: 14px;
   font-weight: 600;
   outline: none;
   cursor: pointer;
   font-family: inherit;
   -webkit-appearance: none;
   appearance: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  text-overflow: ellipsis;
 }
 
 .model-select:focus {
   border-color: var(--loro-green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
 .model-select:disabled {
@@ -279,23 +245,23 @@ input {
 }
 
 .model-select option {
-  background: var(--panel-2);
+  background: #fff;
   color: var(--ink);
 }
 
 .select-caret {
   position: absolute;
-  right: 14px;
+  right: 11px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--loro-green-bright);
-  font-size: 12px;
+  color: var(--ink-dim);
+  font-size: 11px;
   pointer-events: none;
 }
 
 .form-hint {
   font-size: 11px;
-  color: #52645a;
+  color: var(--ink-faint);
   line-height: 1.4;
 }
 
@@ -306,18 +272,18 @@ input {
   border-radius: 99px;
   border: 1px solid var(--line);
   color: var(--ink-dim);
-  background: var(--panel);
+  background: #fff;
   font-weight: 500;
 }
 
 .status-chip-live {
-  border-color: rgba(244, 63, 94, 0.3) !important;
-  background: rgba(244, 63, 94, 0.08) !important;
-  color: var(--loro-red) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: var(--loro-red-deep) !important;
   font-weight: 700;
 }
 
-/* Suggestions Cards */
+/* Contenedor de respuestas */
 .answers-container {
   display: flex;
   flex-direction: column;
@@ -329,20 +295,16 @@ input {
 }
 
 .answer-card {
-  background: var(--panel-2);
+  background: #fff;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px;
-  border-left: 3px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
 }
 
-/* La respuesta vigente es la joya: halo esmeralda sutil + leve elevación,
-   y entra con un fade + rise suave. */
+/* La respuesta vigente: borde acentuado + elevación suave, entra con fade+rise. */
 .answer-card-first {
-  border-color: rgba(16, 185, 129, 0.22) !important;
-  border-left: 3px solid var(--loro-green) !important;
-  background: linear-gradient(180deg, rgba(16, 185, 129, 0.05), rgba(16, 185, 129, 0.015));
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.08), 0 8px 28px -8px rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.35) !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 30px -12px rgba(16, 185, 129, 0.35);
   animation: answerIn 0.3s ease-out;
 }
 
@@ -357,22 +319,18 @@ input {
   }
 }
 
-/* Las respuestas anteriores receden: opacidad + micro-escala, el ojo cae
-   solo en la vigente. */
+/* Respuestas anteriores receden: el ojo cae solo en la vigente. */
 .answer-card:not(.answer-card-first) {
-  opacity: 0.5;
-  transform: scale(0.985);
-  transform-origin: top center;
+  opacity: 0.6;
 }
 
-/* Fila Pregunta / Respuesta al estilo Parakeet: etiqueta a la izquierda,
-   contenido a la derecha. Front-loaded y legible de un vistazo. */
+/* Fila Pregunta / Respuesta estilo Parakeet. */
 .answer-card-q-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-bottom: 10px;
-  margin-bottom: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -394,14 +352,14 @@ input {
 }
 
 .answer-card-label-a {
-  color: var(--loro-green-bright);
+  color: var(--loro-green-deep);
 }
 
 .answer-card-question {
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--ink-dim);
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .answer-card-text {
@@ -419,20 +377,18 @@ input {
   animation: pulse 1.2s ease-in-out infinite;
 }
 
-/* Barra de escucha en vivo: feedback de que el audio entra sin cambiar de tab */
+/* Barra de escucha en vivo */
 .listen-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: var(--panel);
+  padding: 9px 12px;
+  background: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  min-height: 34px;
+  border-radius: 10px;
+  min-height: 36px;
 }
 
-/* Mini-ecualizador: señala "te estoy escuchando" de forma literal al
-   producto (audio), en esmeralda. */
 .eq {
   display: inline-flex;
   align-items: flex-end;
@@ -444,7 +400,7 @@ input {
 .eq span {
   width: 2.5px;
   border-radius: 2px;
-  background: var(--loro-green-bright);
+  background: var(--loro-green);
   height: 35%;
   animation: eq 0.9s ease-in-out infinite;
 }
@@ -479,11 +435,10 @@ input {
   text-overflow: ellipsis;
 }
 
-/* Acceso secundario a la transcripción: chip discreto, no un tab de igual peso. */
 .listen-toggle {
   flex-shrink: 0;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
   padding: 5px 11px;
   color: var(--ink-dim);
@@ -508,7 +463,7 @@ input {
   }
 }
 
-/* Transcript Container */
+/* Contenedor de transcripción */
 .transcript-container {
   display: flex;
   flex-direction: column;
@@ -523,62 +478,63 @@ input {
   font-size: 14.5px;
   line-height: 1.55;
   margin-bottom: 2px;
+  color: var(--ink);
 }
 
-/* Buttons */
+/* Botones */
 .btn-action {
   font-family: inherit;
   border: none;
   border-radius: 10px;
-  padding: 14px;
+  padding: 15px;
   font-size: 15px;
   font-weight: 700;
   width: 100%;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.1s ease;
-}
-
-.btn-action:hover:not(:disabled) {
-  opacity: 0.95;
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
 }
 
 .btn-action:active:not(:disabled) {
   transform: scale(0.995);
 }
 
+/* Acción principal: botón oscuro (como el "Answer" de Parakeet). */
 .btn-primary {
-  background: linear-gradient(135deg, var(--loro-green) 0%, #059669 100%);
-  color: #030d09;
+  background: var(--btn-dark);
+  color: #fff;
 }
 
-/* Secundario/opcional: se lee como plan B, no como paso obligatorio. */
+.btn-primary:hover:not(:disabled) {
+  background: var(--btn-dark-hover);
+}
+
+/* Secundario: outline claro. */
 .btn-ghost {
-  background: transparent;
+  background: #fff;
   color: var(--ink-dim);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
 }
 
 .btn-ghost:hover:not(:disabled) {
   color: var(--ink);
-  border-color: var(--loro-green);
-  opacity: 1;
+  border-color: var(--ink-dim);
 }
 
-/* Detener: claro pero calmo (outline en vez de rojo sólido). */
+/* Detener: outline rojo, calmo. */
 .btn-stop {
-  background: transparent;
-  color: var(--loro-red);
-  border: 1px solid rgba(244, 63, 94, 0.45);
+  background: #fff;
+  color: var(--loro-red-deep);
+  border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
 .btn-stop:hover:not(:disabled) {
-  border-color: var(--loro-red);
-  opacity: 1;
+  border-color: var(--loro-red-deep);
+  background: rgba(239, 68, 68, 0.04);
 }
 
 .btn-hint {
   font-size: 11.5px;
-  color: #52645a;
+  color: var(--ink-faint);
   text-align: center;
   line-height: 1.4;
 }
@@ -607,4 +563,3 @@ input {
   align-items: center;
   justify-content: space-between;
 }
-
