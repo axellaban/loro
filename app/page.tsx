@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 type Status = "idle" | "connecting" | "live" | "error";
 type Mode = "mic" | "tab";
@@ -14,6 +14,131 @@ function SparkleIcon() {
       <path d="M12 2.5l1.9 4.9 4.9 1.9-4.9 1.9L12 16l-1.9-4.8L5.2 9.3l4.9-1.9L12 2.5z" />
       <path d="M18.5 14.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
     </svg>
+  );
+}
+
+// Logos de proveedor para el selector de modelo (como Parakeet).
+function OpenAIMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="#000" aria-hidden="true">
+      <path d="M22.28 9.82a5.98 5.98 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.07 6.07 0 0 0 4.98 4.18a5.98 5.98 0 0 0-3.99 2.9 6.05 6.05 0 0 0 .74 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.52 2.9A5.98 5.98 0 0 0 13.26 22a6.05 6.05 0 0 0 5.77-4.21 5.99 5.99 0 0 0 3.99-2.9 6.05 6.05 0 0 0-.75-7.07zm-9.02 12.6a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.79.79 0 0 0 .39-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.58a4.5 4.5 0 0 1-4.49 4.5zM3.6 18.3a4.47 4.47 0 0 1-.54-3.01l.14.09 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 21a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9a4.48 4.48 0 0 1 2.34-1.97V11.6a.77.77 0 0 0 .39.68l5.82 3.36-2.02 1.17a.08.08 0 0 1-.07 0l-4.83-2.79A4.5 4.5 0 0 1 2.34 7.9zm16.6 3.86-5.84-3.39L15.11 7.2a.08.08 0 0 1 .07 0l4.83 2.78a4.49 4.49 0 0 1-.68 8.1v-5.68a.79.79 0 0 0-.39-.68zm2.01-3.02-.14-.09-4.77-2.78a.78.78 0 0 0-.79 0L9.42 7.24V4.91a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.32 12.9 6.3 11.73a.08.08 0 0 1-.04-.06V6.1a4.5 4.5 0 0 1 7.38-3.45l-.14.08L8.72 5.49a.79.79 0 0 0-.39.68zm1.1-2.36L12 9.06l2.6 1.5v3l-2.6 1.5-2.6-1.5z" />
+    </svg>
+  );
+}
+function AnthropicMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" stroke="#CC785C" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+      <line x1="12" y1="3" x2="12" y2="21" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
+      <line x1="18.4" y1="5.6" x2="5.6" y2="18.4" />
+    </svg>
+  );
+}
+function GeminiMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
+      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
+      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
+    </svg>
+  );
+}
+function ProviderIcon({ provider }: { provider: Provider }) {
+  return (
+    <span className="dd-icon">
+      {provider === "openai" ? <OpenAIMark /> : provider === "anthropic" ? <AnthropicMark /> : <GeminiMark />}
+    </span>
+  );
+}
+
+// Dropdown custom (con icono, tag y badge) — el <select> nativo no lo permite.
+type DDOption = {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  tag?: string;
+  badge?: string;
+};
+function Dropdown({
+  value,
+  options,
+  onChange,
+  disabled,
+  ariaLabel,
+  alignRight,
+}: {
+  value: string;
+  options: DDOption[];
+  onChange: (id: string) => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+  alignRight?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+  const current = options.find((o) => o.id === value) || options[0];
+  return (
+    <div className="dd" ref={ref}>
+      <button
+        type="button"
+        className="dd-trigger"
+        onClick={() => !disabled && setOpen((o) => !o)}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="dd-trigger-main">
+          {current?.icon}
+          <span className="dd-trigger-label">{current?.label}</span>
+        </span>
+        <span className="dd-caret" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className={`dd-menu ${alignRight ? "dd-menu-right" : ""}`} role="listbox">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="option"
+              aria-selected={o.id === value}
+              className={`dd-option ${o.id === value ? "dd-option-sel" : ""}`}
+              onClick={() => {
+                onChange(o.id);
+                setOpen(false);
+              }}
+            >
+              <span className="dd-option-left">
+                {o.icon}
+                <span className="dd-option-label">{o.label}</span>
+                {o.tag && <span className="dd-option-tag">{o.tag}</span>}
+              </span>
+              <span className="dd-option-right">
+                {o.badge && <span className="dd-badge">{o.badge}</span>}
+                {o.id === value && <span className="dd-check" aria-hidden="true">✓</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -737,49 +862,35 @@ export default function Page() {
           <div className="selectors-row">
             <div className="field">
               <label className="mono form-label">Idioma</label>
-              <div className="select-wrap">
-                <select
-                  className="model-select"
-                  value={lang}
-                  onChange={(e) => setLang(e.target.value as Lang)}
-                  disabled={connecting}
-                  aria-label="Idioma de la entrevista"
-                >
-                  <option value="es">🇪🇸 Español</option>
-                  <option value="en">🇺🇸 English</option>
-                </select>
-                <span className="select-caret" aria-hidden="true">▾</span>
-              </div>
+              <Dropdown
+                value={lang}
+                onChange={(id) => setLang(id as Lang)}
+                disabled={connecting}
+                ariaLabel="Idioma de la entrevista"
+                options={[
+                  { id: "es", label: "Español", icon: <span className="dd-flag">🇪🇸</span> },
+                  { id: "en", label: "English", icon: <span className="dd-flag">🇺🇸</span> },
+                ]}
+              />
             </div>
             <div className="field">
               <label className="mono form-label">Modelo de IA</label>
-              <div className="select-wrap">
-                <select
-                  className="model-select"
-                  value={modelId}
-                  onChange={(e) => setModelId(e.target.value)}
-                  disabled={connecting}
-                  aria-label="Modelo de IA"
-                >
-                  {MODELS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="select-caret" aria-hidden="true">▾</span>
-              </div>
+              <Dropdown
+                value={modelId}
+                onChange={setModelId}
+                disabled={connecting}
+                ariaLabel="Modelo de IA"
+                alignRight
+                options={MODELS.map((m) => ({
+                  id: m.id,
+                  label: m.label,
+                  icon: <ProviderIcon provider={m.provider} />,
+                  tag: m.tag === "Recomendado" ? undefined : m.tag,
+                  badge: m.tag === "Recomendado" ? "Recomendado" : undefined,
+                }))}
+              />
             </div>
           </div>
-          <p className="mono form-hint" style={{ marginTop: 6 }}>
-            {selectedModel.label}
-            {selectedModel.tag ? ` · ${selectedModel.tag}` : ""}
-            {selectedModel.provider === "anthropic"
-              ? " — requiere ANTHROPIC_API_KEY en Vercel."
-              : selectedModel.provider === "openai"
-              ? " — requiere OPENAI_API_KEY en Vercel."
-              : ""}
-          </p>
         </div>
       )}
 
