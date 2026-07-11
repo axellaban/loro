@@ -163,18 +163,18 @@ type ModelOption = { id: string; label: string; provider: Provider; model: strin
 // IDs reales de API (verificados, julio 2026). Nota: OpenAI no tiene un
 // "gpt-5.5-mini" — el mini vigente de esa línea es gpt-5-mini. El backend
 // además cae a un modelo estable si alguno fallara, así nunca queda sin respuesta.
+// Por ahora solo Gemini (OpenAI/Claude ocultos). El backend sigue soportando
+// los otros proveedores: para reactivarlos, descomentar sus líneas.
 const MODELS: ModelOption[] = [
-  { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
-  { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
-  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
-  { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-5-mini", tag: "Recomendado" },
-  // Claude oculto por ahora (la cuenta de Anthropic no tiene créditos). El
-  // backend sigue soportándolo: para reactivarlo, descomentar esta línea.
+  // { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
+  // { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
+  // { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
+  // { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-5-mini", tag: "Recomendado" },
   // { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
+  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-3.5-flash", tag: "Recomendado" },
   { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-3.1-flash-lite", tag: "Rápido" },
-  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-3.5-flash", tag: "Smart" },
 ];
-const DEFAULT_MODEL_ID = "gpt-5.5-mini";
+const DEFAULT_MODEL_ID = "gemini-flash";
 
 function buildDgUrl(sttLang: string): string {
   const params = new URLSearchParams({
@@ -400,99 +400,21 @@ export default function Page() {
     [profile, company, role, lang]
   );
 
-  // Decide si vale la pena disparar: evita pedir dos veces lo mismo y, si el
-  // turno creció (la persona siguió hablando), cancela el request viejo y
-  // relanza con el texto completo reusando la misma tarjeta.
-  const fireIfNew = useCallback(
-    (question: string, closeTurn: boolean) => {
-      const q = question.trim();
-      const turn = turnRef.current;
-      if (!q || q.length < 4) {
-        if (closeTurn) turnRef.current = null;
-        return;
-      }
-      if (turn && turn.sentText === q) {
-        if (closeTurn) turnRef.current = null;
-        return; // ya cubierto por un disparo especulativo previo idéntico
-      }
-      turn?.controller?.abort();
 
-      const id = turn ? turn.id : ++ansId.current;
-      const controller = new AbortController();
-      turnRef.current = closeTurn ? null : { id, sentText: q, controller };
-      runGenerate(id, q, controller);
-    },
-    [runGenerate]
-  );
-
-  // Entra/extiende "tu turno": mientras estés respondiendo (mic), la app no
-  // toma tu voz como pregunta. Cada vez que seguís hablando se re-arma el
-  // timer; cuando hay silencio sostenido, termina tu turno y arranca fresco.
-  const bumpCandidateTurn = useCallback(() => {
-    candidateTurnRef.current = true;
-    if (turnEndTimerRef.current) clearTimeout(turnEndTimerRef.current);
-    turnEndTimerRef.current = setTimeout(() => {
-      turnEndTimerRef.current = null;
-      candidateTurnRef.current = false;
-      questionBufRef.current = ""; // fresco para la próxima pregunta del entrevistador
-    }, TURN_SILENCE_MS);
-  }, []);
-
-  // Reevalúa el buffer acumulado cada vez que llega texto nuevo: si ya
-  // "suena completo", programa un disparo especulativo tras un debounce
-  // corto (para no disparar en cada micro-fragmento).
-  const scheduleSpeculative = useCallback(() => {
-    if (specTimerRef.current) clearTimeout(specTimerRef.current);
-    specTimerRef.current = null;
-    if (micModeRef.current && candidateTurnRef.current) return; // tu turno: no dispares
-    const buf = questionBufRef.current;
-    // Las palabras que "cuelgan" dependen del idioma del entrevistador (STT).
-    const hangRe = STT_LANG[lang] === "en" ? HANGING_RE_EN : HANGING_RE_ES;
-    if (!looksLikeCompleteQuestion(buf, hangRe)) return;
-    specTimerRef.current = setTimeout(() => {
-      specTimerRef.current = null;
-      fireIfNew(questionBufRef.current, false);
-    }, SPEC_DEBOUNCE_MS);
-  }, [fireIfNew, lang]);
-
-  const flushQuestion = useCallback(() => {
-    if (specTimerRef.current) {
-      clearTimeout(specTimerRef.current);
-      specTimerRef.current = null;
-    }
-    // Si es tu turno (estás respondiendo en mic), descartá lo acumulado en vez
-    // de dispararlo como pregunta, y extendé el turno.
-    if (micModeRef.current && candidateTurnRef.current) {
-      questionBufRef.current = "";
-      bumpCandidateTurn();
-      return;
-    }
-    const q = questionBufRef.current;
-    questionBufRef.current = "";
-    fireIfNew(q, true);
-    // Una pregunta real cerró → ahora es tu turno de responder (mic).
-    if (micModeRef.current && q.trim().length >= 4) bumpCandidateTurn();
-  }, [fireIfNew, bumpCandidateTurn]);
-
-  // Disparo manual: responde YA con lo que haya, sin esperar al endpointing.
-  // Fuerza aunque sea tu turno (por si el entrevistador te repreguntó y la app
-  // lo tomó como tu voz). Si el buffer ya se vació, usa la cola de la
-  // transcripción para re-pedir sobre lo último dicho.
+  // Disparo manual (ÚNICA forma de responder, como Parakeet): al tocar
+  // "Responder ahora" se genera una respuesta sobre lo último dicho. La app
+  // NO responde sola mientras la persona habla; solo transcribe.
   const answerNow = useCallback(() => {
-    if (specTimerRef.current) {
-      clearTimeout(specTimerRef.current);
-      specTimerRef.current = null;
-    }
-    candidateTurnRef.current = false;
-    if (turnEndTimerRef.current) {
-      clearTimeout(turnEndTimerRef.current);
-      turnEndTimerRef.current = null;
-    }
-    const q = questionBufRef.current.trim() || transcriptRef.current.trim().slice(-300);
+    // Aborta una respuesta en curso para no encimar dos generaciones.
+    turnRef.current?.controller?.abort();
+    turnRef.current = null;
+    const q = questionBufRef.current.trim() || transcriptRef.current.trim().slice(-500);
     questionBufRef.current = "";
-    fireIfNew(q, true);
-    if (micModeRef.current) bumpCandidateTurn();
-  }, [fireIfNew, bumpCandidateTurn]);
+    if (q.trim().length < 2) return;
+    const id = ++ansId.current;
+    const controller = new AbortController();
+    runGenerate(id, q, controller);
+  }, [runGenerate]);
 
   // Limpia respuestas y transcripción en pantalla (como el "Clear" de Parakeet),
   // sin cortar la sesión: el Loro sigue escuchando.
@@ -514,11 +436,8 @@ export default function Page() {
         return;
       }
 
-      // Fin de intervención (silencio prolongado) -> disparo lo acumulado.
-      if (msg.type === "UtteranceEnd") {
-        flushQuestion();
-        return;
-      }
+      // Modo manual: NO se dispara solo por fin de intervención.
+      if (msg.type === "UtteranceEnd") return;
       if (msg.type !== "Results") return;
 
       const alt = msg.channel?.alternatives?.[0];
@@ -536,22 +455,15 @@ export default function Page() {
         return next.slice(-60);
       });
 
+      // Solo acumulamos texto (contexto + buffer para "Responder ahora"). La
+      // generación ocurre EXCLUSIVAMENTE al tocar el botón, así la conversación
+      // no avanza sola con respuestas nuevas mientras la persona habla.
       if (isFinal) {
-        transcriptRef.current += " " + text; // contexto siempre (incluye tu voz)
-        // Si es tu turno (mic, estás respondiendo), no tomes tu voz como
-        // pregunta: solo extendé el turno y seguí.
-        if (micModeRef.current && candidateTurnRef.current) {
-          bumpCandidateTurn();
-          return;
-        }
-        questionBufRef.current += " " + text;
-        // speech_final = Deepgram detectó fin de frase por endpointing (silencio).
-        // Si no, evaluamos si el texto ya "suena completo" para disparar antes.
-        if (msg.speech_final) flushQuestion();
-        else scheduleSpeculative();
+        transcriptRef.current = (transcriptRef.current + " " + text).slice(-8000);
+        questionBufRef.current = (questionBufRef.current + " " + text).slice(-1500);
       }
     },
-    [flushQuestion, scheduleSpeculative, bumpCandidateTurn]
+    []
   );
 
   // ---------- Captura ----------
