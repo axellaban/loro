@@ -59,6 +59,11 @@ const HANGING_RE_ES = hangingRe(HANGING_ES);
 const HANGING_RE_EN = hangingRe(HANGING_EN);
 const QUESTION_END_RE = /[?¿]\s*$/;
 const SPEC_DEBOUNCE_MS = 180;
+// "Tu turno": tras responderse una pregunta, en modo micrófono la app deja de
+// tomar lo que oye como preguntas nuevas (sos vos respondiendo) hasta que hay
+// un silencio sostenido de este largo, que marca que terminaste y vuelve a
+// escuchar al entrevistador.
+const TURN_SILENCE_MS = 2800;
 
 function looksLikeCompleteQuestion(raw: string, hangRe: RegExp): boolean {
   const t = raw.trim();
@@ -107,6 +112,11 @@ export default function Page() {
   // Turno de pregunta en curso: permite cancelar un disparo especulativo y
   // reemplazarlo si la persona sigue hablando, reusando la misma tarjeta.
   const turnRef = useRef<{ id: number; sentText: string; controller: AbortController | null } | null>(null);
+  // "Tu turno" (solo modo micrófono): mientras respondés, no tomar tu voz como
+  // pregunta. micModeRef fija si aplica esta lógica en la sesión actual.
+  const micModeRef = useRef(false);
+  const candidateTurnRef = useRef(false);
+  const turnEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollT = useRef<HTMLDivElement | null>(null);
   const scrollA = useRef<HTMLDivElement | null>(null);
@@ -238,12 +248,26 @@ export default function Page() {
     [runGenerate]
   );
 
+  // Entra/extiende "tu turno": mientras estés respondiendo (mic), la app no
+  // toma tu voz como pregunta. Cada vez que seguís hablando se re-arma el
+  // timer; cuando hay silencio sostenido, termina tu turno y arranca fresco.
+  const bumpCandidateTurn = useCallback(() => {
+    candidateTurnRef.current = true;
+    if (turnEndTimerRef.current) clearTimeout(turnEndTimerRef.current);
+    turnEndTimerRef.current = setTimeout(() => {
+      turnEndTimerRef.current = null;
+      candidateTurnRef.current = false;
+      questionBufRef.current = ""; // fresco para la próxima pregunta del entrevistador
+    }, TURN_SILENCE_MS);
+  }, []);
+
   // Reevalúa el buffer acumulado cada vez que llega texto nuevo: si ya
   // "suena completo", programa un disparo especulativo tras un debounce
   // corto (para no disparar en cada micro-fragmento).
   const scheduleSpeculative = useCallback(() => {
     if (specTimerRef.current) clearTimeout(specTimerRef.current);
     specTimerRef.current = null;
+    if (micModeRef.current && candidateTurnRef.current) return; // tu turno: no dispares
     const buf = questionBufRef.current;
     // Las palabras que "cuelgan" dependen del idioma del entrevistador (STT).
     const hangRe = STT_LANG[lang] === "en" ? HANGING_RE_EN : HANGING_RE_ES;
@@ -259,23 +283,39 @@ export default function Page() {
       clearTimeout(specTimerRef.current);
       specTimerRef.current = null;
     }
+    // Si es tu turno (estás respondiendo en mic), descartá lo acumulado en vez
+    // de dispararlo como pregunta, y extendé el turno.
+    if (micModeRef.current && candidateTurnRef.current) {
+      questionBufRef.current = "";
+      bumpCandidateTurn();
+      return;
+    }
     const q = questionBufRef.current;
     questionBufRef.current = "";
     fireIfNew(q, true);
-  }, [fireIfNew]);
+    // Una pregunta real cerró → ahora es tu turno de responder (mic).
+    if (micModeRef.current && q.trim().length >= 4) bumpCandidateTurn();
+  }, [fireIfNew, bumpCandidateTurn]);
 
   // Disparo manual: responde YA con lo que haya, sin esperar al endpointing.
-  // Si el buffer del turno ya se vació (la pregunta ya se disparó), usa la
-  // cola de la transcripción para poder re-pedir sobre lo último dicho.
+  // Fuerza aunque sea tu turno (por si el entrevistador te repreguntó y la app
+  // lo tomó como tu voz). Si el buffer ya se vació, usa la cola de la
+  // transcripción para re-pedir sobre lo último dicho.
   const answerNow = useCallback(() => {
     if (specTimerRef.current) {
       clearTimeout(specTimerRef.current);
       specTimerRef.current = null;
     }
+    candidateTurnRef.current = false;
+    if (turnEndTimerRef.current) {
+      clearTimeout(turnEndTimerRef.current);
+      turnEndTimerRef.current = null;
+    }
     const q = questionBufRef.current.trim() || transcriptRef.current.trim().slice(-300);
     questionBufRef.current = "";
     fireIfNew(q, true);
-  }, [fireIfNew]);
+    if (micModeRef.current) bumpCandidateTurn();
+  }, [fireIfNew, bumpCandidateTurn]);
 
   // ---------- Mensajes Deepgram ----------
   const onDgMessage = useCallback(
@@ -310,7 +350,13 @@ export default function Page() {
       });
 
       if (isFinal) {
-        transcriptRef.current += " " + text;
+        transcriptRef.current += " " + text; // contexto siempre (incluye tu voz)
+        // Si es tu turno (mic, estás respondiendo), no tomes tu voz como
+        // pregunta: solo extendé el turno y seguí.
+        if (micModeRef.current && candidateTurnRef.current) {
+          bumpCandidateTurn();
+          return;
+        }
         questionBufRef.current += " " + text;
         // speech_final = Deepgram detectó fin de frase por endpointing (silencio).
         // Si no, evaluamos si el texto ya "suena completo" para disparar antes.
@@ -318,7 +364,7 @@ export default function Page() {
         else scheduleSpeculative();
       }
     },
-    [flushQuestion, scheduleSpeculative]
+    [flushQuestion, scheduleSpeculative, bumpCandidateTurn]
   );
 
   // ---------- Captura ----------
@@ -354,6 +400,13 @@ export default function Page() {
     }
     turnRef.current?.controller?.abort();
     turnRef.current = null;
+    // "Tu turno" solo aplica en modo micrófono (en Pestaña no oís tu propia voz).
+    micModeRef.current = mode === "mic";
+    candidateTurnRef.current = false;
+    if (turnEndTimerRef.current) {
+      clearTimeout(turnEndTimerRef.current);
+      turnEndTimerRef.current = null;
+    }
     // Idioma del entrevistador (STT) fijado al inicio de la sesión.
     const dgUrl = buildDgUrl(STT_LANG[lang]);
     try {
@@ -503,6 +556,9 @@ export default function Page() {
     keepAliveRef.current = null;
     if (specTimerRef.current) clearTimeout(specTimerRef.current);
     specTimerRef.current = null;
+    if (turnEndTimerRef.current) clearTimeout(turnEndTimerRef.current);
+    turnEndTimerRef.current = null;
+    candidateTurnRef.current = false;
     turnRef.current?.controller?.abort();
     turnRef.current = null;
     try {
