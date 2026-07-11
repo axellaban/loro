@@ -44,7 +44,7 @@ Usá la TRANSCRIPCIÓN para sonar como una conversación real: no repitas algo q
 - Largo VARIABLE según la pregunta: una factual se contesta en 1-2 bullets; una de comportamiento pide el arco completo (hasta 5). Nunca infles con relleno para llegar a un largo. Nunca te quedes a medias.
 - Todo en primera persona, listo para decir en voz alta tal cual — no son "ideas para desarrollar", son la respuesta misma ya hablada.
 - Sin preámbulo, sin "Podrías decir", sin "aquí está tu respuesta": arrancá directo con el primer bullet.
-- Mismo idioma y mismo registro (tú/vos/usted) que usa el entrevistador en la transcripción.
+- Respondé en el idioma indicado en "## IDIOMA DE LA RESPUESTA" (puede diferir del idioma de la pregunta). Dentro de ese idioma, espejá el registro (tú/vos/usted) del entrevistador.
 
 ## Regla de oro sobre [PREGUNTA]
 Si ese campo tiene CUALQUIER texto —por corto, informal, mal transcrito o inesperado que sea, incluso si el PERFIL o la EMPRESA están vacíos— RESPONDÉLO IGUAL con lo que tengas. Nunca evalúes si "es lo bastante clara". El ÚNICO caso en que devolvés el bullet "· (esperando pregunta)" es cuando [PREGUNTA] dice literalmente "(ninguna aún)" porque no llegó nada. Nunca lo uses por dudar del contenido.`;
@@ -61,6 +61,7 @@ export async function POST(req: Request) {
     profile?: string;
     company?: string;
     role?: string;
+    answerLang?: string;
     transcript?: string;
     question?: string;
   };
@@ -75,6 +76,10 @@ export async function POST(req: Request) {
   const role = (body.role || "").slice(0, 200);
   const transcript = (body.transcript || "").slice(0, 6000);
   const question = (body.question || "").slice(0, 1000);
+  const answerLangLabel =
+    body.answerLang === "en"
+      ? "Inglés (English). Respondé SIEMPRE en inglés, aunque la pregunta esté en otro idioma."
+      : "Español rioplatense. Respondé SIEMPRE en español, aunque la pregunta esté en inglés u otro idioma.";
 
   const userContent = `## EMPRESA
 ${company || "(sin especificar)"}
@@ -84,6 +89,9 @@ ${role || "(sin especificar)"}
 
 ## PERFIL DEL CANDIDATO
 ${profile || "(sin perfil cargado)"}
+
+## IDIOMA DE LA RESPUESTA
+${answerLangLabel}
 
 ## TRANSCRIPCIÓN RECIENTE
 ${transcript || "(vacío)"}

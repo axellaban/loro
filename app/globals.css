@@ -90,6 +90,19 @@ input {
   }
 }
 
+/* Selector de idioma: 3 opciones en fila, apiladas en mobile */
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .lang-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Translucent Flat Panels */
 .panel {
   background: var(--panel);

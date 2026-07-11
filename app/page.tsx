@@ -7,48 +7,65 @@ type Mode = "mic" | "tab";
 type Line = { id: number; text: string; final: boolean };
 type Answer = { id: number; question: string; text: string; done: boolean };
 
-const DG_PARAMS = new URLSearchParams({
-  model: "nova-2",
-  language: "es",
-  smart_format: "true",
-  interim_results: "true",
-  endpointing: "500",
-  utterance_end_ms: "1000",
-  vad_events: "true",
-  encoding: "linear16",
-  sample_rate: "16000",
-  channels: "1",
-}).toString();
-const DG_URL = `wss://api.deepgram.com/v1/listen?${DG_PARAMS}`;
+// ---------- Idioma ----------
+// "es"    → entrevista en español, respuesta en español.
+// "en"    → entrevista en inglés, respuesta en inglés.
+// "en-es" → entrevista en inglés (STT), respuesta en español (modo táctico).
+type Lang = "es" | "en" | "en-es";
+const STT_LANG: Record<Lang, string> = { es: "es", en: "en", "en-es": "en" };
+const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en", "en-es": "es" };
+
+function buildDgUrl(sttLang: string): string {
+  const params = new URLSearchParams({
+    model: "nova-2",
+    language: sttLang,
+    smart_format: "true",
+    interim_results: "true",
+    endpointing: "500",
+    utterance_end_ms: "1000", // mínimo impuesto por Deepgram — NO bajar de 1000
+    vad_events: "true",
+    encoding: "linear16",
+    sample_rate: "16000",
+    channels: "1",
+  }).toString();
+  return `wss://api.deepgram.com/v1/listen?${params}`;
+}
 
 const LS_KEY = "copiloto:context:v1";
 
 // ---------- Endpointing semántico ----------
 // Deepgram avisa fin de turno por silencio (speech_final/UtteranceEnd), pero
-// eso tarda ~1s igual (utterance_end_ms tiene un mínimo de 1000ms impuesto por
-// Deepgram — NO TOCAR ese valor, ver DG_PARAMS arriba). Si el texto acumulado
-// YA suena a pregunta completa, disparamos antes (speculativo) y si la
-// persona sigue hablando, cancelamos y volvemos a disparar con el texto
-// completo. Esta capa es puramente del lado del cliente: no cambia ni un
-// parámetro de la conexión con Deepgram.
-const HANGING_WORDS = [
+// eso tarda ~1s igual. Si el texto acumulado YA suena a pregunta completa,
+// disparamos antes (speculativo) y si la persona sigue hablando, cancelamos y
+// volvemos a disparar. Capa 100% cliente: no cambia nada de la conexión.
+// Las "palabras que cuelgan" (preposiciones/conjunciones que indican frase
+// incompleta) son específicas del idioma del ENTREVISTADOR (el STT).
+const HANGING_ES = [
   "y", "o", "pero", "que", "porque", "aunque", "si", "como", "cuando", "mientras",
   "en", "a", "de", "del", "al", "con", "sobre", "para", "por", "sin", "entre", "hacia", "desde", "hasta",
   "el", "la", "los", "las", "un", "una", "unos", "unas", "mi", "tu", "su",
   "así que", "ya que", "es decir", "por ejemplo", "o sea",
 ];
-const HANGING_RE = new RegExp(
-  "(^|\\s)(" + HANGING_WORDS.map((w) => w.replace(/\s+/g, "\\s+")).join("|") + ")[.,]?\\s*$",
-  "i"
-);
+const HANGING_EN = [
+  "and", "or", "but", "so", "because", "that", "which", "when", "while", "if", "as",
+  "the", "a", "an", "to", "of", "in", "on", "at", "for", "with", "from", "by", "about", "into", "than", "then",
+];
+function hangingRe(words: string[]): RegExp {
+  return new RegExp(
+    "(^|\\s)(" + words.map((w) => w.replace(/\s+/g, "\\s+")).join("|") + ")[.,]?\\s*$",
+    "i"
+  );
+}
+const HANGING_RE_ES = hangingRe(HANGING_ES);
+const HANGING_RE_EN = hangingRe(HANGING_EN);
 const QUESTION_END_RE = /[?¿]\s*$/;
 const SPEC_DEBOUNCE_MS = 180;
 
-function looksLikeCompleteQuestion(raw: string): boolean {
+function looksLikeCompleteQuestion(raw: string, hangRe: RegExp): boolean {
   const t = raw.trim();
   if (t.length < 6) return false;
   if (QUESTION_END_RE.test(t)) return true;
-  if (HANGING_RE.test(t)) return false;
+  if (hangRe.test(t)) return false;
   return t.split(/\s+/).filter(Boolean).length >= 6;
 }
 
@@ -59,6 +76,7 @@ export default function Page() {
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [profile, setProfile] = useState("");
+  const [lang, setLang] = useState<Lang>("es");
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [tab, setTab] = useState<"answer" | "transcript">("answer");
@@ -133,13 +151,14 @@ export default function Page() {
       if (saved.company) setCompany(saved.company);
       if (saved.role) setRole(saved.role);
       if (saved.profile) setProfile(saved.profile);
+      if (saved.lang === "es" || saved.lang === "en" || saved.lang === "en-es") setLang(saved.lang);
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile }));
+      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile, lang }));
     } catch {}
-  }, [company, role, profile]);
+  }, [company, role, profile, lang]);
 
   // ---------- Generación ----------
   // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
@@ -163,6 +182,7 @@ export default function Page() {
             profile,
             company,
             role,
+            answerLang: ANSWER_LANG[lang],
             transcript: transcriptRef.current.slice(-4000),
             question,
           }),
@@ -191,7 +211,7 @@ export default function Page() {
         );
       }
     },
-    [profile, company, role]
+    [profile, company, role, lang]
   );
 
   // Decide si vale la pena disparar: evita pedir dos veces lo mismo y, si el
@@ -226,12 +246,14 @@ export default function Page() {
     if (specTimerRef.current) clearTimeout(specTimerRef.current);
     specTimerRef.current = null;
     const buf = questionBufRef.current;
-    if (!looksLikeCompleteQuestion(buf)) return;
+    // Las palabras que "cuelgan" dependen del idioma del entrevistador (STT).
+    const hangRe = STT_LANG[lang] === "en" ? HANGING_RE_EN : HANGING_RE_ES;
+    if (!looksLikeCompleteQuestion(buf, hangRe)) return;
     specTimerRef.current = setTimeout(() => {
       specTimerRef.current = null;
       fireIfNew(questionBufRef.current, false);
     }, SPEC_DEBOUNCE_MS);
-  }, [fireIfNew]);
+  }, [fireIfNew, lang]);
 
   const flushQuestion = useCallback(() => {
     if (specTimerRef.current) {
@@ -333,6 +355,8 @@ export default function Page() {
     }
     turnRef.current?.controller?.abort();
     turnRef.current = null;
+    // Idioma del entrevistador (STT) fijado al inicio de la sesión.
+    const dgUrl = buildDgUrl(STT_LANG[lang]);
     try {
       const stream = await acquireStream(mode);
       streamRef.current = stream;
@@ -363,7 +387,7 @@ export default function Page() {
         }
         const { token } = await tokRes.json();
 
-        const ws = new WebSocket(DG_URL, ["token", token]);
+        const ws = new WebSocket(dgUrl, ["token", token]);
         ws.binaryType = "arraybuffer";
         wsRef.current = ws;
 
@@ -465,7 +489,7 @@ export default function Page() {
       cleanup();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, acquireStream, onDgMessage]);
+  }, [mode, acquireStream, onDgMessage, lang]);
 
   const cleanup = useCallback(() => {
     // Marca el cierre como intencional ANTES de cerrar el WS: su onclose no
@@ -552,6 +576,41 @@ export default function Page() {
         <p className="mono tagline">
           La cotorra escucha tu entrevista en tiempo real y te cotorrea respuestas. 🦜
         </p>
+      )}
+
+      {/* Selector de idioma */}
+      {!live && (
+        <div>
+          <label className="mono form-label" style={{ display: "block", marginBottom: 8 }}>
+            Idioma de la entrevista
+          </label>
+          <div className="lang-grid">
+            <button
+              className={`btn-select ${lang === "es" ? "btn-select-active" : ""}`}
+              onClick={() => setLang("es")}
+              disabled={connecting}
+            >
+              🇪🇸 Español
+              <span className="btn-select-sub">entrevista en español</span>
+            </button>
+            <button
+              className={`btn-select ${lang === "en" ? "btn-select-active" : ""}`}
+              onClick={() => setLang("en")}
+              disabled={connecting}
+            >
+              🇺🇸 English
+              <span className="btn-select-sub">interview in English</span>
+            </button>
+            <button
+              className={`btn-select ${lang === "en-es" ? "btn-select-active" : ""}`}
+              onClick={() => setLang("en-es")}
+              disabled={connecting}
+            >
+              🇺🇸→🇪🇸 Inglés
+              <span className="btn-select-sub">pregunta en inglés · respondés en español</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Selector de modo */}
