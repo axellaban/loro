@@ -7,6 +7,16 @@ type Mode = "mic" | "tab";
 type Line = { id: number; text: string; final: boolean };
 type Answer = { id: number; question: string; text: string; done: boolean };
 
+// Ícono "mágico" (sparkle / auto-awesome) del botón de respuesta, como Parakeet.
+function SparkleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2.5l1.9 4.9 4.9 1.9-4.9 1.9L12 16l-1.9-4.8L5.2 9.3l4.9-1.9L12 2.5z" />
+      <path d="M18.5 14.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
+    </svg>
+  );
+}
+
 // ---------- Idioma ----------
 // "es" → entrevista y respuesta en español.
 // "en" → entrevista y respuesta en inglés.
@@ -656,12 +666,24 @@ export default function Page() {
         <div className="brand">
           <span className="brand-title">Loreado.ia 🦜</span>
         </div>
-        <span className={`status-chip ${live ? "status-chip-live" : ""}`}>
-          {status === "idle" && "en espera"}
-          {connecting && "conectando…"}
-          {live && "en vivo"}
-          {status === "error" && "error"}
-        </span>
+        <div className="header-actions">
+          <span className={`status-chip ${live ? "status-chip-live" : ""}`}>
+            {status === "idle" && "en espera"}
+            {connecting && "conectando…"}
+            {live && "en vivo"}
+            {status === "error" && "error"}
+          </span>
+          {live && (
+            <button
+              className="stop-x"
+              onClick={stop}
+              aria-label="Detener"
+              title="Detener"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </header>
 
       {!live && (
@@ -914,17 +936,15 @@ export default function Page() {
           </button>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <button onClick={answerNow} className="btn-action btn-primary">
-              ✦ Responder ahora
-            </button>
-            <div className="grid-responsive" style={{ gap: 10 }}>
-              <button onClick={clearAll} className="btn-action btn-ghost">
-                Limpiar
-              </button>
-              <button onClick={stop} className="btn-action btn-stop">
-                ■ Detener
+            <div className="clear-row">
+              <button onClick={clearAll} className="clear-pill mono">
+                ✕ Limpiar
               </button>
             </div>
+            <button onClick={answerNow} className="btn-action btn-primary btn-answer">
+              <SparkleIcon />
+              Responder ahora
+            </button>
           </div>
         )}
         {!live && (
