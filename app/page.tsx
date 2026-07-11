@@ -838,20 +838,12 @@ export default function Page() {
 
       {/* Contenido */}
       <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
-        {!live && (
-          <p
-            className="mono"
-            style={{ margin: "auto", textAlign: "center", color: "var(--ink-faint)", fontSize: 13, lineHeight: 1.6, maxWidth: 340, padding: 16 }}
-          >
-            🦜 Escucha la entrevista y transcribe en vivo. Cuando quieras la respuesta, tocás “Responder ahora” y la genera sobre lo último dicho.
-          </p>
-        )}
         {live && tab === "answer" && (
           <div className="panel" style={{ flex: 1, minHeight: 0 }}>
             <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
                 <p className="placeholder" style={{ fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", padding: "8px" }}>
-                  Tocá “Responder ahora” cuando termine la pregunta y tu respuesta aparece acá.
+                  Tocá “Responder” cuando termine la pregunta y tu respuesta aparece acá.
                 </p>
               ) : (
                 answers.map((a, index) => (
@@ -919,7 +911,7 @@ export default function Page() {
             </div>
             <button onClick={answerNow} className="btn-action btn-primary btn-answer">
               <SparkleIcon />
-              Responder ahora
+              Responder
             </button>
           </div>
         )}
