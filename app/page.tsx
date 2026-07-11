@@ -245,12 +245,6 @@ export default function Page() {
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [tab, setTab] = useState<"answer" | "transcript">("answer");
-  // Autocompletar desde el aviso: pegás el post de trabajo y el LLM extrae
-  // empresa + descripción del puesto (como "Fill fields from Job Post").
-  const [showFill, setShowFill] = useState(false);
-  const [fillText, setFillText] = useState("");
-  const [filling, setFilling] = useState(false);
-  const [fillError, setFillError] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -374,8 +368,13 @@ export default function Page() {
           signal: controller.signal,
         });
         if (!res.ok || !res.body) {
+          const detail = (await res.text().catch(() => "")).slice(0, 300);
           setAnswers((prev) =>
-            prev.map((a) => (a.id === id ? { ...a, text: "· Error generando respuesta.", done: true } : a))
+            prev.map((a) =>
+              a.id === id
+                ? { ...a, text: detail ? `⚠️ ${detail}` : "· Error generando respuesta.", done: true }
+                : a
+            )
           );
           return;
         }
@@ -492,34 +491,6 @@ export default function Page() {
     fireIfNew(q, true);
     if (micModeRef.current) bumpCandidateTurn();
   }, [fireIfNew, bumpCandidateTurn]);
-
-  // Autocompletar empresa + descripción del puesto desde un aviso pegado.
-  const fillFromJobPost = useCallback(async () => {
-    const text = fillText.trim();
-    if (!text) return;
-    setFilling(true);
-    setFillError("");
-    try {
-      const res = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) {
-        setFillError(await res.text().catch(() => "No se pudo autocompletar."));
-        return;
-      }
-      const data = await res.json();
-      if (data.company) setCompany(String(data.company).slice(0, 200));
-      if (data.role) setRole(String(data.role).slice(0, 2000));
-      setShowFill(false);
-      setFillText("");
-    } catch {
-      setFillError("No se pudo autocompletar. Probá de nuevo.");
-    } finally {
-      setFilling(false);
-    }
-  }, [fillText]);
 
   // Limpia respuestas y transcripción en pantalla (como el "Clear" de Parakeet),
   // sin cortar la sesión: el Loro sigue escuchando.
@@ -937,53 +908,9 @@ export default function Page() {
       {/* Contexto de la entrevista (solo antes de arrancar) */}
       {!live && (
         <div className="panel">
-          <div className="context-head">
-            <label className="mono form-label">
-              Contexto de la entrevista
-            </label>
-            <button
-              className="fill-link"
-              onClick={() => { setShowFill((v) => !v); setFillError(""); }}
-              disabled={connecting}
-              type="button"
-            >
-              <SparkleIcon />
-              Autocompletar desde aviso
-            </button>
-          </div>
-
-          {showFill && (
-            <div className="fill-box">
-              <textarea
-                value={fillText}
-                onChange={(e) => setFillText(e.target.value)}
-                placeholder="Pegá acá el aviso de trabajo completo (título, empresa, responsabilidades, requisitos) y lo separo en los campos."
-                className="form-textarea"
-                style={{ height: 110 }}
-                disabled={filling}
-              />
-              {fillError && <p className="mono form-hint" style={{ color: "var(--loro-red-deep)" }}>{fillError}</p>}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  className="btn-action btn-primary"
-                  style={{ padding: "10px 14px", fontSize: 13.5 }}
-                  onClick={fillFromJobPost}
-                  disabled={filling || !fillText.trim()}
-                >
-                  {filling ? "Leyendo aviso…" : "Completar campos"}
-                </button>
-                <button
-                  className="clear-pill mono"
-                  onClick={() => { setShowFill(false); setFillError(""); }}
-                  disabled={filling}
-                  type="button"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
-
+          <label className="mono form-label">
+            Contexto de la entrevista
+          </label>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label className="mono form-mini-label">
               Empresa

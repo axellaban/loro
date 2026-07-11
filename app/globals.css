@@ -371,51 +371,6 @@ input {
   line-height: 1.4;
 }
 
-/* Autocompletar desde aviso (como "Fill fields from Job Post"). */
-.context-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.fill-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: transparent;
-  border: none;
-  color: var(--loro-green-deep);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.fill-link svg {
-  width: 15px;
-  height: 15px;
-}
-
-.fill-link:hover:not(:disabled) {
-  color: var(--loro-green-bright);
-}
-
-.fill-link:disabled {
-  color: var(--ink-faint);
-  cursor: default;
-}
-
-.fill-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: #f6fbf9;
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  border-radius: 10px;
-}
 
 /* Status Chips */
 .status-chip {

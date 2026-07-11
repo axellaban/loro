@@ -138,12 +138,12 @@ ${transcript || "(vacío)"}
   // Fallbacks: si el modelo pedido fallara (ID inválido, no habilitado en la
   // cuenta, etc.), se reintenta con uno estable para no quedar sin respuesta
   // en plena entrevista.
-  const FALLBACK: Record<Provider, string> = {
-    openai: "gpt-4.1-mini",
-    anthropic: "claude-haiku-4-5",
-    gemini: "gemini-2.5-flash",
+  const FALLBACK: Record<Provider, string[]> = {
+    openai: ["gpt-4.1-mini", "gpt-4o-mini"],
+    anthropic: ["claude-haiku-4-5"],
+    gemini: ["gemini-2.5-flash"],
   };
-  const candidates = model === FALLBACK[provider] ? [model] : [model, FALLBACK[provider]];
+  const candidates = [model, ...FALLBACK[provider].filter((m) => m !== model)];
 
   try {
     if (provider === "anthropic") return await streamAnthropic(candidates, userContent);
@@ -298,22 +298,32 @@ async function streamOpenAI(models: string[], userContent: string): Promise<Resp
   let detail = "";
   for (const model of models) {
     if (!model) continue;
+    // Los modelos "reasoning" (GPT-5, o-series) usan max_completion_tokens,
+    // rechazan temperature custom y permiten bajar el esfuerzo de razonamiento
+    // (clave para latencia en vivo). Los clásicos (gpt-4.x) usan max_tokens.
+    const isReasoning = /^(gpt-5|o[0-9])/.test(model);
+    const reqBody: Record<string, unknown> = {
+      model,
+      stream: true,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+    };
+    if (isReasoning) {
+      reqBody.max_completion_tokens = 900;
+      reqBody.reasoning_effort = "low";
+    } else {
+      reqBody.max_tokens = 512;
+      reqBody.temperature = 0.4;
+    }
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0.4,
-        max_tokens: 512,
-        stream: true,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-      }),
+      body: JSON.stringify(reqBody),
     });
     if (upstream.ok && upstream.body) {
       return textStreamResponse(
