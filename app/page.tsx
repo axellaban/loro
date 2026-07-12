@@ -105,12 +105,56 @@ function CheckIcon() {
     </svg>
   );
 }
-function RefreshIcon() {
+
+// Tooltip de ayuda (ⓘ) tap-to-toggle, apto mobile (el title nativo no aparece
+// al tocar en el celular).
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M23 4v6h-6M1 20v-6h6" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
+    <span className="info-tip" ref={ref}>
+      <button
+        type="button"
+        className="info-tip-btn"
+        onClick={(e) => {
+          e.preventDefault();
+          setOpen((o) => !o);
+        }}
+        aria-label="Ayuda"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+      </button>
+      {open && <span className="info-bubble">{text}</span>}
+    </span>
+  );
+}
+
+// Tira en vivo: muestra las últimas palabras oídas y resalta la más reciente
+// (cue de "te estoy escuchando ahora"), como el marcado de Parakeet.
+function ListenText({ text }: { text: string }) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  // El contenedor trunca a la izquierda (direction: rtl) para que la palabra
+  // más reciente quede siempre visible a la derecha; el <bdi> mantiene el orden
+  // de lectura normal (izq→der) del texto latino.
+  if (words.length === 0) return <bdi>escuchando…</bdi>;
+  const last = words[words.length - 1];
+  const head = words.slice(Math.max(0, words.length - 9), words.length - 1).join(" ");
+  return (
+    <bdi>
+      {head && <>{head} </>}
+      <span className="active-word">{last}</span>
+    </bdi>
   );
 }
 
@@ -430,20 +474,6 @@ export default function Page() {
     const controller = new AbortController();
     runGenerate(id, q, controller);
   }, [runGenerate]);
-
-  // Regenera: pide OTRA versión de la respuesta para la misma pregunta,
-  // en una tarjeta nueva arriba (así podés comparar con la anterior).
-  const regenerate = useCallback(
-    (question: string) => {
-      if (!question.trim()) return;
-      turnRef.current?.controller?.abort();
-      turnRef.current = null;
-      const id = ++ansId.current;
-      const controller = new AbortController();
-      runGenerate(id, question, controller);
-    },
-    [runGenerate]
-  );
 
   // Copia la respuesta al portapapeles con feedback breve.
   const copyAnswer = useCallback((id: number, text: string) => {
@@ -853,6 +883,7 @@ export default function Page() {
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label className="mono form-mini-label">
               <BriefcaseIcon /> Empresa
+              <InfoTip text="La empresa donde estás entrevistando. Ayuda a que las respuestas suenen específicas de ese lugar." />
             </label>
             <input
               value={company}
@@ -865,6 +896,7 @@ export default function Page() {
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
             <label className="mono form-mini-label">
               <DocIcon /> Descripción del puesto
+              <InfoTip text="Pegá el aviso o el rol al que aplicás: responsabilidades, requisitos, seniority. Cuanto más completo, mejores las respuestas." />
             </label>
             <textarea
               value={role}
@@ -876,6 +908,7 @@ export default function Page() {
           </div>
           <label className="mono form-mini-label" style={{ marginTop: 4 }}>
             <UserIcon /> Tu perfil / CV
+            <InfoTip text="Pegá tu CV, experiencia y logros. El Loro usa esto para responder en tu nombre con datos reales, sin inventar." />
           </label>
           <textarea
             value={profile}
@@ -904,8 +937,8 @@ export default function Page() {
                 <span />
                 <span />
               </span>
-              <span className="listen-text">
-                {lines.length ? lines[lines.length - 1].text : "escuchando…"}
+              <span className="listen-text listen-text-live">
+                <ListenText text={lines.length ? lines[lines.length - 1].text : ""} />
               </span>
               <button className="listen-toggle" onClick={() => setTab("transcript")}>
                 Transcripción
@@ -938,14 +971,6 @@ export default function Page() {
                   <div key={a.id} className={`answer-card ${index === 0 ? "answer-card-first" : ""}`}>
                     {a.text && (
                       <div className="card-actions">
-                        <button
-                          className="card-btn"
-                          onClick={() => regenerate(a.question)}
-                          aria-label="Regenerar respuesta"
-                          title="Regenerar (otra versión)"
-                        >
-                          <RefreshIcon />
-                        </button>
                         <button
                           className={`card-btn ${copiedId === a.id ? "card-btn-done" : ""}`}
                           onClick={() => copyAnswer(a.id, a.text)}

@@ -188,6 +188,61 @@ input {
   flex-shrink: 0;
 }
 
+/* Tooltip de ayuda (ⓘ) */
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.info-tip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.info-tip-btn:hover {
+  color: var(--loro-green-deep);
+}
+
+.info-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 240px;
+  background: var(--ink);
+  color: #fff;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.45;
+  padding: 8px 11px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px -6px rgba(16, 24, 40, 0.3);
+}
+
+/* La tira en vivo trunca a la izquierda para mostrar siempre lo más reciente. */
+.listen-text-live {
+  direction: rtl;
+  text-align: left;
+}
+
+/* Palabra activa en la tira de transcripción en vivo. */
+.active-word {
+  color: var(--loro-green-bright);
+  font-weight: 700;
+}
+
 .form-input, .form-textarea {
   background: #fff;
   border: 1px solid var(--line-strong);
@@ -482,7 +537,7 @@ input {
   flex-direction: column;
   gap: 4px;
   padding-bottom: 12px;
-  padding-right: 72px; /* deja lugar para los botones (regenerar + copiar) */
+  padding-right: 36px; /* deja lugar para el botón de copiar */
   margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
