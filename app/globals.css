@@ -165,9 +165,9 @@ input {
 
 /* Labels de formulario */
 .form-label {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0;
   color: var(--loro-green-deep);
   font-weight: 700;
 }
@@ -175,11 +175,11 @@ input {
 .form-mini-label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-faint);
+  gap: 6px;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0;
+  color: var(--ink-dim);
   font-weight: 600;
 }
 
@@ -411,10 +411,41 @@ input {
 }
 
 .answer-card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 16px;
+}
+
+/* Botón de copiar respuesta (como el iconito de Parakeet, arriba a la derecha). */
+.copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  z-index: 2;
+}
+
+.copy-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink-dim);
+}
+
+.copy-btn-done {
+  color: var(--loro-green-bright);
+  border-color: var(--loro-green);
+  background: #f0fdf9;
 }
 
 /* La respuesta vigente: borde acentuado + elevación suave, entra con fade+rise. */
@@ -446,6 +477,7 @@ input {
   flex-direction: column;
   gap: 4px;
   padding-bottom: 12px;
+  padding-right: 34px; /* deja lugar para el botón de copiar */
   margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
@@ -457,9 +489,8 @@ input {
 }
 
 .answer-card-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  letter-spacing: 0;
   font-weight: 700;
 }
 

@@ -90,6 +90,21 @@ function UserIcon() {
     </svg>
   );
 }
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+function CheckIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
 
 // Dropdown custom (con icono, tag y badge) — el <select> nativo no lo permite.
 type DDOption = {
@@ -245,6 +260,7 @@ export default function Page() {
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [tab, setTab] = useState<"answer" | "transcript">("answer");
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -406,6 +422,18 @@ export default function Page() {
     const controller = new AbortController();
     runGenerate(id, q, controller);
   }, [runGenerate]);
+
+  // Copia la respuesta al portapapeles con feedback breve.
+  const copyAnswer = useCallback((id: number, text: string) => {
+    const clean = text.replace(/\n{3,}/g, "\n\n").trim();
+    navigator.clipboard
+      ?.writeText(clean)
+      .then(() => {
+        setCopiedId(id);
+        setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+      })
+      .catch(() => {});
+  }, []);
 
   // Limpia respuestas y transcripción en pantalla (como el "Clear" de Parakeet),
   // sin cortar la sesión: el Loro sigue escuchando.
@@ -757,8 +785,10 @@ export default function Page() {
         </div>
       )}
 
-      {/* Selector de modo */}
-      {!live && (
+      {/* Selector de modo: solo cuando hay más de una opción. En iOS "Pestaña"
+          no existe (el navegador no captura audio de pestaña), así que no tiene
+          sentido mostrar un selector de una sola opción — se usa micrófono. */}
+      {!live && !isIOS && (
         <div className={`grid-responsive`}>
           <button
             className={`btn-select ${mode === "mic" ? "btn-select-active" : ""}`}
@@ -768,16 +798,14 @@ export default function Page() {
             🎙️ Micrófono
             <span className="btn-select-sub">Escuchar la sala por mic</span>
           </button>
-          {!isIOS && (
-            <button
-              className={`btn-select ${mode === "tab" ? "btn-select-active" : ""}`}
-              onClick={() => setMode("tab")}
-              disabled={connecting}
-            >
-              🖥️ Pestaña
-              <span className="btn-select-sub">Audio digital de Meet/Zoom</span>
-            </button>
-          )}
+          <button
+            className={`btn-select ${mode === "tab" ? "btn-select-active" : ""}`}
+            onClick={() => setMode("tab")}
+            disabled={connecting}
+          >
+            🖥️ Pestaña
+            <span className="btn-select-sub">Audio digital de Meet/Zoom</span>
+          </button>
         </div>
       )}
       {error && (
@@ -886,12 +914,22 @@ export default function Page() {
               ) : (
                 answers.map((a, index) => (
                   <div key={a.id} className={`answer-card ${index === 0 ? "answer-card-first" : ""}`}>
+                    {a.text && (
+                      <button
+                        className={`copy-btn ${copiedId === a.id ? "copy-btn-done" : ""}`}
+                        onClick={() => copyAnswer(a.id, a.text)}
+                        aria-label="Copiar respuesta"
+                        title="Copiar respuesta"
+                      >
+                        {copiedId === a.id ? <CheckIcon /> : <CopyIcon />}
+                      </button>
+                    )}
                     <div className="answer-card-q-row">
-                      <span className="mono answer-card-label answer-card-label-q">💬 Pregunta</span>
+                      <span className="answer-card-label answer-card-label-q">💬 Pregunta</span>
                       <span className="answer-card-question">{a.question}</span>
                     </div>
                     <div className="answer-card-a-row">
-                      <span className="mono answer-card-label answer-card-label-a">⭐ Respuesta</span>
+                      <span className="answer-card-label answer-card-label-a">⭐ Respuesta</span>
                       <div className="answer-card-text">
                         {a.text ? (
                           // Colapsa líneas en blanco de más entre viñetas, pero conserva
