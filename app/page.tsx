@@ -917,11 +917,6 @@ export default function Page() {
             className="form-textarea"
             disabled={connecting}
           />
-          {(!company.trim() || !role.trim()) && (
-            <p className="mono form-hint">
-              Completá empresa y descripción del puesto para respuestas mejor personalizadas.
-            </p>
-          )}
         </div>
       )}
 
