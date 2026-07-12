@@ -53,6 +53,44 @@ function ProviderIcon({ provider }: { provider: Provider }) {
   );
 }
 
+// Iconos de los campos de contexto (estilo Parakeet: outline al lado del label).
+const fieldIconProps = {
+  width: 13,
+  height: 13,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+function BriefcaseIcon() {
+  return (
+    <svg {...fieldIconProps}>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+function DocIcon() {
+  return (
+    <svg {...fieldIconProps}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8M8 17h8" />
+    </svg>
+  );
+}
+function UserIcon() {
+  return (
+    <svg {...fieldIconProps}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 // Dropdown custom (con icono, tag y badge) — el <select> nativo no lo permite.
 type DDOption = {
   id: string;
@@ -764,7 +802,7 @@ export default function Page() {
           </label>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label className="mono form-mini-label">
-              Empresa
+              <BriefcaseIcon /> Empresa
             </label>
             <input
               value={company}
@@ -776,7 +814,7 @@ export default function Page() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
             <label className="mono form-mini-label">
-              Descripción del puesto
+              <DocIcon /> Descripción del puesto
             </label>
             <textarea
               value={role}
@@ -787,7 +825,7 @@ export default function Page() {
             />
           </div>
           <label className="mono form-mini-label" style={{ marginTop: 4 }}>
-            Tu perfil / CV
+            <UserIcon /> Tu perfil / CV
           </label>
           <textarea
             value={profile}
