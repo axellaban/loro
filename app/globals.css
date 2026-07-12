@@ -418,11 +418,17 @@ input {
   padding: 16px;
 }
 
-/* Botón de copiar respuesta (como el iconito de Parakeet, arriba a la derecha). */
-.copy-btn {
+/* Acciones de la tarjeta (regenerar + copiar), arriba a la derecha. */
+.card-actions {
   position: absolute;
   top: 10px;
   right: 10px;
+  display: inline-flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.card-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -434,15 +440,14 @@ input {
   color: var(--ink-dim);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-  z-index: 2;
 }
 
-.copy-btn:hover {
+.card-btn:hover {
   color: var(--ink);
   border-color: var(--ink-dim);
 }
 
-.copy-btn-done {
+.card-btn-done {
   color: var(--loro-green-bright);
   border-color: var(--loro-green);
   background: #f0fdf9;
@@ -477,7 +482,7 @@ input {
   flex-direction: column;
   gap: 4px;
   padding-bottom: 12px;
-  padding-right: 34px; /* deja lugar para el botón de copiar */
+  padding-right: 72px; /* deja lugar para los botones (regenerar + copiar) */
   margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }

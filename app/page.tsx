@@ -105,6 +105,14 @@ function CheckIcon() {
     </svg>
   );
 }
+function RefreshIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M23 4v6h-6M1 20v-6h6" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+}
 
 // Dropdown custom (con icono, tag y badge) — el <select> nativo no lo permite.
 type DDOption = {
@@ -422,6 +430,20 @@ export default function Page() {
     const controller = new AbortController();
     runGenerate(id, q, controller);
   }, [runGenerate]);
+
+  // Regenera: pide OTRA versión de la respuesta para la misma pregunta,
+  // en una tarjeta nueva arriba (así podés comparar con la anterior).
+  const regenerate = useCallback(
+    (question: string) => {
+      if (!question.trim()) return;
+      turnRef.current?.controller?.abort();
+      turnRef.current = null;
+      const id = ++ansId.current;
+      const controller = new AbortController();
+      runGenerate(id, question, controller);
+    },
+    [runGenerate]
+  );
 
   // Copia la respuesta al portapapeles con feedback breve.
   const copyAnswer = useCallback((id: number, text: string) => {
@@ -915,14 +937,24 @@ export default function Page() {
                 answers.map((a, index) => (
                   <div key={a.id} className={`answer-card ${index === 0 ? "answer-card-first" : ""}`}>
                     {a.text && (
-                      <button
-                        className={`copy-btn ${copiedId === a.id ? "copy-btn-done" : ""}`}
-                        onClick={() => copyAnswer(a.id, a.text)}
-                        aria-label="Copiar respuesta"
-                        title="Copiar respuesta"
-                      >
-                        {copiedId === a.id ? <CheckIcon /> : <CopyIcon />}
-                      </button>
+                      <div className="card-actions">
+                        <button
+                          className="card-btn"
+                          onClick={() => regenerate(a.question)}
+                          aria-label="Regenerar respuesta"
+                          title="Regenerar (otra versión)"
+                        >
+                          <RefreshIcon />
+                        </button>
+                        <button
+                          className={`card-btn ${copiedId === a.id ? "card-btn-done" : ""}`}
+                          onClick={() => copyAnswer(a.id, a.text)}
+                          aria-label="Copiar respuesta"
+                          title="Copiar respuesta"
+                        >
+                          {copiedId === a.id ? <CheckIcon /> : <CopyIcon />}
+                        </button>
+                      </div>
                     )}
                     <div className="answer-card-q-row">
                       <span className="answer-card-label answer-card-label-q">💬 Pregunta</span>
