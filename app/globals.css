@@ -1045,11 +1045,12 @@ input {
 .landing-warn {
   color: #ef4444;
   text-transform: lowercase; /* minúscula: contrasta con el resto en mayúscula */
-  font-size: clamp(10px, 2.2vw, 12px);
+  font-size: clamp(8px, 1.7vw, 10px);
   font-weight: 600;
-  max-width: 30rem;
+  max-width: 26rem;
   letter-spacing: 0.06em;
   line-height: 1.5;
+  margin-top: 36px;
   padding: 0 16px;
   opacity: 0.9;
 }
