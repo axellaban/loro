@@ -902,39 +902,43 @@ export default function Page() {
 
   return (
     <main className={`app-container ${live ? "app-live" : ""}`}>
-      <header className="brand-header">
+      <header className={`brand-header ${live ? "brand-header-live" : ""}`}>
         {live ? (
-          <span className="brand-logo" aria-label="Loreado.IA" title="Loreado.IA">🦜</span>
+          <>
+            <div className="header-row">
+              <div className="brand">
+                <span className="brand-title">Loreado.IA 🦜</span>
+              </div>
+              <button
+                className="stop-x"
+                onClick={stop}
+                aria-label="Detener"
+                title="Detener"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="header-center">
+              <span className="timer-pill sessions-pill" title="Sesiones gratis restantes">
+                🦜 {Math.max(0, FREE_SESSIONS - sessionsUsed)}/{FREE_SESSIONS}
+              </span>
+              <span className="timer-pill">
+                <ClockIcon />
+                {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
+              </span>
+            </div>
+          </>
         ) : (
-          <div className="brand">
-            <span className="brand-title">Loreado.IA 🦜</span>
-          </div>
+          <>
+            <div className="brand">
+              <span className="brand-title">Loreado.IA 🦜</span>
+            </div>
+            <div className="header-actions">
+              {connecting && <span className="status-chip">conectando…</span>}
+              {status === "error" && <span className="status-chip">error</span>}
+            </div>
+          </>
         )}
-        {live && (
-          <div className="header-center">
-            <span className="timer-pill sessions-pill" title="Sesiones gratis restantes">
-              🦜 {Math.max(0, FREE_SESSIONS - sessionsUsed)}/{FREE_SESSIONS}
-            </span>
-            <span className="timer-pill">
-              <ClockIcon />
-              {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
-            </span>
-          </div>
-        )}
-        <div className="header-actions">
-          {!live && connecting && <span className="status-chip">conectando…</span>}
-          {!live && status === "error" && <span className="status-chip">error</span>}
-          {live && (
-            <button
-              className="stop-x"
-              onClick={stop}
-              aria-label="Detener"
-              title="Detener"
-            >
-              ✕
-            </button>
-          )}
-        </div>
       </header>
 
       {!live && (

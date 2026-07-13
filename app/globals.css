@@ -828,18 +828,25 @@ input {
   gap: 8px;
 }
 
-/* Logo compacto (solo parrot) en la pantalla en vivo, para dejar lugar a las pills. */
-.brand-logo {
-  font-size: 26px;
-  line-height: 1;
-  flex-shrink: 0;
+/* En vivo el header pasa a 2 filas (marca+X arriba, pills abajo): así entra la
+   marca completa "Loreado.IA" + las 2 pills sin apretar en mobile. */
+.brand-header-live {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 /* Pills del header (sesiones + timer), mismo formato estilo Parakeet. */
 .header-center {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
