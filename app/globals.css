@@ -828,6 +828,13 @@ input {
   gap: 8px;
 }
 
+/* Logo compacto (solo parrot) en la pantalla en vivo, para dejar lugar a las pills. */
+.brand-logo {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 /* Pills del header (sesiones + timer), mismo formato estilo Parakeet. */
 .header-center {
   display: flex;
