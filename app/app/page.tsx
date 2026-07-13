@@ -903,23 +903,25 @@ export default function Page() {
   return (
     <main className={`app-container ${live ? "app-live" : ""}`}>
       <header className="brand-header">
-        <div className="brand">
-          <span className="brand-title">Loreado.IA 🦜</span>
-        </div>
-        {live && (
-          <span className="timer-pill">
-            <ClockIcon />
-            {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
-          </span>
+        {!live && (
+          <div className="brand">
+            <span className="brand-title">Loreado.IA 🦜</span>
+          </div>
         )}
-        <div className="header-actions">
-          {!live && (
-            <span className="status-chip">
-              {status === "idle" && "en espera"}
-              {connecting && "conectando…"}
-              {status === "error" && "error"}
+        <div className="header-center">
+          <span className="timer-pill sessions-pill" title="Sesiones gratis restantes">
+            🦜 {Math.max(0, FREE_SESSIONS - sessionsUsed)}/{FREE_SESSIONS}
+          </span>
+          {live && (
+            <span className="timer-pill">
+              <ClockIcon />
+              {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
             </span>
           )}
+        </div>
+        <div className="header-actions">
+          {!live && connecting && <span className="status-chip">conectando…</span>}
+          {!live && status === "error" && <span className="status-chip">error</span>}
           {live && (
             <button
               className="stop-x"
@@ -1207,16 +1209,11 @@ export default function Page() {
           </div>
         )}
         {!live && (
-          <>
-            <p className="mono sessions-hint">
-              🦜 Te quedan {Math.max(0, FREE_SESSIONS - sessionsUsed)} de {FREE_SESSIONS} sesiones gratis
-            </p>
-            <p className="mono btn-hint">
-              {mode === "mic"
-                ? "Apoyá el celular cerca de los parlantes; sin auriculares el micrófono tiene que oír al entrevistador."
-                : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
-            </p>
-          </>
+          <p className="mono btn-hint">
+            {mode === "mic"
+              ? "Apoyá el celular cerca de los parlantes; sin auriculares el micrófono tiene que oír al entrevistador."
+              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
+          </p>
         )}
       </footer>
 
