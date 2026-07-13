@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Loreado.ia — Acceso Beta",
+  title: "Loreado.IA — Acceso Beta",
   description: "El copiloto de IA que RRHH no quiere que uses. Acceso beta cerrado.",
 };
 

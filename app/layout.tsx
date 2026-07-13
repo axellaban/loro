@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Loreado.ia 🦜",
+  title: "Loreado.IA 🦜",
   description: "Asistente de respuestas en tiempo real para llamadas",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Loreado.ia",
+    title: "Loreado.IA",
   },
 };
 

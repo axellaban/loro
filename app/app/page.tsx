@@ -816,7 +816,7 @@ export default function Page() {
     <main className={`app-container ${live ? "app-live" : ""}`}>
       <header className="brand-header">
         <div className="brand">
-          <span className="brand-title">Loreado.ia 🦜</span>
+          <span className="brand-title">Loreado.IA 🦜</span>
         </div>
         <div className="header-actions">
           <span className={`status-chip ${live ? "status-chip-live" : ""}`}>
