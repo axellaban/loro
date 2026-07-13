@@ -828,28 +828,36 @@ input {
   gap: 8px;
 }
 
-/* Timer de sesión gratis (estilo Parakeet: reloj + "X min (Free)"). */
+/* Timer de sesión gratis (estilo Parakeet: reloj + "X mins (Free)"). */
 .timer-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 7px;
+  padding: 8px 16px;
   border-radius: 999px;
-  background: #eef0f3;
-  border: 1px solid var(--line);
-  color: var(--ink-dim);
-  font-size: 13px;
+  background: #eceef1;
+  color: var(--ink);
+  font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .timer-pill svg {
   flex-shrink: 0;
+  color: var(--ink-dim);
 }
 
 .timer-free {
   color: var(--ink-faint);
   font-weight: 500;
+}
+
+/* Sesiones gratis restantes (visible en la pantalla de inicio). */
+.sessions-hint {
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--loro-green-deep);
 }
 
 /* Detener = botón rojo con "✕" arriba a la derecha (como Parakeet). */

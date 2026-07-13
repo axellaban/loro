@@ -906,13 +906,14 @@ export default function Page() {
         <div className="brand">
           <span className="brand-title">Loreado.IA 🦜</span>
         </div>
+        {live && (
+          <span className="timer-pill">
+            <ClockIcon />
+            {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
+          </span>
+        )}
         <div className="header-actions">
-          {live ? (
-            <span className="timer-pill">
-              <ClockIcon />
-              {Math.ceil(remainingSec / 60)} min <span className="timer-free">(Free)</span>
-            </span>
-          ) : (
+          {!live && (
             <span className="status-chip">
               {status === "idle" && "en espera"}
               {connecting && "conectando…"}
@@ -1206,12 +1207,16 @@ export default function Page() {
           </div>
         )}
         {!live && (
-          <p className="mono btn-hint">
-            {Math.max(0, FREE_SESSIONS - sessionsUsed)} de {FREE_SESSIONS} sesiones gratis ·{" "}
-            {mode === "mic"
-              ? "Apoyá el celular cerca de los parlantes; sin auriculares el micrófono tiene que oír al entrevistador."
-              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
-          </p>
+          <>
+            <p className="mono sessions-hint">
+              🦜 Te quedan {Math.max(0, FREE_SESSIONS - sessionsUsed)} de {FREE_SESSIONS} sesiones gratis
+            </p>
+            <p className="mono btn-hint">
+              {mode === "mic"
+                ? "Apoyá el celular cerca de los parlantes; sin auriculares el micrófono tiene que oír al entrevistador."
+                : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
+            </p>
+          </>
         )}
       </footer>
 
