@@ -996,9 +996,22 @@ input {
   position: absolute;
   inset: -8px;
   border-radius: 14px;
-  background: linear-gradient(90deg, #22d3ee, #bbf7d0, #3b82f6);
+  /* Mismo efecto que el botón "Responder": halo de colores de loro que fluye. */
+  background: linear-gradient(
+    90deg,
+    #10b981,
+    #34d399,
+    #a3e635,
+    #fbbf24,
+    #f59e0b,
+    #fb7185,
+    #22d3ee,
+    #10b981
+  );
+  background-size: 300% 100%;
   filter: blur(16px);
-  opacity: 0.7;
+  opacity: 0.8;
+  animation: loroGlow 5s linear infinite;
   transition: opacity 0.35s ease;
 }
 
