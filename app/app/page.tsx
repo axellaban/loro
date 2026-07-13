@@ -324,6 +324,19 @@ function buildDgUrl(sttLang: string): string {
 
 const LS_KEY = "copiloto:context:v1";
 
+// ---------- Cuota gratuita (100% client-side, sin backend) ----------
+// Cada navegador arranca con FREE_SESSIONS sesiones de hasta SESSION_MAX_MS.
+// Se descuenta 1 al arrancar. Al agotarse, se muestra el modal de lista de
+// espera. Es escasez percibida, no protección de costos (se saltea borrando
+// storage / incógnito — a propósito en esta fase de guerrilla).
+const SESSIONS_KEY = "loreado:sessions:v1";
+const FREE_SESSIONS = 5;
+const SESSION_MAX_MS = 10 * 60 * 1000;
+// Google Form (lista de espera): submit directo por no-cors, sin backend.
+const GFORM_ACTION =
+  "https://docs.google.com/forms/d/e/1FAIpQLSelOpUf5moBn1tDItWN6Jf37Ky47_4AJwNs5WqiS-E1zL1aqQ/formResponse";
+const GFORM_EMAIL_ENTRY = "entry.73601750";
+
 // ---------- Endpointing semántico ----------
 export default function Page() {
   const [status, setStatus] = useState<Status>("idle");
@@ -338,6 +351,12 @@ export default function Page() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [tab, setTab] = useState<"answer" | "transcript">("answer");
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  // Cuota gratuita
+  const [sessionsUsed, setSessionsUsed] = useState(0);
+  const sessionsUsedRef = useRef(0);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -345,6 +364,7 @@ export default function Page() {
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const wakeLockRef = useRef<any>(null);
   const keepAliveRef = useRef<any>(null);
+  const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Reconexión: distingue cierres pedidos por el usuario (stop/cleanup) de
   // caídas inesperadas del WS en medio de la entrevista.
   const intentionalCloseRef = useRef(false);
@@ -401,6 +421,16 @@ export default function Page() {
       document.removeEventListener("visibilitychange", onResume);
       window.removeEventListener("pageshow", onResume);
     };
+  }, []);
+
+  // Carga la cuota gratuita usada (persistida en el navegador).
+  useEffect(() => {
+    try {
+      const n = parseInt(localStorage.getItem(SESSIONS_KEY) || "0", 10);
+      const used = Number.isFinite(n) ? Math.max(0, n) : 0;
+      sessionsUsedRef.current = used;
+      setSessionsUsed(used);
+    } catch {}
   }, []);
 
   // ---------- Contexto persistido (empresa / puesto / perfil) ----------
@@ -529,6 +559,21 @@ export default function Page() {
     setLines([]);
   }, []);
 
+  // Lista de espera: manda el email directo al Google Form (no-cors, sin backend).
+  // La respuesta es opaca, así que asumimos éxito y mostramos "Enviado ✔".
+  const submitWaitlist = useCallback(async () => {
+    const em = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return;
+    try {
+      await fetch(GFORM_ACTION, {
+        method: "POST",
+        mode: "no-cors",
+        body: new URLSearchParams({ [GFORM_EMAIL_ENTRY]: em }),
+      });
+    } catch {}
+    setEmailSent(true);
+  }, [email]);
+
   // ---------- Mensajes Deepgram ----------
   const onDgMessage = useCallback(
     (raw: string) => {
@@ -591,6 +636,11 @@ export default function Page() {
   }, []);
 
   const start = useCallback(async () => {
+    // Cuota gratuita: si no quedan sesiones, mostramos la lista de espera.
+    if (sessionsUsedRef.current >= FREE_SESSIONS) {
+      setShowPaywall(true);
+      return;
+    }
     setError("");
     setStatus("connecting");
     questionBufRef.current = "";
@@ -719,6 +769,17 @@ export default function Page() {
 
       await connectWs();
 
+      // La sesión arrancó de verdad (audio + socket): descontamos 1 y armamos
+      // el corte automático a los 10 minutos.
+      const used = sessionsUsedRef.current + 1;
+      sessionsUsedRef.current = used;
+      setSessionsUsed(used);
+      try {
+        localStorage.setItem(SESSIONS_KEY, String(used));
+      } catch {}
+      if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = setTimeout(() => stop(), SESSION_MAX_MS);
+
       stream.getAudioTracks()[0].onended = () => stop();
 
       // Wake lock: evita que el celular apague la pantalla en modo mic.
@@ -745,6 +806,8 @@ export default function Page() {
     stableTimerRef.current = null;
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     keepAliveRef.current = null;
+    if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
+    sessionTimerRef.current = null;
     turnRef.current?.controller?.abort();
     turnRef.current = null;
     try {
@@ -1113,12 +1176,49 @@ export default function Page() {
         )}
         {!live && (
           <p className="mono btn-hint">
+            {Math.max(0, FREE_SESSIONS - sessionsUsed)} de {FREE_SESSIONS} sesiones gratis ·{" "}
             {mode === "mic"
-              ? "Apoyá el celular cerca de los parlantes. Sin auriculares: el micrófono tiene que poder oír al entrevistador."
-              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”. Con auriculares funciona igual."}
+              ? "Apoyá el celular cerca de los parlantes; sin auriculares el micrófono tiene que oír al entrevistador."
+              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
           </p>
         )}
       </footer>
+
+      {showPaywall && (
+        <div className="paywall-overlay" onClick={() => setShowPaywall(false)}>
+          <div className="paywall" onClick={(e) => e.stopPropagation()}>
+            <div className="paywall-title">🛑 BETA PAUSADA POR COSTOS</div>
+            <p className="paywall-text">
+              Llegaste al límite de {FREE_SESSIONS} sesiones. Las APIs son caras y tuve que frenar
+              el acceso gratuito para no fundirme.
+            </p>
+            <p className="paywall-text paywall-cta">Sumate a la lista de espera para la versión PRO.</p>
+            {emailSent ? (
+              <div className="paywall-sent">Enviado ✔</div>
+            ) : (
+              <div className="paywall-form">
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submitWaitlist()}
+                  placeholder="tu@email.com"
+                  className="form-input"
+                />
+                <button
+                  className="btn-action btn-primary"
+                  onClick={submitWaitlist}
+                  disabled={!email.trim()}
+                >
+                  Entregá al Loro
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

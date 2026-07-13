@@ -1058,3 +1058,73 @@ input {
   .landing-glow { transition: none; }
   .landing-btn { transition: none; }
 }
+
+/* ===================== Paywall / lista de espera ===================== */
+.paywall-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 8, 6, 0.72);
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.paywall {
+  width: 100%;
+  max-width: 26rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 24px 60px -12px rgba(16, 24, 40, 0.5);
+  text-align: center;
+  animation: answerIn 0.25s ease-out;
+}
+
+.paywall-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+
+.paywall-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  margin-bottom: 10px;
+}
+
+.paywall-cta {
+  color: var(--ink);
+  font-weight: 600;
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.paywall-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.paywall-sent {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--loro-green-deep);
+  background: #f0fdf9;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 10px;
+  padding: 14px;
+  animation: answerIn 0.25s ease-out;
+}
