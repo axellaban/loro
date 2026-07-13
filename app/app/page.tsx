@@ -130,6 +130,14 @@ function CheckIcon() {
     </svg>
   );
 }
+function ClockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
 
 // Tooltip de ayuda (ⓘ) tap-to-toggle, apto mobile (el title nativo no aparece
 // al tocar en el celular).
@@ -357,6 +365,8 @@ export default function Page() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
+  // Countdown de la sesión (10 min gratis), estilo Parakeet.
+  const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -365,6 +375,7 @@ export default function Page() {
   const wakeLockRef = useRef<any>(null);
   const keepAliveRef = useRef<any>(null);
   const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Reconexión: distingue cierres pedidos por el usuario (stop/cleanup) de
   // caídas inesperadas del WS en medio de la entrevista.
   const intentionalCloseRef = useRef(false);
@@ -779,6 +790,18 @@ export default function Page() {
       } catch {}
       if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
       sessionTimerRef.current = setTimeout(() => stop(), SESSION_MAX_MS);
+      // Countdown visible (pill "X min (Free)"), tick cada segundo.
+      const startedAt = Date.now();
+      setRemainingSec(Math.round(SESSION_MAX_MS / 1000));
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      countdownRef.current = setInterval(() => {
+        const left = Math.max(0, Math.ceil((SESSION_MAX_MS - (Date.now() - startedAt)) / 1000));
+        setRemainingSec(left);
+        if (left <= 0 && countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+      }, 1000);
 
       stream.getAudioTracks()[0].onended = () => stop();
 
@@ -808,6 +831,8 @@ export default function Page() {
     keepAliveRef.current = null;
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     sessionTimerRef.current = null;
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = null;
     turnRef.current?.controller?.abort();
     turnRef.current = null;
     try {
@@ -882,12 +907,18 @@ export default function Page() {
           <span className="brand-title">Loreado.IA 🦜</span>
         </div>
         <div className="header-actions">
-          <span className={`status-chip ${live ? "status-chip-live" : ""}`}>
-            {status === "idle" && "en espera"}
-            {connecting && "conectando…"}
-            {live && "en vivo"}
-            {status === "error" && "error"}
-          </span>
+          {live ? (
+            <span className="timer-pill">
+              <ClockIcon />
+              {Math.ceil(remainingSec / 60)} min <span className="timer-free">(Free)</span>
+            </span>
+          ) : (
+            <span className="status-chip">
+              {status === "idle" && "en espera"}
+              {connecting && "conectando…"}
+              {status === "error" && "error"}
+            </span>
+          )}
           {live && (
             <button
               className="stop-x"

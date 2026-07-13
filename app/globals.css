@@ -828,6 +828,30 @@ input {
   gap: 8px;
 }
 
+/* Timer de sesión gratis (estilo Parakeet: reloj + "X min (Free)"). */
+.timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef0f3;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.timer-pill svg {
+  flex-shrink: 0;
+}
+
+.timer-free {
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
 /* Detener = botón rojo con "✕" arriba a la derecha (como Parakeet). */
 .stop-x {
   display: inline-flex;
