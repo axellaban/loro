@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { track } from "../lib/track";
 
 type Status = "idle" | "connecting" | "live" | "error";
 type Mode = "mic" | "tab";
@@ -298,19 +299,16 @@ type ModelOption = { id: string; label: string; provider: Provider; model: strin
 // de API: para Claude va el ID canónico (claude-haiku-4-5) y para Gemini los IDs
 // que funcionan con la key actual; el resto usa el ID que matchea el nombre.
 // Cualquiera se puede pisar por env en el backend (OPENAI_MODEL/ANTHROPIC_MODEL/GEMINI_MODEL).
-// IDs reales de API (verificados, julio 2026). Nota: OpenAI no tiene un
-// "gpt-5.5-mini" — el mini vigente de esa línea es gpt-5-mini. El backend
-// además cae a un modelo estable si alguno fallara, así nunca queda sin respuesta.
-// Por ahora solo Gemini (OpenAI/Claude ocultos). El backend sigue soportando
-// los otros proveedores: para reactivarlos, descomentar sus líneas.
+// IDs reales de la API de Gemini (los que responden con la key actual). El
+// backend igual cae a un modelo estable si alguno fallara, así nunca queda sin
+// respuesta. Por ahora solo Gemini (OpenAI/Claude ocultos); el backend soporta
+// los tres proveedores: para reactivarlos, descomentar sus líneas y cargar la key.
 const MODELS: ModelOption[] = [
   // { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
   // { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
-  // { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
-  // { id: "gpt-5.5-mini", label: "GPT-5.5 Mini", provider: "openai", model: "gpt-5-mini", tag: "Recomendado" },
   // { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
-  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-3.5-flash", tag: "Recomendado" },
-  { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-3.1-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash", label: "Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
+  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
 ];
 const DEFAULT_MODEL_ID = "gemini-flash";
 
@@ -338,12 +336,12 @@ const LS_KEY = "copiloto:context:v1";
 // espera. Es escasez percibida, no protección de costos (se saltea borrando
 // storage / incógnito — a propósito en esta fase de guerrilla).
 const SESSIONS_KEY = "loreado:sessions:v1";
+const BONUS_KEY = "loreado:bonus:v1";
 const FREE_SESSIONS = 5;
+// Sesiones extra que se ganan compartiendo (loop viral). Tope para que no sea
+// infinito.
+const MAX_BONUS = 3;
 const SESSION_MAX_MS = 10 * 60 * 1000;
-// Google Form (lista de espera): submit directo por no-cors, sin backend.
-const GFORM_ACTION =
-  "https://docs.google.com/forms/d/e/1FAIpQLSelOpUf5moBn1tDItWN6Jf37Ky47_4AJwNs5WqiS-E1zL1aqQ/formResponse";
-const GFORM_EMAIL_ENTRY = "entry.73601750";
 
 // ---------- Endpointing semántico ----------
 export default function Page() {
@@ -362,9 +360,18 @@ export default function Page() {
   // Cuota gratuita
   const [sessionsUsed, setSessionsUsed] = useState(0);
   const sessionsUsedRef = useRef(0);
+  // Sesiones extra ganadas por compartir (loop viral).
+  const [bonus, setBonus] = useState(0);
+  const bonusRef = useRef(0);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [shareDone, setShareDone] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [sending, setSending] = useState(false);
+  // Total de sesiones disponibles (base + bonus) y cuántas quedan.
+  const freeSessions = FREE_SESSIONS + bonus;
+  const sessionsLeft = Math.max(0, freeSessions - sessionsUsed);
   // Countdown de la sesión (10 min gratis), estilo Parakeet.
   const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
 
@@ -434,13 +441,22 @@ export default function Page() {
     };
   }, []);
 
-  // Carga la cuota gratuita usada (persistida en el navegador).
+  // Funnel: el usuario llegó a la app.
+  useEffect(() => {
+    track("enter_app");
+  }, []);
+
+  // Carga la cuota gratuita usada + bonus (persistidos en el navegador).
   useEffect(() => {
     try {
       const n = parseInt(localStorage.getItem(SESSIONS_KEY) || "0", 10);
       const used = Number.isFinite(n) ? Math.max(0, n) : 0;
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
+      const b = parseInt(localStorage.getItem(BONUS_KEY) || "0", 10);
+      const earned = Number.isFinite(b) ? Math.min(MAX_BONUS, Math.max(0, b)) : 0;
+      bonusRef.current = earned;
+      setBonus(earned);
     } catch {}
   }, []);
 
@@ -455,14 +471,15 @@ export default function Page() {
       if (saved.profile) setProfile(saved.profile);
       // El modelo sí se restaura (preferencia persistente del usuario).
       if (saved.modelId && MODELS.some((m) => m.id === saved.modelId)) setModelId(saved.modelId);
-      // El idioma NO se restaura: el default siempre es español (se elige por sesión).
+      // Idioma: se restaura la última preferencia (es/en).
+      if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile, modelId }));
+      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile, modelId, lang }));
     } catch {}
-  }, [company, role, profile, modelId]);
+  }, [company, role, profile, modelId, lang]);
 
   // ---------- Generación ----------
   // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
@@ -515,6 +532,7 @@ export default function Page() {
           setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, text: acc } : a)));
         }
         setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, done: true } : a)));
+        track("answer_generated", { model: modelRef.current.model });
       } catch (err: any) {
         if (err?.name === "AbortError") return;
         setAnswers((prev) =>
@@ -538,13 +556,22 @@ export default function Page() {
     if (q.trim().length < 2) return;
     const id = ++ansId.current;
     const controller = new AbortController();
+    // Registrar el turno en curso: así el próximo toque a "Responder" (o
+    // clearAll/cleanup) puede abortar este stream de verdad.
+    turnRef.current = { id, sentText: q, controller };
     runGenerate(id, q, controller);
   }, [runGenerate]);
 
-  // Feedback 👍/👎 por respuesta (se togglea; por ahora solo estado local).
+  // Feedback 👍/👎 por respuesta. Togglea el estado visual y manda el evento a
+  // analytics (única señal de calidad de respuestas que tenemos).
   const setFeedback = useCallback((id: number, fb: "up" | "down") => {
     setAnswers((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, feedback: a.feedback === fb ? null : fb } : a))
+      prev.map((a) => {
+        if (a.id !== id) return a;
+        const next = a.feedback === fb ? null : fb;
+        if (next) track("answer_feedback", { rating: next, model: modelRef.current.model });
+        return { ...a, feedback: next };
+      })
     );
   }, []);
 
@@ -570,20 +597,57 @@ export default function Page() {
     setLines([]);
   }, []);
 
-  // Lista de espera: manda el email directo al Google Form (no-cors, sin backend).
-  // La respuesta es opaca, así que asumimos éxito y mostramos "Enviado ✔".
+  // Lista de espera: manda el email a /api/waitlist, que reenvía al Google Form
+  // desde el servidor y reporta éxito/fallo REAL (no el submit opaco no-cors).
   const submitWaitlist = useCallback(async () => {
     const em = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setEmailError("Poné un email válido.");
+      return;
+    }
+    setSending(true);
+    setEmailError("");
     try {
-      await fetch(GFORM_ACTION, {
+      const r = await fetch("/api/waitlist", {
         method: "POST",
-        mode: "no-cors",
-        body: new URLSearchParams({ [GFORM_EMAIL_ENTRY]: em }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: em }),
       });
-    } catch {}
-    setEmailSent(true);
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) {
+        setEmailSent(true);
+        track("waitlist_submit");
+      } else {
+        setEmailError(j.error || "No se pudo enviar. Probá de nuevo.");
+      }
+    } catch {
+      setEmailError("Error de red. Probá de nuevo.");
+    } finally {
+      setSending(false);
+    }
   }, [email]);
+
+  // Loop viral: compartir por WhatsApp otorga +1 sesión (hasta MAX_BONUS).
+  // Honesto con la fase actual: no verifica que el amigo entre (igual que la
+  // cuota client-side), pero convierte a cada usuario en distribuidor.
+  const shareForBonus = useCallback(() => {
+    const url =
+      typeof window !== "undefined" ? window.location.origin : "https://copiloto-mvp.vercel.app";
+    const msg = `Estoy usando Loreado.IA: una IA que te sopla las respuestas en las entrevistas, en tiempo real 🦜 Probalo gratis 👉 ${url}`;
+    try {
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+    } catch {}
+    track("share_whatsapp");
+    if (bonusRef.current < MAX_BONUS) {
+      const b = bonusRef.current + 1;
+      bonusRef.current = b;
+      setBonus(b);
+      try {
+        localStorage.setItem(BONUS_KEY, String(b));
+      } catch {}
+    }
+    setShareDone(true);
+  }, []);
 
   // ---------- Mensajes Deepgram ----------
   const onDgMessage = useCallback(
@@ -648,8 +712,9 @@ export default function Page() {
 
   const start = useCallback(async () => {
     // Cuota gratuita: si no quedan sesiones, mostramos la lista de espera.
-    if (sessionsUsedRef.current >= FREE_SESSIONS) {
+    if (sessionsUsedRef.current >= FREE_SESSIONS + bonusRef.current) {
       setShowPaywall(true);
+      track("paywall_shown");
       return;
     }
     setError("");
@@ -689,9 +754,11 @@ export default function Page() {
           const e = await tokRes.json().catch(() => ({}));
           throw new Error(e.error || "No se pudo obtener token de Deepgram.");
         }
-        const { token } = await tokRes.json();
+        const { token, scheme } = await tokRes.json();
 
-        const ws = new WebSocket(dgUrl, ["token", token]);
+        // Token temporal de Deepgram (grant): usa esquema "bearer". Fallback a
+        // "token" por compatibilidad si el backend no mandara scheme.
+        const ws = new WebSocket(dgUrl, [scheme || "token", token]);
         ws.binaryType = "arraybuffer";
         wsRef.current = ws;
 
@@ -785,6 +852,7 @@ export default function Page() {
       const used = sessionsUsedRef.current + 1;
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
+      track("session_start", { mode, model: modelRef.current.model });
       try {
         localStorage.setItem(SESSIONS_KEY, String(used));
       } catch {}
@@ -910,7 +978,7 @@ export default function Page() {
           {live && (
             <div className="header-center">
               <span className="timer-pill sessions-pill" title="Sesiones gratis restantes">
-                {FREE_SESSIONS}/{FREE_SESSIONS} Loros ~ {Math.ceil(remainingSec / 60)} mins (Free)
+                {sessionsLeft}/{freeSessions} Loros ~ {Math.ceil(remainingSec / 60)} mins (Free)
               </span>
             </div>
           )}
@@ -1211,12 +1279,34 @@ export default function Page() {
           <div className="paywall" onClick={(e) => e.stopPropagation()}>
             <div className="paywall-title">🛑 BETA PAUSADA POR COSTOS</div>
             <p className="paywall-text">
-              Llegaste al límite de {FREE_SESSIONS} sesiones. Las APIs son caras y tuve que frenar
+              Llegaste al límite de {freeSessions} sesiones. Las APIs son caras y tuve que frenar
               el acceso gratuito para no fundirme.
             </p>
-            <p className="paywall-text paywall-cta">Sumate a la lista de espera para acceso sin límites.</p>
+
+            {/* Loop viral: compartir = +1 sesión. Es la vía primaria de salida. */}
+            {shareDone && sessionsLeft > 0 ? (
+              <div className="paywall-share paywall-share-done">
+                <div className="paywall-share-title">🦜 ¡Ganaste 1 sesión más!</div>
+                <button
+                  className="btn-action btn-primary"
+                  onClick={() => setShowPaywall(false)}
+                >
+                  Seguir gratis →
+                </button>
+              </div>
+            ) : bonusRef.current < MAX_BONUS ? (
+              <div className="paywall-share">
+                <div className="paywall-share-title">🦜 Regalale un Loro a un amigo</div>
+                <p className="paywall-text">Compartís y te ganás +1 sesión gratis al toque.</p>
+                <button className="btn-action btn-whatsapp" onClick={shareForBonus}>
+                  Compartir por WhatsApp
+                </button>
+              </div>
+            ) : null}
+
+            <p className="paywall-text paywall-cta">O sumate a la lista de espera para acceso sin límites.</p>
             {emailSent ? (
-              <div className="paywall-sent">Enviado ✔</div>
+              <div className="paywall-sent">Enviado ✔ Te avisamos cuando abramos cupos.</div>
             ) : (
               <div className="paywall-form">
                 <input
@@ -1224,7 +1314,10 @@ export default function Page() {
                   inputMode="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError("");
+                  }}
                   onKeyDown={(e) => e.key === "Enter" && submitWaitlist()}
                   placeholder="tu@email.com"
                   className="form-input"
@@ -1232,10 +1325,11 @@ export default function Page() {
                 <button
                   className="btn-action btn-primary"
                   onClick={submitWaitlist}
-                  disabled={!email.trim()}
+                  disabled={!email.trim() || sending}
                 >
-                  Entregá al Loro
+                  {sending ? "Enviando…" : "Entregá al Loro"}
                 </button>
+                {emailError && <div className="paywall-error">{emailError}</div>}
               </div>
             )}
           </div>

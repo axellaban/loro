@@ -1,5 +1,7 @@
 export const runtime = "edge";
 
+import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
+
 // ---------- Modelos disponibles ----------
 // El cliente manda { provider, model }. Cada provider usa su propia API key
 // (env var) y su propio endpoint de streaming. Si falta la key, se devuelve un
@@ -60,22 +62,6 @@ Usá la TRANSCRIPCIÓN para sonar como una conversación real: no repitas algo q
 ## Regla de oro sobre [PREGUNTA]
 Si ese campo tiene CUALQUIER texto —por corto, informal, mal transcrito o inesperado que sea, incluso si el PERFIL o la EMPRESA están vacíos— RESPONDÉLO IGUAL con lo que tengas. Nunca evalúes si "es lo bastante clara". El ÚNICO caso en que devolvés "(esperando pregunta)" es cuando [PREGUNTA] dice literalmente "(ninguna aún)" porque no llegó nada. Nunca lo uses por dudar del contenido.`;
 
-// ---------- Guard de origen ----------
-// Estos endpoints son pagos (LLM) y no tienen auth. Un guard de mismo-origen
-// bloquea el abuso trivial desde otros sitios en el navegador (que siempre
-// mandan Origin). NO es protección fuerte contra un atacante server-side:
-// para eso hace falta auth real + rate-limit (p.ej. Vercel KV / Upstash).
-function sameOriginOk(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return true; // sin Origin (native/server) — se permite
-  const host = req.headers.get("host");
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
-
 function resolveModel(provider: Provider, requested: string): string {
   if (provider === "anthropic") return ANTHROPIC_MODEL_OVERRIDE || requested || "claude-haiku-4-5";
   if (provider === "openai") return OPENAI_MODEL_OVERRIDE || requested || "gpt-4o-mini";
@@ -83,8 +69,17 @@ function resolveModel(provider: Provider, requested: string): string {
 }
 
 export async function POST(req: Request) {
-  if (!sameOriginOk(req)) {
+  if (!sameOriginStrict(req)) {
     return new Response("Origen no permitido.", { status: 403 });
+  }
+  // Endpoint pago (LLM). Límite generoso para uso real (una entrevista dispara
+  // muchas respuestas), pero corta el abuso automatizado.
+  const rl = rateLimit(req, "answer", 40, 60_000);
+  if (!rl.ok) {
+    return new Response("Demasiadas solicitudes. Esperá un momento.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfter) },
+    });
   }
 
   let body: {

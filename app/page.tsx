@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import LandingWaitlist from "./components/LandingWaitlist";
 
 export const metadata: Metadata = {
   title: "Loreado.IA — Acceso Beta",
@@ -27,6 +28,8 @@ export default function Landing() {
           ⚠️ Estamos experimentando una demanda excepcionalmente alta. Por favor, tené
           paciencia mientras trabajamos en escalar nuestros sistemas.
         </p>
+
+        <LandingWaitlist />
       </main>
     </div>
   );

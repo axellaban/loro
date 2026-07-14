@@ -1,25 +1,25 @@
 export const runtime = "edge";
 
-// Guard de mismo-origen: bloquea que otro sitio pida la key desde el navegador.
-// No es protección fuerte (un atacante server-side puede spoofear Origin), pero
-// corta el abuso trivial. Protección real requiere auth + rate-limit.
-function sameOriginOk(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return true; // sin Origin (native/server) — se permite
-  const host = req.headers.get("host");
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
+import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 
-// Retorna la API Key directamente para que el navegador abra el WebSocket contra Deepgram.
-// Esto permite que funcione con cualquier rol de clave (incluido Member) sin requerir privilegios de Admin.
+// Emite un TOKEN TEMPORAL de Deepgram (grant), no la API key permanente.
+// El token expira a los 60s: alcanza para abrir el WebSocket y después es
+// inútil. La key permanente NUNCA llega al navegador.
+//
+// El navegador abre el WS con el subprotocolo ["bearer", access_token]
+// (los access tokens de grant usan esquema Bearer; las API keys usaban "token").
 export async function POST(req: Request) {
-  if (!sameOriginOk(req)) {
+  if (!sameOriginStrict(req)) {
     return Response.json({ error: "Origen no permitido." }, { status: 403 });
   }
+  const rl = rateLimit(req, "dg-token", 30, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: "Demasiadas solicitudes. Esperá unos segundos." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
+  }
+
   const rawKey = process.env.DEEPGRAM_API_KEY;
   if (!rawKey) {
     return Response.json(
@@ -29,6 +29,31 @@ export async function POST(req: Request) {
   }
   const apiKey = rawKey.trim().replace(/^["']|["']$/g, "");
 
-  return Response.json({ token: apiKey });
+  try {
+    const r = await fetch("https://api.deepgram.com/v1/auth/grant", {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ttl_seconds: 60 }),
+    });
+    if (r.ok) {
+      const j: any = await r.json().catch(() => ({}));
+      const token = j.access_token || j.key;
+      if (token) {
+        return Response.json({ token, scheme: "bearer", expires_in: j.expires_in ?? 60 });
+      }
+    }
+    const detail = (await r.text().catch(() => "")).slice(0, 200);
+    return Response.json(
+      { error: `No se pudo emitir el token temporal de Deepgram. ${detail}` },
+      { status: 502 }
+    );
+  } catch (e: any) {
+    return Response.json(
+      { error: `Error emitiendo token: ${e?.message || "desconocido"}` },
+      { status: 502 }
+    );
+  }
 }
-

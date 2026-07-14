@@ -26,8 +26,13 @@ Audio (mic o pestaña) ─► AudioWorklet (PCM16, resample a 16kHz)
     /api/answer ─► Gemini (streaming) ─► bullets en pantalla
 ```
 
-- La API key de Deepgram nunca llega al navegador: `/api/deepgram-token` emite token temporal.
+- La API key de Deepgram nunca llega al navegador: `/api/deepgram-token` emite un
+  token temporal (grant, TTL 60s) vía la API de Deepgram; el navegador abre el
+  WebSocket con ese token efímero (subprotocolo `["bearer", token]`).
 - La key de Gemini vive solo en el servidor.
+- Las rutas `/api/answer` y `/api/deepgram-token` exigen mismo-origen y tienen
+  rate-limit por IP (en memoria, best-effort). No es auth: para protección fuerte
+  hace falta login + store compartido (Upstash/Vercel KV).
 
 ## Correr local
 

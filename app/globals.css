@@ -1099,6 +1099,67 @@ input {
   .landing-btn { transition: none; }
 }
 
+/* Captura de email en la landing (estética negra/minimal de la portada). */
+.landing-waitlist {
+  margin-top: 40px;
+  width: 100%;
+  max-width: 26rem;
+  padding: 0 16px;
+}
+.landing-waitlist-label {
+  color: #8a8f98;
+  font-size: clamp(10px, 2.4vw, 12px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+.landing-waitlist-row {
+  display: flex;
+  gap: 8px;
+}
+.landing-waitlist-input {
+  flex: 1;
+  min-width: 0;
+  background: #111;
+  border: 1px solid #333;
+  color: #fff;
+  font-size: 15px;
+  padding: 12px 14px;
+  border-radius: 0;
+  outline: none;
+}
+.landing-waitlist-input::placeholder { color: #666; }
+.landing-waitlist-input:focus { border-color: #10b981; }
+.landing-waitlist-btn {
+  background: #10b981;
+  color: #000;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 12px 18px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.landing-waitlist-btn:disabled { opacity: 0.5; cursor: default; }
+.landing-waitlist-error {
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.landing-waitlist-sent {
+  margin-top: 40px;
+  color: #10b981;
+  font-size: clamp(12px, 3vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0 16px;
+}
+
 /* ===================== Paywall / lista de espera ===================== */
 .paywall-overlay {
   position: fixed;
@@ -1159,7 +1220,7 @@ input {
 }
 
 .paywall-sent {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--loro-green-deep);
   background: #f0fdf9;
@@ -1167,4 +1228,39 @@ input {
   border-radius: 10px;
   padding: 14px;
   animation: answerIn 0.25s ease-out;
+}
+
+/* Sección de compartir (loop viral) dentro del paywall. */
+.paywall-share {
+  border: 1px dashed rgba(16, 185, 129, 0.45);
+  background: #f0fdf9;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.paywall-share-done {
+  border-style: solid;
+}
+.paywall-share-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+/* Botón de WhatsApp (verde de marca de WhatsApp para reconocimiento). */
+.btn-whatsapp {
+  background: #25d366;
+  color: #06371c;
+  font-weight: 800;
+}
+.btn-whatsapp:hover {
+  background: #1fb855;
+}
+
+.paywall-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c0392b;
+  margin-top: 2px;
 }
