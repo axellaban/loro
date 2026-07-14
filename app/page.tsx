@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -27,6 +28,17 @@ export default function Landing() {
           ⚠️ Estamos experimentando una demanda excepcionalmente alta. Por favor, tené
           paciencia mientras trabajamos en escalar nuestros sistemas.
         </p>
+
+        <div className="landing-sticker">
+          <Image
+            src="/toby.gif"
+            alt="Toby de RRHH desaprobando"
+            width={150}
+            height={112}
+            unoptimized
+          />
+          <span className="landing-sticker-caption">RRHH viéndote usar esto</span>
+        </div>
       </main>
     </div>
   );
