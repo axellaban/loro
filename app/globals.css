@@ -1086,11 +1086,12 @@ input {
   color: #ef4444;
   font-size: clamp(11px, 2.5vw, 13px);
   font-weight: 600;
-  max-width: 28rem;
+  max-width: 26rem;
   letter-spacing: 0.06em;
   line-height: 1.5;
-  margin-top: 36px;
-  padding: 0 16px;
+  margin: 36px auto 0;
+  padding: 0 20px;
+  text-align: center;
   opacity: 0.9;
 }
 
@@ -1100,7 +1101,7 @@ input {
 }
 
 .landing-sticker {
-  width: min(320px, 70vw);
+  width: min(380px, 78vw);
   height: auto;
   margin: 8px 0 24px;
 }
