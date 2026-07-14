@@ -1022,7 +1022,7 @@ input {
 }
 
 .landing-sub {
-  font-size: clamp(1.25rem, 4vw, 2.25rem);
+  font-size: clamp(0.9rem, 2.5vw, 1.25rem);
   font-weight: 400;
   color: #fff;
   margin-bottom: 64px;
