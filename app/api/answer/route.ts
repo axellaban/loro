@@ -1,6 +1,6 @@
 export const runtime = "edge";
 
-import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
+import { capacityClosed, rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 
 // ---------- Modelos disponibles ----------
 // El cliente manda { provider, model }. Cada provider usa su propia API key
@@ -69,12 +69,18 @@ function resolveModel(provider: Provider, requested: string): string {
 }
 
 export async function POST(req: Request) {
+  if (capacityClosed()) {
+    return Response.json(
+      { error: "Cupos agotados por hoy. Sumate a la lista de espera y te avisamos.", closed: true },
+      { status: 503 }
+    );
+  }
   if (!sameOriginStrict(req)) {
     return new Response("Origen no permitido.", { status: 403 });
   }
-  // Endpoint pago (LLM). Límite generoso para uso real (una entrevista dispara
-  // muchas respuestas), pero corta el abuso automatizado.
-  const rl = rateLimit(req, "answer", 40, 60_000);
+  // Endpoint pago (LLM). Una entrevista real dispara 2-4 respuestas por minuto;
+  // 20 sigue siendo holgado y corta antes el abuso automatizado.
+  const rl = rateLimit(req, "answer", 20, 60_000);
   if (!rl.ok) {
     return new Response("Demasiadas solicitudes. Esperá un momento.", {
       status: 429,

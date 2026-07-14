@@ -364,6 +364,10 @@ export default function Page() {
   const [bonus, setBonus] = useState(0);
   const bonusRef = useRef(0);
   const [showPaywall, setShowPaywall] = useState(false);
+  // Por qué se muestra el paywall: "quota" = se acabaron las sesiones gratis
+  // del navegador; "capacity" = kill switch global del server (CAPACITY_CLOSED),
+  // donde compartir no destraba nada — solo queda la lista de espera.
+  const [paywallReason, setPaywallReason] = useState<"quota" | "capacity">("quota");
   const [shareDone, setShareDone] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
@@ -521,7 +525,13 @@ export default function Page() {
           signal: controller.signal,
         });
         if (!res.ok || !res.body) {
-          const detail = (await res.text().catch(() => "")).slice(0, 300);
+          let detail = (await res.text().catch(() => "")).slice(0, 300);
+          // El kill switch (y otros errores JSON) devuelven { error }: mostramos
+          // el mensaje limpio en vez del JSON crudo.
+          try {
+            const j = JSON.parse(detail);
+            if (j?.error) detail = j.error;
+          } catch {}
           setAnswers((prev) =>
             prev.map((a) =>
               a.id === id
@@ -737,6 +747,7 @@ export default function Page() {
   const start = useCallback(async () => {
     // Cuota gratuita: si no quedan sesiones, mostramos la lista de espera.
     if (sessionsUsedRef.current >= FREE_SESSIONS + bonusRef.current) {
+      setPaywallReason("quota");
       setShowPaywall(true);
       track("paywall_shown");
       return;
@@ -776,6 +787,13 @@ export default function Page() {
         const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
         if (!tokRes.ok) {
           const e = await tokRes.json().catch(() => ({}));
+          // Kill switch global del server: no es un error de conexión, es
+          // "no hay más cupo hoy" → lo maneja el catch de start() con paywall.
+          if (tokRes.status === 503 && e.closed) {
+            const err = new Error(e.error || "Cupos agotados por hoy.");
+            err.name = "CapacityClosed";
+            throw err;
+          }
           throw new Error(e.error || "No se pudo obtener token de Deepgram.");
         }
         const { token, scheme } = await tokRes.json();
@@ -903,9 +921,18 @@ export default function Page() {
         if (navigator.wakeLock) wakeLockRef.current = await navigator.wakeLock.request("screen");
       } catch {}
     } catch (err: any) {
+      cleanup();
+      if (err?.name === "CapacityClosed") {
+        // Sin cupo global: se ve como escasez (paywall + waitlist), no como
+        // una app rota con un error técnico en rojo.
+        setStatus("idle");
+        setPaywallReason("capacity");
+        setShowPaywall(true);
+        track("capacity_closed_shown");
+        return;
+      }
       setError(err?.message || "Error al iniciar.");
       setStatus("error");
-      cleanup();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, acquireStream, onDgMessage, lang]);
@@ -1301,14 +1328,28 @@ export default function Page() {
       {showPaywall && (
         <div className="paywall-overlay" onClick={() => setShowPaywall(false)}>
           <div className="paywall" onClick={(e) => e.stopPropagation()}>
-            <div className="paywall-title">🛑 BETA PAUSADA POR COSTOS</div>
-            <p className="paywall-text">
-              Llegaste al límite de {freeSessions} sesiones. Las APIs son caras y tuve que frenar
-              el acceso gratuito para no fundirme.
-            </p>
+            {paywallReason === "capacity" ? (
+              <>
+                <div className="paywall-title">🛑 CUPOS AGOTADOS POR HOY</div>
+                <p className="paywall-text">
+                  Las APIs son caras y el acceso gratis se abre de a tandas para no fundirme.
+                  El cupo de hoy ya se usó entero.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="paywall-title">🛑 BETA PAUSADA POR COSTOS</div>
+                <p className="paywall-text">
+                  Llegaste al límite de {freeSessions} sesiones. Las APIs son caras y tuve que frenar
+                  el acceso gratuito para no fundirme.
+                </p>
+              </>
+            )}
 
-            {/* Loop viral: compartir = +1 sesión. Es la vía primaria de salida. */}
-            {shareDone && sessionsLeft > 0 ? (
+            {/* Loop viral: compartir = +1 sesión. Es la vía primaria de salida
+                cuando el límite es la cuota del navegador; con el server cerrado
+                (capacity) compartir no destraba nada, así que no se ofrece. */}
+            {paywallReason === "capacity" ? null : shareDone && sessionsLeft > 0 ? (
               <div className="paywall-share paywall-share-done">
                 <div className="paywall-share-title">🦜 ¡Ganaste 1 sesión más!</div>
                 <button
@@ -1328,7 +1369,11 @@ export default function Page() {
               </div>
             ) : null}
 
-            <p className="paywall-text paywall-cta">O sumate a la lista de espera para acceso sin límites.</p>
+            <p className="paywall-text paywall-cta">
+              {paywallReason === "capacity"
+                ? "Dejá tu email y te avisamos apenas abra la próxima tanda."
+                : "O sumate a la lista de espera para acceso sin límites."}
+            </p>
             {emailSent ? (
               <div className="paywall-sent">Enviado ✔ Te avisamos cuando abramos cupos.</div>
             ) : (

@@ -44,6 +44,15 @@ export function rateLimit(
   return { ok: true, remaining: limit - b.count, retryAfter: 0 };
 }
 
+// Kill switch global de los endpoints pagos (Deepgram + LLM). Con
+// CAPACITY_CLOSED=1 en Vercel (+ redeploy), /api/answer y /api/deepgram-token
+// devuelven 503 y la UI muestra "cupos agotados + lista de espera". Es el
+// freno de mano para un pico viral que se va de presupuesto: se corta el
+// gasto en ~1 minuto sin tocar código. /api/waitlist queda siempre abierto.
+export function capacityClosed(): boolean {
+  return process.env.CAPACITY_CLOSED === "1";
+}
+
 // Guard de mismo-origen estricto: exige Origin y que su host coincida con el
 // del request. Un navegador SIEMPRE manda Origin en un fetch POST (mismo o
 // cross origin), así que la app real pasa; curl/scripts nativos que omiten

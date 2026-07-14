@@ -1,6 +1,6 @@
 export const runtime = "edge";
 
-import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
+import { capacityClosed, rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 
 // Emite un TOKEN TEMPORAL de Deepgram (grant), no la API key permanente.
 // El token expira a los 60s: alcanza para abrir el WebSocket y después es
@@ -9,10 +9,18 @@ import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 // El navegador abre el WS con el subprotocolo ["bearer", access_token]
 // (los access tokens de grant usan esquema Bearer; las API keys usaban "token").
 export async function POST(req: Request) {
+  if (capacityClosed()) {
+    return Response.json(
+      { error: "Cupos agotados por hoy. Sumate a la lista de espera y te avisamos.", closed: true },
+      { status: 503 }
+    );
+  }
   if (!sameOriginStrict(req)) {
     return Response.json({ error: "Origen no permitido." }, { status: 403 });
   }
-  const rl = rateLimit(req, "dg-token", 30, 60_000);
+  // Una sesión usa 1 token + los reintentos de reconexión; 10/min cubre hasta
+  // el peor caso de flapping sin dejar margen para scripts.
+  const rl = rateLimit(req, "dg-token", 10, 60_000);
   if (!rl.ok) {
     return Response.json(
       { error: "Demasiadas solicitudes. Esperá unos segundos." },
