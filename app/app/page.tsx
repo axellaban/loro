@@ -548,9 +548,15 @@ export default function Page() {
   // "Responder ahora" se genera una respuesta sobre lo último dicho. La app
   // NO responde sola mientras la persona habla; solo transcribe.
   const answerNow = useCallback(() => {
-    // Aborta una respuesta en curso para no encimar dos generaciones.
-    turnRef.current?.controller?.abort();
+    // Aborta una respuesta en curso para no encimar dos generaciones. Si esa
+    // respuesta todavía estaba vacía (no llegó ni el primer token), sacamos su
+    // tarjeta para que no quede colgada en pantalla al reintentar.
+    const prev = turnRef.current;
+    prev?.controller?.abort();
     turnRef.current = null;
+    if (prev) {
+      setAnswers((list) => list.filter((a) => !(a.id === prev.id && !a.done && !a.text)));
+    }
     const q = questionBufRef.current.trim() || transcriptRef.current.trim().slice(-500);
     questionBufRef.current = "";
     if (q.trim().length < 2) return;
@@ -853,6 +859,13 @@ export default function Page() {
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
       track("session_start", { mode, model: modelRef.current.model });
+      // Pre-calienta el backend (edge + conexión a Gemini) para que la primera
+      // respuesta no sufra el cold start y se quede "tarada". Best-effort.
+      fetch("/api/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ warmup: true }),
+      }).catch(() => {});
       try {
         localStorage.setItem(SESSIONS_KEY, String(used));
       } catch {}

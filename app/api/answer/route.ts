@@ -91,11 +91,38 @@ export async function POST(req: Request) {
     question?: string;
     provider?: string;
     model?: string;
+    warmup?: boolean;
   };
   try {
     body = await req.json();
   } catch {
     return new Response("Body inválido.", { status: 400 });
+  }
+
+  // Pre-calentamiento: el cliente pega acá al arrancar la sesión para despertar
+  // el edge function y abrir la conexión a Gemini, así la PRIMERA respuesta real
+  // no paga el cold start (se quedaba "tarada" el primer tap). Hace una
+  // generación mínima (1 token) y descarta el resultado.
+  if (body.warmup) {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey) {
+        await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: "hi" }] }],
+              generationConfig: { maxOutputTokens: 1, thinkingConfig: { thinkingBudget: 0 } },
+            }),
+          }
+        );
+      }
+    } catch {
+      // el warmup es best-effort; si falla no pasa nada
+    }
+    return new Response("ok");
   }
 
   const provider: Provider =
