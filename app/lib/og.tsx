@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { ParrotSvg } from "./parrot";
 
 // Tamaño estándar de Open Graph / Twitter card.
 export const ogSize = { width: 1200, height: 630 };
@@ -59,7 +60,7 @@ export function ogImage() {
 
           {/* Marca */}
           <div style={{ display: "flex", alignItems: "center", gap: 16, zIndex: 1 }}>
-            <div style={{ fontSize: 44 }}>🦜</div>
+            <ParrotSvg size={58} />
             <div
               style={{
                 display: "flex",

@@ -1,10 +1,11 @@
 import { ImageResponse } from "next/og";
+import { ParrotSvg } from "./lib/parrot";
 
 export const runtime = "edge";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-// Favicon: loro sobre verde de marca.
+// Favicon: loro de marca sobre fondo oscuro.
 export default function Icon() {
   return new ImageResponse(
     (
@@ -15,12 +16,11 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#10b981",
+          background: "#0a0a0f",
           borderRadius: 7,
-          fontSize: 22,
         }}
       >
-        🦜
+        <ParrotSvg size={26} />
       </div>
     ),
     { ...size }

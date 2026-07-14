@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { ParrotSvg } from "./lib/parrot";
 
 export const runtime = "edge";
 export const size = { width: 180, height: 180 };
@@ -15,11 +16,10 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#10b981",
-          fontSize: 120,
+          background: "#0a0a0f",
         }}
       >
-        🦜
+        <ParrotSvg size={130} />
       </div>
     ),
     { ...size }

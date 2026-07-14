@@ -487,7 +487,8 @@ export default function Page() {
   // controller, el AbortError se ignora en silencio: ya hay una versión
   // mejor en camino para la misma tarjeta.
   const runGenerate = useCallback(
-    async (id: number, question: string, controller: AbortController) => {
+    async (id: number, question: string, controller: AbortController, attempt = 0) => {
+      // Crea/resetea la tarjeta (en un reintento la vaciamos para re-streamear).
       setAnswers((prev) => {
         const card: Answer = { id, question, text: "", done: false, ts: Date.now(), feedback: null };
         return prev.some((a) => a.id === id)
@@ -530,6 +531,15 @@ export default function Page() {
           if (done) break;
           acc += dec.decode(value, { stream: true });
           setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, text: acc } : a)));
+        }
+        // El modelo a veces devuelve el placeholder "(esperando pregunta)" (o
+        // texto vacío) en la primera respuesta, aunque la pregunta sea real.
+        // Reintentamos UNA vez automáticamente en vez de dejar la tarjeta así.
+        const finalText = acc.trim();
+        const isPlaceholder =
+          !finalText || /esperando pregunta|ninguna a[uú]n/i.test(finalText);
+        if (isPlaceholder && attempt < 1 && !controller.signal.aborted) {
+          return runGenerate(id, question, controller, attempt + 1);
         }
         setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, done: true } : a)));
         track("answer_generated", { model: modelRef.current.model });
@@ -859,13 +869,6 @@ export default function Page() {
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
       track("session_start", { mode, model: modelRef.current.model });
-      // Pre-calienta el backend (edge + conexión a Gemini) para que la primera
-      // respuesta no sufra el cold start y se quede "tarada". Best-effort.
-      fetch("/api/answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ warmup: true }),
-      }).catch(() => {});
       try {
         localStorage.setItem(SESSIONS_KEY, String(used));
       } catch {}
