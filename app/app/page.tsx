@@ -1312,7 +1312,7 @@ export default function Page() {
                 <div className="paywall-share-title">🦜 Regalale un Loro a un amigo</div>
                 <p className="paywall-text">Compartís y te ganás +1 sesión gratis al toque.</p>
                 <button className="btn-action btn-whatsapp" onClick={shareForBonus}>
-                  Compartir por WhatsApp
+                  Lorealo por WhatsApp
                 </button>
               </div>
             ) : null}
