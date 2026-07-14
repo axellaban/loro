@@ -55,13 +55,19 @@ así que lo más simple es probar directamente en Vercel (preview deploy).
 
 ### Variables de entorno (Vercel → Settings → Environment Variables)
 
-| Variable            | Requerida | De dónde                                       |
-|---------------------|-----------|------------------------------------------------|
-| `DEEPGRAM_API_KEY`  | Sí        | console.deepgram.com → API Keys                |
-| `GEMINI_API_KEY`    | Sí        | aistudio.google.com → API Keys (Google Studio) |
-| `GEMINI_MODEL`      | No        | default `gemini-2.5-flash`                    |
+| Variable                   | Requerida | De dónde / para qué                                            |
+|----------------------------|-----------|----------------------------------------------------------------|
+| `DEEPGRAM_API_KEY`         | Sí        | console.deepgram.com → API Keys                                |
+| `GEMINI_API_KEY`           | Sí        | aistudio.google.com → API Keys (Google Studio)                 |
+| `GEMINI_MODEL`             | No        | default `gemini-2.5-flash`                                     |
+| `CAPACITY_CLOSED`          | No        | `1` = kill switch: cierra los endpoints pagos (503) y la app muestra "cupos agotados + waitlist". Requiere redeploy al cambiarla. |
+| `NEXT_PUBLIC_POSTHOG_KEY`  | No        | posthog.com → Project API key. Sin ella no se mandan eventos de funnel (en Vercel Hobby los eventos custom de Vercel Analytics se descartan). |
+| `NEXT_PUBLIC_POSTHOG_HOST` | No        | default `https://us.i.posthog.com`                             |
 
-Marcá las 3 para Production, Preview y Development.
+Marcá las requeridas para Production, Preview y Development.
+
+Checklist operativo pre-lanzamiento (cuotas, spend caps, kill switch, borradores
+del post): ver [LAUNCH.md](./LAUNCH.md).
 
 ## Latencia real
 
