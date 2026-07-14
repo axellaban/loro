@@ -1,20 +1,31 @@
 import { track as vercelTrack } from "@vercel/analytics";
+import posthog from "posthog-js";
 
 // Wrapper de tracking a prueba de fallos: nunca rompe la UI si Analytics no
 // está cargado (dev, adblock, etc.). Centraliza los nombres de evento del
 // funnel para no tener strings sueltos por el código.
+//
+// Cada evento se manda a dos destinos: Vercel Analytics (en Hobby los eventos
+// custom se descartan; quedan por si se pasa a Pro) y PostHog (el funnel real
+// — se inicializa en AnalyticsClient solo si NEXT_PUBLIC_POSTHOG_KEY está).
 export type FunnelEvent =
   | "enter_app"
   | "session_start"
   | "answer_generated"
   | "answer_feedback"
   | "paywall_shown"
+  | "capacity_closed_shown"
   | "waitlist_submit"
   | "share_whatsapp";
 
 export function track(event: FunnelEvent, props?: Record<string, string | number | boolean>) {
   try {
     vercelTrack(event, props);
+  } catch {
+    // no-op
+  }
+  try {
+    if (posthog.__loaded) posthog.capture(event, props);
   } catch {
     // no-op
   }
