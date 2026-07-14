@@ -910,11 +910,7 @@ export default function Page() {
           {live && (
             <div className="header-center">
               <span className="timer-pill sessions-pill" title="Sesiones gratis restantes">
-                {Math.max(0, FREE_SESSIONS - sessionsUsed)}/{FREE_SESSIONS}
-              </span>
-              <span className="timer-pill" title="Minutos gratis de esta sesión">
-                <ClockIcon />
-                {Math.ceil(remainingSec / 60)} min
+                {FREE_SESSIONS}/{FREE_SESSIONS} Loros ~ {Math.ceil(remainingSec / 60)} mins (Gratis)
               </span>
             </div>
           )}
