@@ -673,7 +673,7 @@ export default function Page() {
   const shareForBonus = useCallback(() => {
     const url =
       typeof window !== "undefined" ? window.location.origin : "https://copiloto-mvp.vercel.app";
-    const msg = `Mirá esto… me voló la cabeza.\nUn Loro con IA que te sopla las respuestas en vivo. Escucha la entrevista por el mic y cuando el entrevistador termina la pregunta, tocás un botón: en 1 segundo (literal) tenés la respuesta armada, con TU CV, la empresa y el puesto donde aplicás como CONTEXTO. Sin login, ni emails, ni boludeces de marketing.\n${url}`;
+    const msg = `Mirá esto… me voló la cabeza 🦜\nUn Loro con IA que te sopla las respuestas en la entrevista, armadas con tu CV, la empresa y el puesto. Tocás un botón y listo. Sin login, sin vueltas.\n${url}`;
     try {
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
     } catch {}
