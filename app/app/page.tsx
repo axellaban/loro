@@ -617,6 +617,7 @@ export default function Page() {
       .then(() => {
         setCopiedId(id);
         setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+        track("answer_copied", { model: modelRef.current.model });
       })
       .catch(() => {});
   }, []);
@@ -931,6 +932,7 @@ export default function Page() {
         track("capacity_closed_shown");
         return;
       }
+      track("session_error", { error: err?.name || "unknown" });
       setError(err?.message || "Error al iniciar.");
       setStatus("error");
     }
@@ -977,6 +979,7 @@ export default function Page() {
   }, []);
 
   const stop = useCallback(() => {
+    track("session_stopped");
     cleanup();
     setStatus("idle");
   }, [cleanup]);
@@ -1057,7 +1060,7 @@ export default function Page() {
               <label className="mono form-label">Idioma</label>
               <Dropdown
                 value={lang}
-                onChange={(id) => setLang(id as Lang)}
+                onChange={(id) => { setLang(id as Lang); track("lang_changed", { lang: id }); }}
                 disabled={connecting}
                 ariaLabel="Idioma de la entrevista"
                 options={[
@@ -1070,7 +1073,7 @@ export default function Page() {
               <label className="mono form-label">Modelo de IA</label>
               <Dropdown
                 value={modelId}
-                onChange={setModelId}
+                onChange={(id) => { setModelId(id); const m = MODELS.find((m) => m.id === id); if (m) track("model_changed", { model: m.model, provider: m.provider }); }}
                 disabled={connecting}
                 ariaLabel="Modelo de IA"
                 alignRight
@@ -1094,7 +1097,7 @@ export default function Page() {
         <div className={`grid-responsive`}>
           <button
             className={`btn-select ${mode === "mic" ? "btn-select-active" : ""}`}
-            onClick={() => setMode("mic")}
+            onClick={() => { setMode("mic"); track("mode_changed", { mode: "mic" }); }}
             disabled={connecting}
           >
             🎙️ Micrófono
@@ -1102,7 +1105,7 @@ export default function Page() {
           </button>
           <button
             className={`btn-select ${mode === "tab" ? "btn-select-active" : ""}`}
-            onClick={() => setMode("tab")}
+            onClick={() => { setMode("tab"); track("mode_changed", { mode: "tab" }); }}
             disabled={connecting}
           >
             🖥️ Pestaña
