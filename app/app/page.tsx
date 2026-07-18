@@ -673,7 +673,7 @@ export default function Page() {
   const shareForBonus = useCallback(() => {
     const url =
       typeof window !== "undefined" ? window.location.origin : "https://copiloto-mvp.vercel.app";
-    const msg = `Mira esto… me voló la cabeza.\nLoreado.IA: una IA que te sopla las respuestas en las entrevistas, en tiempo real 🦜\nProbalo gratis 👉 ${url}`;
+    const msg = `Mirá esto… me voló la cabeza 🦜\nUn Loro con IA que te sopla las respuestas en la entrevista, armadas con tu CV, la empresa y el puesto. Tocás un botón y listo. Sin login, sin vueltas.\n${url}`;
     try {
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
     } catch {}
