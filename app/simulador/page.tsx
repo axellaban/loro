@@ -453,10 +453,10 @@ const LS_KEY_CONTEXT = "simulador:context:v1";
 // Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
 // turno por un carraspeo transcripto).
 const MIN_ANSWER_CHARS = 10;
-// Espera extra (cancelable con habla) después del silencio, antes de cerrar.
-// Benchmark: los voice agents cierran turno a 0.5-0.8s de silencio; en
-// entrevista damos más margen para pensar, total ~2.3s.
-const CONFIRM_MS = 800;
+// Ventana de gracia (cancelable si el candidato sigue hablando) antes de cerrar.
+// En una entrevista la gente hace pausas para pensar mid-respuesta, así que
+// damos margen amplio para no cortarla: ~2.5-3.5s de silencio total.
+const CONFIRM_MS = 1500;
 // Sin respuesta real: a los 12s ofrecemos pasar de pregunta; a los 25s la
 // sala avanza sola, para que un candidato que se queda mudo no quede colgado.
 const STUCK_MS = 12000;
@@ -638,7 +638,7 @@ export default function SimuladorPage() {
     }
   };
 
-  const SILENCE_MS = 1500;
+  const SILENCE_MS = 1800;
 
   const startWatchdog = () => {
     if (watchdogRef.current) clearInterval(watchdogRef.current);
@@ -761,14 +761,14 @@ export default function SimuladorPage() {
       const acc = `${currentAnswerRef.current} ${text}`.trim();
       currentAnswerRef.current = acc;
       setCurrentAnswer(acc);
-      // Respaldo por si Deepgram nunca emite UtteranceEnd: 1.6s sin habla
-      // nueva después de un final dispara el cierre.
+      // Respaldo por si Deepgram nunca emite UtteranceEnd: sin habla nueva
+      // después de un final, entra en la ventana de gracia.
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = setTimeout(() => {
         if (phaseRef.current === "listening" && currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS) {
           enterConfirming();
         }
-      }, 1200);
+      }, 1800);
     } else if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
