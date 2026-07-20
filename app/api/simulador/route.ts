@@ -126,7 +126,12 @@ export async function POST(req: Request) {
   const interviewType = (body.interviewType || "General").slice(0, 100);
   const answerLang = body.answerLang === "en" ? "en" : "es";
 
-  const history = body.history || [];
+  // Truncar cada turno: respuestas dictadas muy largas inflan tokens y la
+  // latencia del feedback (que tiene que entrar en los 25s de Edge).
+  const history = (body.history || []).slice(0, 20).map((h) => ({
+    question: String(h?.question || "").slice(0, 600),
+    answer: String(h?.answer || "").slice(0, 2500),
+  }));
   const historyText = history.length > 0
     ? history.map((h, i) => `Pregunta ${i + 1}: ${h.question}\nRespuesta ${i + 1}: ${h.answer}`).join("\n\n")
     : "(Aún no comenzó la entrevista)";

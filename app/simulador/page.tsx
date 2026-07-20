@@ -425,8 +425,10 @@ const LS_KEY_CONTEXT = "simulador:context:v1";
 // Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
 // turno por un carraspeo transcripto).
 const MIN_ANSWER_CHARS = 10;
-// Countdown visible antes de cerrar la respuesta por silencio.
-const CONFIRM_SECONDS = 2;
+// Espera extra (cancelable con habla) después del silencio, antes de cerrar.
+// Benchmark: los voice agents cierran turno a 0.5-0.8s de silencio; en
+// entrevista damos más margen para pensar, total ~2.3s.
+const CONFIRM_MS = 800;
 
 export default function SimuladorPage() {
   const [phase, setPhase] = useState<Phase>("setup");
@@ -506,7 +508,7 @@ export default function SimuladorPage() {
   const stabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const confirmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Watchdog de silencio: regla de tiempo dura que no depende de que Deepgram
   // emita UtteranceEnd/is_final — chequea actividad de voz cada 400ms.
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -583,9 +585,9 @@ export default function SimuladorPage() {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-    if (confirmIntervalRef.current) {
-      clearInterval(confirmIntervalRef.current);
-      confirmIntervalRef.current = null;
+    if (confirmTimerRef.current) {
+      clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
     }
     if (watchdogRef.current) {
       clearInterval(watchdogRef.current);
@@ -593,7 +595,7 @@ export default function SimuladorPage() {
     }
   };
 
-  const SILENCE_MS = 2200;
+  const SILENCE_MS = 1500;
 
   const startWatchdog = () => {
     if (watchdogRef.current) clearInterval(watchdogRef.current);
@@ -619,10 +621,10 @@ export default function SimuladorPage() {
   const enterConfirming = () => {
     clearTurnTimers();
     setPhaseBoth("confirming");
-    confirmIntervalRef.current = setTimeout(() => {
-      confirmIntervalRef.current = null;
+    confirmTimerRef.current = setTimeout(() => {
+      confirmTimerRef.current = null;
       closeAnswerRef.current(true);
-    }, CONFIRM_SECONDS * 1000) as unknown as ReturnType<typeof setInterval>;
+    }, CONFIRM_MS);
   };
 
   // ---------- Deepgram ----------
@@ -684,7 +686,7 @@ export default function SimuladorPage() {
         if (phaseRef.current === "listening" && currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS) {
           enterConfirming();
         }
-      }, 1600);
+      }, 1200);
     } else if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -1334,7 +1336,7 @@ export default function SimuladorPage() {
 
           <footer style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
-              ▶ Entrar a la Sala de Entrevista
+              ▶ Generar Sala de Entrevista
             </button>
           </footer>
         </>
