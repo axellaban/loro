@@ -4,14 +4,12 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Loreado.IA — Simulador de Entrevistas",
-  description: "Desbloqueá el 'Modo Dios' en tu próxima entrevista. Practicá gratis con una IA que te entrevista de verdad y te da un informe al toque.",
+  description: "Desbloquea el 'Modo Dios' en tu próxima entrevista.",
 };
 
-// Landing del simulador: misma estética "anti-marketing" que la home (fondo
-// negro, mayúsculas, halo de loro), pero el CTA lleva al simulador gratis.
 export default function MockLanding() {
   return (
-    <div className="landing landing-sim">
+    <div className="landing">
       <main className="landing-main">
         <h1 className="landing-title">
           Desbloquea el &apos;Modo Dios&apos; en tu próxima entrevista
@@ -20,23 +18,24 @@ export default function MockLanding() {
         <Image
           src="/modo-dios.gif"
           alt="Modo Dios"
-          width={220}
-          height={123}
+          width={320}
+          height={240}
           unoptimized
           className="landing-sticker"
         />
 
-        <h2 className="landing-sub">Practicá con una IA que te entrevista de verdad.</h2>
+        <h2 className="landing-sub">Acceso beta cerrado.</h2>
 
         <div className="landing-btn-wrap">
           <div className="landing-glow" aria-hidden="true" />
           <Link href="/simulador" className="landing-btn">
-            Entrá gratis
+            Entrá
           </Link>
         </div>
 
-        <p className="landing-note">
-          Sin login, sin instalar nada. El Loro te entrevista por video y te da un informe con tu puntaje.
+        <p className="landing-warn">
+          ⚠️ Estamos experimentando una demanda excepcionalmente alta. Por favor, tené
+          paciencia mientras trabajamos en escalar nuestros sistemas.
         </p>
       </main>
     </div>

@@ -1317,11 +1317,10 @@ export default function SimuladorPage() {
 
   // Loop viral top-of-funnel: comparte el SIMULADOR gratis por WhatsApp.
   const shareSimulator = () => {
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "https://loreado.vercel.app";
     const msg =
-      `Practiqué una entrevista con una IA que te entrevista por video y te tira un informe con tu puntaje 🦜\n` +
-      `Está buenísimo para prepararte. Probalo gratis:\n${origin}/simulador`;
+      `Mira esto… me voló la cabeza.\n` +
+      `Simulé una entrevista con una IA por video en tiempo real, luego te da un informe con tips muy piola. Es gratis:\n` +
+      `https://loreado.vercel.app/simulador`;
     track("sim_share_whatsapp");
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
