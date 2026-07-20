@@ -1359,7 +1359,7 @@ export default function SimuladorPage() {
 
           <footer className="sim-setup-footer">
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
-              ▶ Generar Sala de Entrevista
+              ▶ Soltar Loro (generar sala)
             </button>
           </footer>
         </>

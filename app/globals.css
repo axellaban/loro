@@ -1477,7 +1477,15 @@ input {
 }
 .sim-avatar-video-paused {
   filter: saturate(0.85) brightness(0.97);
-  transform: scale(1);
+  transform: scale(1.02);
+  /* Micro "respiración" mientras el loro no habla (pensando/escuchando), para
+     que el frame no se vea congelado. El scale mínimo 1.02 mantiene overscan
+     así el translate/rotate nunca revela el fondo de la caja. */
+  animation: simAvatarIdle 4.5s ease-in-out infinite;
+}
+@keyframes simAvatarIdle {
+  0%, 100% { transform: scale(1.02) translateY(0) rotate(0deg); }
+  50% { transform: scale(1.05) translateY(-1%) rotate(0.5deg); }
 }
 /* Oculto pero en el DOM para que precargue mientras se muestra el SVG. */
 .sim-avatar-video-hidden { opacity: 0; }
@@ -2125,7 +2133,7 @@ input {
   .sim-stage-badge-dot,
   .sim-chat-chip-dot,
   .sim-bubble { animation: none !important; }
-  .sim-avatar-video { transition: none; transform: none; }
+  .sim-avatar-video { transition: none; transform: none; animation: none; }
 }
 
 /* --- Reporte visual: velocímetro, semáforos y scores por pregunta --- */
