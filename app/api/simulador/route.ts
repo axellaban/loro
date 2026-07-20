@@ -24,7 +24,8 @@ Reglas críticas:
 4. Mantén tu respuesta MUY corta y conversacional (máximo 2-3 oraciones en total). Debe ser ideal para leerse de un vistazo o ser leída por un sintetizador de voz.
 5. Haz una sola pregunta a la vez. No acumules preguntas.
 6. Responde SIEMPRE en el idioma indicado en "## IDIOMA DE LA RESPUESTA".
-7. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".`;
+7. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".
+8. Si el PROGRESO indica que es la ÚLTIMA pregunta, avisale brevemente al candidato que es la última antes de formularla.`;
 
 const SYSTEM_PROMPT_FEEDBACK = `Sos un COACH DE ENTREVISTAS experto. Tu tarea es analizar una simulación de entrevista completa y generar un reporte de feedback detallado, constructivo y accionable.
 Recibís:
@@ -94,6 +95,8 @@ export async function POST(req: Request) {
     provider?: string;
     model?: string;
     history?: Array<{ question: string; answer: string }>;
+    questionIndex?: number;
+    questionsCount?: number;
   };
   try {
     body = await req.json();
@@ -117,6 +120,12 @@ export async function POST(req: Request) {
     ? history.map((h, i) => `Pregunta ${i + 1}: ${h.question}\nRespuesta ${i + 1}: ${h.answer}`).join("\n\n")
     : "(Aún no comenzó la entrevista)";
 
+  const qIndex = Math.max(1, Math.min(50, Number(body.questionIndex) || history.length + 1));
+  const qCount = Math.max(0, Math.min(20, Number(body.questionsCount) || 0));
+  const progressText = qCount
+    ? `Esta es la pregunta ${qIndex} de ${qCount}.${qIndex >= qCount ? " Es la ÚLTIMA pregunta de la entrevista." : ""}`
+    : "(sin límite definido)";
+
   const answerLangLabel =
     answerLang === "en"
       ? "Inglés (English). Formula tus preguntas en inglés."
@@ -133,6 +142,9 @@ ${profile || "(sin perfil cargado)"}
 
 ## TIPO DE ENTREVISTA
 ${interviewType}
+
+## PROGRESO
+${progressText}
 
 ## IDIOMA DE LA RESPUESTA
 ${answerLangLabel}

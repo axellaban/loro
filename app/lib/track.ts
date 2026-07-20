@@ -24,7 +24,15 @@ export type FunnelEvent =
   | "paywall_shown"
   | "capacity_closed_shown"
   | "waitlist_submit"
-  | "share_whatsapp";
+  | "share_whatsapp"
+  | "sim_session_start"
+  | "sim_question_asked"
+  | "sim_answer_closed"
+  | "sim_tts_error"
+  | "sim_camera_denied"
+  | "sim_feedback_shown"
+  | "sim_session_finished"
+  | "sim_paywall_shown";
 
 export function track(event: FunnelEvent, props?: Record<string, string | number | boolean>) {
   try {

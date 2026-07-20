@@ -1,16 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { track, identify } from "../lib/track";
+import { track } from "../lib/track";
+import Avatar, { type AvatarState } from "./Avatar";
+import { TtsQueue, extractSentences } from "./tts";
 
-type Status = "idle" | "connecting" | "live" | "error";
-type Mode = "mic";
 type Line = { id: number; text: string; final: boolean };
 type Lang = "es" | "en";
 type Provider = "gemini" | "anthropic" | "openai";
 type ModelOption = { id: string; label: string; provider: Provider; model: string; tag: string };
 
 type InterviewType = "general" | "technical" | "behavioral" | "hr";
+
+// Fases del turno de entrevista. El flujo es automático: el entrevistador
+// habla (speaking), escucha (listening) y cierra la respuesta por silencio
+// (confirming) sin que el usuario tenga que tocar nada.
+type Phase =
+  | "setup"
+  | "connecting"
+  | "asking"
+  | "speaking"
+  | "listening"
+  | "confirming"
+  | "feedback";
 
 type HistoryItem = {
   question: string;
@@ -39,24 +51,6 @@ const MODELS: ModelOption[] = [
   { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
 ];
 const DEFAULT_MODEL_ID = "gemini-flash";
-
-function fmtTime(ts: number): string {
-  try {
-    return new Date(ts).toLocaleTimeString("es-AR", { hour: "numeric", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
-// Sparkle Icon
-function SparkleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2.5l1.9 4.9 4.9 1.9-4.9 1.9L12 16l-1.9-4.8L5.2 9.3l4.9-1.9L12 2.5z" />
-      <path d="M18.5 14.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
-    </svg>
-  );
-}
 
 // Provider Marks
 function OpenAIMark() {
@@ -285,15 +279,32 @@ function buildDgUrl(sttLang: string): string {
   return `wss://api.deepgram.com/v1/listen?${params}`;
 }
 
+function fmtElapsed(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 const LS_KEY_CONTEXT = "simulador:context:v1";
 const SESSIONS_KEY = "loreado:sessions:v1";
 const BONUS_KEY = "loreado:bonus:v1";
 const FREE_SESSIONS = 5;
 const MAX_BONUS = 3;
 
+// Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
+// turno por un carraspeo transcripto).
+const MIN_ANSWER_CHARS = 10;
+// Countdown visible antes de cerrar la respuesta por silencio.
+const CONFIRM_SECONDS = 2;
+
 export default function SimuladorPage() {
-  const [stage, setStage] = useState<"setup" | "interview" | "feedback">("setup");
-  const [status, setStatus] = useState<Status>("idle");
+  const [phase, setPhase] = useState<Phase>("setup");
+  const phaseRef = useRef<Phase>("setup");
+  const setPhaseBoth = useCallback((p: Phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  }, []);
+
   const [error, setError] = useState("");
 
   // Setup form states
@@ -305,15 +316,23 @@ export default function SimuladorPage() {
   const [interviewType, setInterviewType] = useState<InterviewType>("general");
   const [questionsCount, setQuestionsCount] = useState<number>(5);
 
-  // Voice Speech states
+  // Voz del entrevistador
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
+  const mutedRef = useRef(false);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
   // Interview state
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const historyRef = useRef<HistoryItem[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState("");
+  const questionRef = useRef("");
   const [lines, setLines] = useState<Line[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState("");
-  const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
+  const currentAnswerRef = useRef("");
+  const [confirmCountdown, setConfirmCountdown] = useState(CONFIRM_SECONDS);
+  const [elapsed, setElapsed] = useState(0);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Feedback state
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
@@ -328,42 +347,36 @@ export default function SimuladorPage() {
   const freeSessions = FREE_SESSIONS + bonus;
   const sessionsLeft = Math.max(0, freeSessions - sessionsUsed);
 
-  // Refs for audio and websocket
+  // Refs de audio / red
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
+  const ttsRef = useRef<TtsQueue | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const lineId = useRef(0);
-  const reconnectAttemptsRef = useRef(0);
+  const sessionLangRef = useRef<Lang>("es");
 
-  // Selected AI Model
+  const intentionalCloseRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedAtRef = useRef(0);
+  const wakeLockRef = useRef<any>(null);
+
   const selectedModel = MODELS.find((m) => m.id === modelId) || MODELS[0];
 
-  // TTS Helper
-  const speakText = useCallback((text: string, language: Lang) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    
-    if (isVoiceMuted) return;
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    const langCode = language === "en" ? "en-US" : "es-ES";
-    utterance.lang = langCode;
-
-    // Grab voices and find a natural one
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(
-      (v) => v.lang.startsWith(langCode) && (v.name.includes("Google") || v.name.includes("Natural"))
-    );
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    } else {
-      const backupVoice = voices.find((v) => v.lang.startsWith(langCode));
-      if (backupVoice) utterance.voice = backupVoice;
-    }
-
-    window.speechSynthesis.speak(utterance);
-  }, [isVoiceMuted]);
+  // Los handlers del WebSocket viven entre renders: llaman a la versión fresca
+  // de cada función de flujo a través de estos refs.
+  const beginTurnRef = useRef<(h: HistoryItem[]) => void>(() => {});
+  const closeAnswerRef = useRef<(auto: boolean) => void>(() => {});
+  const dgMessageRef = useRef<(raw: string) => void>(() => {});
+  const connectWsRef = useRef<(first: boolean) => Promise<void>>(async () => {});
+  const scheduleReconnectRef = useRef<() => void>(() => {});
 
   // Load and save context
   useEffect(() => {
@@ -390,14 +403,14 @@ export default function SimuladorPage() {
     } catch {}
   }, [company, role, profile, modelId, lang, interviewType, questionsCount]);
 
-  // Load Session counter
+  // Load session counter
   useEffect(() => {
     try {
       const n = parseInt(localStorage.getItem(SESSIONS_KEY) || "0", 10);
       const used = Number.isFinite(n) ? Math.max(0, n) : 0;
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
-      
+
       const b = parseInt(localStorage.getItem(BONUS_KEY) || "0", 10);
       const earned = Number.isFinite(b) ? Math.min(MAX_BONUS, Math.max(0, b)) : 0;
       bonusRef.current = earned;
@@ -405,15 +418,46 @@ export default function SimuladorPage() {
     } catch {}
   }, []);
 
-  // Web Speech synthesis load voices guard
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-    }
-  }, []);
+  // ---------- Timers del turno ----------
 
-  // Handle live transcription messages from Deepgram
-  const onDgMessage = useCallback((raw: string) => {
+  const clearTurnTimers = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (confirmIntervalRef.current) {
+      clearInterval(confirmIntervalRef.current);
+      confirmIntervalRef.current = null;
+    }
+  };
+
+  const enterListening = () => {
+    currentAnswerRef.current = "";
+    setCurrentAnswer("");
+    setLines([]);
+    setPhaseBoth("listening");
+  };
+
+  const enterConfirming = () => {
+    clearTurnTimers();
+    setPhaseBoth("confirming");
+    let n = CONFIRM_SECONDS;
+    setConfirmCountdown(n);
+    confirmIntervalRef.current = setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        if (confirmIntervalRef.current) clearInterval(confirmIntervalRef.current);
+        confirmIntervalRef.current = null;
+        closeAnswerRef.current(true);
+      } else {
+        setConfirmCountdown(n);
+      }
+    }, 1000);
+  };
+
+  // ---------- Deepgram ----------
+
+  const onDgMessage = (raw: string) => {
     let msg: any;
     try {
       msg = JSON.parse(raw);
@@ -421,12 +465,29 @@ export default function SimuladorPage() {
       return;
     }
 
+    if (msg.type === "UtteranceEnd") {
+      if (phaseRef.current === "listening" && currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS) {
+        enterConfirming();
+      }
+      return;
+    }
     if (msg.type !== "Results") return;
+
+    // Gating anti-eco: fuera de listening/confirming (avatar hablando o
+    // pensando) cualquier transcript se descarta.
+    const ph = phaseRef.current;
+    if (ph !== "listening" && ph !== "confirming") return;
 
     const alt = msg.channel?.alternatives?.[0];
     const text: string = alt?.transcript || "";
     if (!text) return;
     const isFinal = !!msg.is_final;
+
+    // Habla nueva durante el countdown → todavía no terminó: volver a escuchar.
+    if (ph === "confirming") {
+      clearTurnTimers();
+      setPhaseBoth("listening");
+    }
 
     setLines((prev) => {
       const next = [...prev];
@@ -439,22 +500,226 @@ export default function SimuladorPage() {
     });
 
     if (isFinal) {
-      setCurrentAnswer((prev) => `${prev} ${text}`.trim());
+      const acc = `${currentAnswerRef.current} ${text}`.trim();
+      currentAnswerRef.current = acc;
+      setCurrentAnswer(acc);
+      // Respaldo por si Deepgram nunca emite UtteranceEnd: 1.6s sin habla
+      // nueva después de un final dispara el cierre.
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        if (phaseRef.current === "listening" && currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS) {
+          enterConfirming();
+        }
+      }, 1600);
+    } else if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
-  }, []);
+  };
+  dgMessageRef.current = onDgMessage;
 
-  // Set up microphone capture
-  const acquireStream = useCallback(async (): Promise<MediaStream> => {
-    return navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-  }, []);
-
-  // Disconnect WebSocket and audio streams
-  const cleanup = useCallback(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+  const scheduleReconnect = () => {
+    if (intentionalCloseRef.current) return;
+    const ph = phaseRef.current;
+    if (ph === "setup" || ph === "feedback") return;
+    if (reconnectAttemptsRef.current >= 3) {
+      setError("Se perdió la conexión de audio. Podés finalizar y ver el feedback de lo respondido.");
+      return;
     }
+    const delay = 600 * 2 ** reconnectAttemptsRef.current;
+    reconnectAttemptsRef.current += 1;
+    reconnectTimerRef.current = setTimeout(() => {
+      connectWsRef.current(false).catch(() => scheduleReconnectRef.current());
+    }, delay);
+  };
+  scheduleReconnectRef.current = scheduleReconnect;
+
+  const connectWs = async (first: boolean) => {
+    const dgUrl = buildDgUrl(STT_LANG[sessionLangRef.current]);
+    const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
+    if (!tokRes.ok) throw new Error("Error al obtener token de Deepgram.");
+    const { token, scheme } = await tokRes.json();
+    const ws = new WebSocket(dgUrl, [scheme || "token", token]);
+    ws.binaryType = "arraybuffer";
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      // Mientras el avatar habla no fluye PCM: sin KeepAlive Deepgram corta
+      // el socket a ~10s de silencio.
+      if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+      keepAliveRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "KeepAlive" }));
+      }, 7000);
+      // Conexión estable 10s → renueva el presupuesto de reintentos.
+      if (stabilityTimerRef.current) clearTimeout(stabilityTimerRef.current);
+      stabilityTimerRef.current = setTimeout(() => {
+        reconnectAttemptsRef.current = 0;
+      }, 10_000);
+      if (first) beginTurnRef.current([]);
+    };
+    ws.onmessage = (e) => {
+      if (typeof e.data === "string") dgMessageRef.current(e.data);
+    };
+    ws.onerror = () => {};
+    ws.onclose = () => {
+      if (keepAliveRef.current) {
+        clearInterval(keepAliveRef.current);
+        keepAliveRef.current = null;
+      }
+      if (wsRef.current === ws) scheduleReconnectRef.current();
+    };
+  };
+  connectWsRef.current = connectWs;
+
+  // ---------- Turno: pregunta → voz → escucha ----------
+
+  const beginTurn = async (currentHistory: HistoryItem[]) => {
+    setPhaseBoth("asking");
+    setCurrentQuestion("");
+    questionRef.current = "";
+
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    ttsRef.current?.stop();
+    const queue = new TtsQueue(ctx, sessionLangRef.current);
+    queue.setMuted(mutedRef.current);
+    ttsRef.current = queue;
+    setAnalyser(queue.analyser);
+
+    let ttsFailed = false;
+    queue.onStart = () => {
+      if (phaseRef.current === "asking") setPhaseBoth("speaking");
+    };
+    queue.onError = () => {
+      ttsFailed = true;
+      track("sim_tts_error");
+    };
+    queue.onAllEnded = () => {
+      // Si el TTS falló, dar tiempo a leer la pregunta en pantalla en vez de
+      // pasar a escuchar de inmediato. El margen de 300ms deja drenar el
+      // parlante antes de reabrir el mic (anti-eco).
+      const delay = ttsFailed ? Math.max(1800, questionRef.current.length * 45) : 300;
+      setTimeout(() => {
+        if (phaseRef.current === "asking" || phaseRef.current === "speaking") enterListening();
+      }, delay);
+    };
+
+    try {
+      const res = await fetch("/api/simulador", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "next-question",
+          profile,
+          company,
+          role,
+          interviewType,
+          answerLang: sessionLangRef.current,
+          provider: selectedModel.provider,
+          model: selectedModel.model,
+          history: currentHistory,
+          questionIndex: currentHistory.length + 1,
+          questionsCount,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error("Error al obtener la pregunta.");
+      track("sim_question_asked", { question_index: currentHistory.length + 1, model: selectedModel.model });
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let questionText = "";
+      // Troceo incremental: cada oración completa entra a la cola TTS mientras
+      // el LLM sigue streameando, para que la voz arranque con la primera.
+      let pending = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value, { stream: true });
+        questionText += chunk;
+        questionRef.current = questionText;
+        setCurrentQuestion(questionText);
+
+        pending += chunk;
+        const { complete, rest } = extractSentences(pending);
+        // Oraciones muy cortas ("Bien.") se fusionan con la siguiente para no
+        // pagar un round-trip de TTS por dos palabras.
+        let hold = "";
+        for (const sentence of complete) {
+          hold = hold ? `${hold} ${sentence}` : sentence;
+          if (hold.length >= 25) {
+            queue.enqueue(hold);
+            hold = "";
+          }
+        }
+        pending = hold ? `${hold} ${rest}` : rest;
+      }
+      if (pending.trim()) queue.enqueue(pending.trim());
+      queue.finishInput();
+
+      if (!questionText.trim()) throw new Error("El entrevistador no devolvió pregunta.");
+    } catch (err: any) {
+      queue.stop();
+      endSession();
+      setError(err?.message || "Error al conectar con la IA.");
+    }
+  };
+  beginTurnRef.current = (h) => {
+    void beginTurn(h);
+  };
+
+  const closeAnswer = (auto: boolean) => {
+    const ph = phaseRef.current;
+    if (ph !== "listening" && ph !== "confirming") return;
+    clearTurnTimers();
+
+    const answer = currentAnswerRef.current.trim();
+    if (!answer) {
+      setPhaseBoth("listening");
+      return;
+    }
+
+    const updated = [...historyRef.current, { question: questionRef.current, answer }];
+    historyRef.current = updated;
+    setHistory(updated);
+    currentAnswerRef.current = "";
+    setCurrentAnswer("");
+    setLines([]);
+    track("sim_answer_closed", { auto, question_index: updated.length });
+
+    if (updated.length >= questionsCount) {
+      finishToFeedback(updated);
+    } else {
+      beginTurnRef.current(updated);
+    }
+  };
+  closeAnswerRef.current = closeAnswer;
+
+  // ---------- Fin de entrevista / feedback ----------
+
+  const cleanupMedia = () => {
+    intentionalCloseRef.current = true;
+    clearTurnTimers();
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (stabilityTimerRef.current) {
+      clearTimeout(stabilityTimerRef.current);
+      stabilityTimerRef.current = null;
+    }
+    if (keepAliveRef.current) {
+      clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    ttsRef.current?.stop();
+    ttsRef.current = null;
+    setAnalyser(null);
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "CloseStream" }));
@@ -468,62 +733,54 @@ export default function SimuladorPage() {
       audioCtxRef.current?.close();
     } catch {}
     streamRef.current?.getTracks().forEach((t) => t.stop());
-
+    try {
+      wakeLockRef.current?.release();
+    } catch {}
+    wakeLockRef.current = null;
     wsRef.current = null;
     workletRef.current = null;
     audioCtxRef.current = null;
     streamRef.current = null;
-  }, []);
+    setCameraOn(false);
+  };
 
-  // Request the next question from backend
-  const fetchNextQuestion = useCallback(async (currentHistory: HistoryItem[]) => {
-    setIsGeneratingQuestion(true);
-    setCurrentQuestion("");
-    try {
-      const res = await fetch("/api/simulador", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "next-question",
-          profile,
-          company,
-          role,
-          interviewType,
-          answerLang: lang,
-          provider: selectedModel.provider,
-          model: selectedModel.model,
-          history: currentHistory,
-        }),
-      });
+  const finishToFeedback = (finalHistory: HistoryItem[]) => {
+    cleanupMedia();
+    track("sim_session_finished", { questions: finalHistory.length, duration_s: elapsedNow() });
+    void fetchFeedback(finalHistory);
+  };
 
-      if (!res.ok || !res.body) {
-        throw new Error("Error al obtener la pregunta.");
+  const elapsedNow = () =>
+    startedAtRef.current ? Math.floor((Date.now() - startedAtRef.current) / 1000) : 0;
+
+  // Botón "Finalizar": corta donde esté. Si hay al menos una respuesta (o una
+  // en curso con contenido), va al feedback; si no, vuelve al setup.
+  const endInterview = () => {
+    const ph = phaseRef.current;
+    if (ph === "listening" || ph === "confirming") {
+      const a = currentAnswerRef.current.trim();
+      if (a.length >= MIN_ANSWER_CHARS) {
+        const updated = [...historyRef.current, { question: questionRef.current, answer: a }];
+        historyRef.current = updated;
+        setHistory(updated);
       }
-
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let questionText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = dec.decode(value, { stream: true });
-        questionText += chunk;
-        setCurrentQuestion(questionText);
-      }
-
-      setIsGeneratingQuestion(false);
-      speakText(questionText, lang);
-    } catch (err: any) {
-      setIsGeneratingQuestion(false);
-      setError(err?.message || "Error al conectar con la IA.");
     }
-  }, [profile, company, role, interviewType, lang, selectedModel, speakText]);
+    if (historyRef.current.length > 0) {
+      finishToFeedback(historyRef.current);
+    } else {
+      endSession();
+      track("session_stopped");
+    }
+  };
 
-  // Request final feedback report from backend
-  const fetchFeedback = useCallback(async (finalHistory: HistoryItem[]) => {
+  const endSession = () => {
+    cleanupMedia();
+    setPhaseBoth("setup");
+  };
+
+  const fetchFeedback = async (finalHistory: HistoryItem[]) => {
     setIsGeneratingFeedback(true);
-    setStage("feedback");
+    setPhaseBoth("feedback");
     try {
       const res = await fetch("/api/simulador", {
         method: "POST",
@@ -534,484 +791,225 @@ export default function SimuladorPage() {
           company,
           role,
           interviewType,
-          answerLang: lang,
+          answerLang: sessionLangRef.current,
           provider: selectedModel.provider,
           model: selectedModel.model,
           history: finalHistory,
         }),
       });
-
-      if (!res.ok) {
-        throw new Error("No se pudo obtener el reporte de feedback.");
-      }
-
+      if (!res.ok) throw new Error("No se pudo obtener el reporte de feedback.");
       const report: FeedbackReport = await res.json();
       setFeedbackReport(report);
       setIsGeneratingFeedback(false);
+      track("sim_feedback_shown", { score: report?.score ?? 0 });
     } catch (err: any) {
       setIsGeneratingFeedback(false);
       setError(err?.message || "Error al procesar el feedback.");
     }
-  }, [profile, company, role, interviewType, lang, selectedModel]);
+  };
 
-  // Start the interview simulation (connect socket + load first question)
-  const startSimulation = useCallback(async () => {
-    // 1. Session control check
+  // ---------- Inicio de sesión ----------
+
+  const startSimulation = async () => {
     if (sessionsUsedRef.current >= freeSessions) {
       setError("Beta pausada: Límite de sesiones gratuitas alcanzado.");
+      track("sim_paywall_shown");
       return;
     }
 
     setError("");
-    setStatus("connecting");
     setHistory([]);
+    historyRef.current = [];
     setLines([]);
     setCurrentAnswer("");
+    currentAnswerRef.current = "";
+    setCurrentQuestion("");
+    questionRef.current = "";
     setFeedbackReport(null);
-    setStage("interview");
-
-    const dgUrl = buildDgUrl(STT_LANG[lang]);
+    setElapsed(0);
+    setShowHistory(false);
+    sessionLangRef.current = lang;
+    intentionalCloseRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    setPhaseBoth("connecting");
 
     try {
-      // Setup Web Audio API and AudioWorklet
-      const stream = await acquireStream();
+      // Un solo prompt de permisos con mic + cámara; si la cámara falla se
+      // reintenta solo audio (la cámara es local y opcional, nunca se sube).
+      const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      let stream: MediaStream;
+      let camDenied = false;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraints,
+          video: { facingMode: "user", width: { ideal: 640 } },
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        camDenied = true;
+        track("sim_camera_denied");
+      }
       streamRef.current = stream;
+      setCameraOn(!camDenied && stream.getVideoTracks().length > 0);
 
       const audioCtx = new AudioContext();
       audioCtxRef.current = audioCtx;
       if (audioCtx.state === "suspended") await audioCtx.resume();
       await audioCtx.audioWorklet.addModule("/pcm-worklet.js");
-      
+
       const source = audioCtx.createMediaStreamSource(stream);
       const worklet = new AudioWorkletNode(audioCtx, "pcm-worklet");
       workletRef.current = worklet;
 
       worklet.port.onmessage = (e) => {
+        // Gating anti-eco: solo fluye PCM cuando es el turno del usuario.
+        const ph = phaseRef.current;
+        if (ph !== "listening" && ph !== "confirming") return;
         const w = wsRef.current;
         if (w && w.readyState === WebSocket.OPEN) w.send(e.data);
       };
       source.connect(worklet);
 
-      // Connect to Deepgram WS
-      const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
-      if (!tokRes.ok) {
-        throw new Error("Error al obtener token de Deepgram.");
-      }
-      const { token, scheme } = await tokRes.json();
-      const ws = new WebSocket(dgUrl, [scheme || "token", token]);
-      ws.binaryType = "arraybuffer";
-      wsRef.current = ws;
+      await connectWs(true);
 
-      ws.onopen = () => {
-        setStatus("live");
-        // Start interview loop: fetch first question
-        fetchNextQuestion([]);
-      };
-      ws.onmessage = (e) => onDgMessage(e.data);
-      ws.onerror = (err) => {
-        console.error("Deepgram WS error:", err);
-      };
-      ws.onclose = () => {
-        setStatus("idle");
-      };
-
-      // Count session used
+      // Cuota
       const used = sessionsUsedRef.current + 1;
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
       try {
         localStorage.setItem(SESSIONS_KEY, String(used));
       } catch {}
-      track("session_start", { mode: "mic", model: selectedModel.model });
+      track("sim_session_start", { model: selectedModel.model, questions: questionsCount, lang });
+
+      // Wake lock: que no se apague la pantalla en el celular a mitad de entrevista.
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock?.request("screen");
+      } catch {}
+
+      startedAtRef.current = Date.now();
+      timerIntervalRef.current = setInterval(() => setElapsed(elapsedNow()), 1000);
     } catch (err: any) {
-      cleanup();
-      setError(err?.message || "No se pudo iniciar el simulador.");
-      setStatus("error");
-      setStage("setup");
+      cleanupMedia();
+      setError(err?.message || "No se pudo iniciar el simulador. Revisá los permisos de micrófono.");
+      setPhaseBoth("setup");
     }
-  }, [lang, acquireStream, onDgMessage, fetchNextQuestion, cleanup, freeSessions, selectedModel]);
+  };
 
-  // Stop / Cancel simulation
-  const stopSimulation = useCallback(() => {
-    cleanup();
-    setStatus("idle");
-    setStage("setup");
-    track("session_stopped");
-  }, [cleanup]);
+  // Re-adquirir wake lock al volver de background durante la entrevista.
+  useEffect(() => {
+    const onVis = () => {
+      const ph = phaseRef.current;
+      if (document.visibilityState === "visible" && ph !== "setup" && ph !== "feedback") {
+        (navigator as any).wakeLock
+          ?.request("screen")
+          .then((wl: any) => {
+            wakeLockRef.current = wl;
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
-  // Submit answer and move forward
-  const submitAnswer = useCallback(() => {
-    const finalAnswer = currentAnswer.trim();
-    if (!finalAnswer) return;
-
-    const updatedHistory = [...history, { question: currentQuestion, answer: finalAnswer }];
-    setHistory(updatedHistory);
-    setCurrentAnswer("");
-    setLines([]);
-
-    if (updatedHistory.length >= questionsCount) {
-      // Finished all questions: stop listening and fetch feedback
-      cleanup();
-      setStatus("idle");
-      fetchFeedback(updatedHistory);
-      track("answer_generated", { model: selectedModel.model, questions: String(updatedHistory.length) });
-    } else {
-      // Fetch next question
-      fetchNextQuestion(updatedHistory);
+  // Conectar el stream de la cámara al <video> cuando el PiP está montado.
+  useEffect(() => {
+    if (cameraOn && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
     }
-  }, [currentAnswer, currentQuestion, history, questionsCount, fetchNextQuestion, fetchFeedback, cleanup, selectedModel]);
+  }, [cameraOn, phase]);
 
-  // Copy optimal answers to clipboard
-  const copyOptimalAnswer = useCallback((index: number, text: string) => {
-    navigator.clipboard?.writeText(text).then(() => {
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex((c) => (c === index ? null : c)), 1500);
-      track("answer_copied", { model: selectedModel.model });
-    });
-  }, [selectedModel]);
+  // Cleanup al desmontar la página.
+  useEffect(() => {
+    return () => {
+      intentionalCloseRef.current = true;
+      cleanupMedia();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const live = status === "live";
-  const connecting = status === "connecting";
+  const toggleMute = () => {
+    const m = !isVoiceMuted;
+    setIsVoiceMuted(m);
+    mutedRef.current = m;
+    ttsRef.current?.setMuted(m);
+  };
+
+  const copyOptimalAnswer = useCallback(
+    (index: number, text: string) => {
+      navigator.clipboard?.writeText(text).then(() => {
+        setCopiedIndex(index);
+        setTimeout(() => setCopiedIndex((c) => (c === index ? null : c)), 1500);
+        track("answer_copied", { model: selectedModel.model });
+      });
+    },
+    [selectedModel]
+  );
+
+  const inInterview = phase !== "setup" && phase !== "feedback";
+  const connecting = phase === "connecting";
+
+  const avatarState: AvatarState =
+    phase === "asking"
+      ? "thinking"
+      : phase === "speaking"
+        ? "speaking"
+        : phase === "listening" || phase === "confirming"
+          ? "listening"
+          : "idle";
+
+  const statusLabel =
+    phase === "connecting"
+      ? "Conectando micrófono y cámara…"
+      : phase === "asking"
+        ? "El entrevistador está preparando la pregunta…"
+        : phase === "speaking"
+          ? "El entrevistador está hablando"
+          : phase === "listening"
+            ? "Te escuchamos — respondé hablando"
+            : phase === "confirming"
+              ? `¿Terminaste? Avanzando en ${confirmCountdown}…`
+              : "";
+
+  const interim = lines.length > 0 ? lines[lines.length - 1].text : "";
+  const canFinishAnswer =
+    (phase === "listening" || phase === "confirming") && currentAnswer.trim().length > 0;
+  const isLastQuestion = history.length + 1 >= questionsCount;
+
+  const historyPanel = (extraClass: string) => (
+    <aside className={`sim-side-panel ${extraClass}`}>
+      <div className="sim-side-title">Transcripción</div>
+      {history.length === 0 ? (
+        <p className="sim-history-empty">Acá van a aparecer tus respuestas a medida que avance la entrevista.</p>
+      ) : (
+        history.map((h, i) => (
+          <div className="sim-history-item" key={i}>
+            <div className="sim-history-q">
+              P{i + 1}. {h.question}
+            </div>
+            <div className="sim-history-a">{h.answer}</div>
+          </div>
+        ))
+      )}
+    </aside>
+  );
 
   return (
-    <main className={`app-container ${live ? "app-live" : ""}`}>
-      {/* Custom Styles block to keep everything 100% isolated from /app */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        .sim-meta-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
-          padding: 8px 12px;
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(10px);
-          border-bottom: 1px solid var(--line);
-          margin-bottom: 12px;
-          border-radius: var(--radius);
-        }
-        .sim-badge {
-          background: #f0fdf4;
-          border: 1px solid #bbf7d0;
-          color: var(--loro-green-bright);
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 8px;
-          font-size: 12px;
-        }
-        .sim-mute-btn {
-          background: transparent;
-          border: 1px solid var(--line);
-          border-radius: 8px;
-          padding: 6px 12px;
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--ink-dim);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          transition: all 0.2s ease;
-        }
-        .sim-mute-btn:hover {
-          background: #f8fafc;
-          border-color: var(--line-strong);
-          color: var(--ink);
-        }
-        .sim-interview-box {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          flex: 1;
-          min-height: 0;
-        }
-        .sim-card {
-          border-radius: var(--radius);
-          border: 1px solid var(--line);
-          background: var(--panel);
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-          overflow: hidden;
-        }
-        .sim-card-header {
-          padding: 12px 16px;
-          background: #f8fafc;
-          border-bottom: 1px solid var(--line);
-          font-weight: 600;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: var(--ink-dim);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .sim-card-body {
-          padding: 20px;
-        }
-        .sim-question-text {
-          font-size: 17px;
-          line-height: 1.6;
-          color: var(--ink);
-          font-weight: 500;
-        }
-        .sim-pulse-animation {
-          display: inline-flex;
-          gap: 4px;
-          align-items: center;
-        }
-        .sim-pulse-dot {
-          width: 8px;
-          height: 8px;
-          background-color: var(--loro-green);
-          border-radius: 50%;
-          animation: simPulse 1.4s infinite ease-in-out both;
-        }
-        .sim-pulse-dot:nth-child(2) { animation-delay: 0.2s; }
-        .sim-pulse-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes simPulse {
-          0%, 80%, 100% { transform: scale(0); }
-          40% { transform: scale(1.0); }
-        }
-        .sim-answer-textarea {
-          width: 100%;
-          min-height: 120px;
-          padding: 14px;
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          font-size: 14.5px;
-          line-height: 1.6;
-          resize: none;
-          background: #fdfdfd;
-          outline: none;
-          color: var(--ink);
-          transition: border-color 0.2s;
-        }
-        .sim-answer-textarea:focus {
-          border-color: var(--loro-green);
-          background: #fff;
-        }
-        .sim-live-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          color: var(--loro-green-bright);
-          font-weight: 600;
-          font-size: 12px;
-        }
-        .sim-live-dot {
-          width: 8px;
-          height: 8px;
-          background: var(--loro-green);
-          border-radius: 50%;
-          animation: simBlink 1.5s infinite;
-        }
-        @keyframes simBlink {
-          0% { opacity: 0.4; }
-          50% { opacity: 1; }
-          100% { opacity: 0.4; }
-        }
-        .sim-feedback-container {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          padding-bottom: 30px;
-        }
-        .sim-score-circle-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 24px;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, rgba(255,255,255,0) 70%);
-        }
-        .sim-score-circle {
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          background: #fff;
-          border: 8px solid var(--loro-green);
-          box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 36px;
-          font-weight: 800;
-          color: var(--loro-green-bright);
-          margin-bottom: 12px;
-          position: relative;
-        }
-        .sim-score-circle::after {
-          content: '/100';
-          font-size: 13px;
-          color: var(--ink-dim);
-          position: absolute;
-          bottom: 24px;
-        }
-        .sim-score-label {
-          font-weight: 700;
-          font-size: 15px;
-          color: var(--ink);
-          letter-spacing: -0.01em;
-        }
-        .sim-columns-layout {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-        @media (max-width: 768px) {
-          .sim-columns-layout {
-            grid-template-columns: 1fr;
-          }
-        }
-        .sim-feedback-card {
-          padding: 16px;
-          border-radius: var(--radius);
-          border: 1px solid var(--line);
-          background: #fff;
-        }
-        .sim-feedback-card-title {
-          font-weight: 700;
-          font-size: 14px;
-          margin-bottom: 12px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .sim-strengths-list, .sim-improvements-list {
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .sim-strengths-list li::before {
-          content: '✓';
-          color: var(--loro-green-bright);
-          font-weight: bold;
-          margin-right: 8px;
-        }
-        .sim-improvements-list li::before {
-          content: '→';
-          color: #f59e0b;
-          font-weight: bold;
-          margin-right: 8px;
-        }
-        .sim-strengths-list li, .sim-improvements-list li {
-          font-size: 13.5px;
-          line-height: 1.5;
-          color: var(--ink-dim);
-        }
-        .sim-question-report-card {
-          border: 1px solid var(--line);
-          border-radius: var(--radius);
-          background: #fff;
-          margin-bottom: 12px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-        }
-        .sim-report-q-header {
-          padding: 14px 16px;
-          background: #f8fafc;
-          border-bottom: 1px solid var(--line);
-          font-weight: 600;
-          font-size: 14px;
-          color: var(--ink);
-        }
-        .sim-report-row {
-          padding: 14px 16px;
-          border-bottom: 1px solid #f1f5f9;
-          font-size: 13.5px;
-          line-height: 1.6;
-        }
-        .sim-report-row:last-child {
-          border-bottom: none;
-        }
-        .sim-report-label {
-          font-weight: 700;
-          font-size: 12px;
-          text-transform: uppercase;
-          color: var(--ink-dim);
-          display: block;
-          margin-bottom: 4px;
-          letter-spacing: 0.05em;
-        }
-        .sim-report-val {
-          color: var(--ink);
-        }
-        .sim-report-val-suggestion {
-          background: #f0fdf4;
-          border: 1px dashed #a7f3d0;
-          padding: 12px;
-          border-radius: 8px;
-          color: var(--loro-green-deep);
-          font-style: italic;
-          position: relative;
-          padding-right: 40px;
-        }
-        .sim-copy-suggested-btn {
-          position: absolute;
-          right: 10px;
-          top: 10px;
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 6px;
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--ink-dim);
-          transition: all 0.15s;
-        }
-        .sim-copy-suggested-btn:hover {
-          color: var(--loro-green-bright);
-          border-color: #a7f3d0;
-        }
-        .sim-loading-feedback {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 60px 20px;
-          text-align: center;
-          gap: 16px;
-        }
-        .sim-loading-spinner {
-          width: 48px;
-          height: 48px;
-          border: 4px solid rgba(16, 185, 129, 0.1);
-          border-radius: 50%;
-          border-left-color: var(--loro-green);
-          animation: simSpin 1s linear infinite;
-        }
-        @keyframes simSpin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      ` }} />
+    <main className="app-container">
+      {!inInterview && (
+        <header className="brand-header">
+          <div className="brand">
+            <span className="brand-title">Loreado.IA 🦜</span>
+            <span className="sim-badge">Simulador Beta</span>
+          </div>
+        </header>
+      )}
 
-      <header className="brand-header">
-        <div className="brand">
-          <span className="brand-title">Loreado.IA 🦜</span>
-          <span className="sim-badge">Simulador Beta</span>
-        </div>
-        <div className="header-right">
-          {live && (
-            <div className="header-center">
-              <span className="timer-pill sessions-pill">
-                Sesión en Vivo
-              </span>
-            </div>
-          )}
-          {!live && connecting && <span className="status-chip">conectando…</span>}
-          {live && (
-            <button className="stop-x" onClick={stopSimulation} aria-label="Detener" title="Detener">
-              ✕
-            </button>
-          )}
-        </div>
-      </header>
-
-      {stage === "setup" && (
+      {phase === "setup" && (
         <>
           <p className="tagline">
-            La IA te entrevista en tiempo real simulando un proceso real. Respondé hablando y obtené un reporte de feedback completo. 🦜
+            El Loro te entrevista cara a cara: te hace preguntas por voz, te escucha responder y al final te da un
+            reporte de feedback completo. 🦜
           </p>
 
           <div className="selectors-row" style={{ marginTop: 8 }}>
@@ -1020,7 +1018,6 @@ export default function SimuladorPage() {
               <Dropdown
                 value={lang}
                 onChange={(id) => setLang(id as Lang)}
-                disabled={connecting}
                 ariaLabel="Idioma de la simulación"
                 options={[
                   { id: "es", label: "Español", icon: <span className="dd-flag">🇪🇸</span> },
@@ -1033,7 +1030,6 @@ export default function SimuladorPage() {
               <Dropdown
                 value={modelId}
                 onChange={(id) => setModelId(id)}
-                disabled={connecting}
                 ariaLabel="Modelo de IA"
                 alignRight
                 options={MODELS.map((m) => ({
@@ -1053,7 +1049,6 @@ export default function SimuladorPage() {
               <Dropdown
                 value={interviewType}
                 onChange={(id) => setInterviewType(id as InterviewType)}
-                disabled={connecting}
                 ariaLabel="Tipo de Entrevista"
                 options={[
                   { id: "general", label: "General / Fit Cultural" },
@@ -1068,7 +1063,6 @@ export default function SimuladorPage() {
               <Dropdown
                 value={String(questionsCount)}
                 onChange={(id) => setQuestionsCount(Number(id))}
-                disabled={connecting}
                 ariaLabel="Cantidad de preguntas"
                 alignRight
                 options={[
@@ -1080,24 +1074,11 @@ export default function SimuladorPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="mono error-box" style={{
-              fontSize: 13,
-              color: "var(--loro-red-deep)",
-              background: "rgba(239, 68, 68, 0.07)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: 12,
-              padding: "12px 16px",
-              lineHeight: 1.5,
-              marginTop: 10
-            }}>
-              ⚠️ {error}
-            </div>
-          )}
+          {error && <div className="mono sim-error-box" style={{ marginTop: 10 }}>⚠️ {error}</div>}
 
           <div className="panel" style={{ marginTop: 12 }}>
             <label className="mono form-label">Contexto del Puesto</label>
-            
+
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label className="mono form-mini-label">
                 <BriefcaseIcon /> Empresa
@@ -1108,7 +1089,6 @@ export default function SimuladorPage() {
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Ej: Mercado Libre"
                 className="form-input"
-                disabled={connecting}
               />
             </div>
 
@@ -1122,7 +1102,6 @@ export default function SimuladorPage() {
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Pegá la descripción del puesto, seniority, requisitos o tecnologías."
                 className="form-textarea form-textarea-sm"
-                disabled={connecting}
               />
             </div>
 
@@ -1135,142 +1114,124 @@ export default function SimuladorPage() {
               onChange={(e) => setProfile(e.target.value)}
               placeholder="Pegá tu CV, experiencia previa o notas de tu perfil laboral."
               className="form-textarea"
-              disabled={connecting}
             />
           </div>
 
           <footer style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-            <button onClick={startSimulation} disabled={connecting} className="btn-action btn-primary">
-              {connecting ? "Iniciando Simulador… 🦜" : "▶ Iniciar Simulación (requiere micrófono)"}
+            <button onClick={() => void startSimulation()} className="btn-action btn-primary">
+              ▶ Iniciar Entrevista (micrófono y cámara)
             </button>
             <p className="mono btn-hint" style={{ textAlign: "center" }}>
-              Se consumirá 1 sesión de tu cuota de Loros ({sessionsLeft} restantes).
+              La cámara es opcional y nunca sale de tu navegador. Se consumirá 1 sesión de tu cuota ({sessionsLeft}{" "}
+              restantes).
             </p>
           </footer>
         </>
       )}
 
-      {stage === "interview" && (
-        <div className="sim-interview-box">
-          <div className="sim-meta-header">
-            <span className="mono" style={{ fontWeight: 600, fontSize: 13, color: "var(--ink-dim)" }}>
-              Pregunta {history.length + 1} de {questionsCount}
-            </span>
-            
-            <button
-              onClick={() => {
-                const nextMuted = !isVoiceMuted;
-                setIsVoiceMuted(nextMuted);
-                if (nextMuted) {
-                  window.speechSynthesis?.cancel();
-                } else if (currentQuestion) {
-                  speakText(currentQuestion, lang);
-                }
-              }}
-              className="sim-mute-btn"
-            >
-              {isVoiceMuted ? "🔇 Voz silenciada" : "🔊 Voz de IA activa"}
+      {inInterview && (
+        <div className="sim-live-grid">
+          <div className="sim-live-header">
+            <div className="sim-live-header-left">
+              <span className="sim-rec-dot" aria-hidden="true" />
+              <span className="sim-timer mono">{fmtElapsed(elapsed)}</span>
+              <span className="sim-qcount">
+                Pregunta {Math.min(history.length + 1, questionsCount)} de {questionsCount}
+              </span>
+            </div>
+            <button className="sim-end-btn" onClick={endInterview}>
+              Finalizar
             </button>
           </div>
 
-          {error && (
-            <div className="mono error-box" style={{
-              fontSize: 13,
-              color: "var(--loro-red-deep)",
-              background: "rgba(239, 68, 68, 0.07)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: 12,
-              padding: "12px 16px",
-              lineHeight: 1.5
-            }}>
-              ⚠️ {error}
-            </div>
-          )}
+          {error && <div className="mono sim-error-box">⚠️ {error}</div>}
 
-          <div className="sim-card">
-            <div className="sim-card-header">
-              <span>🎙️ Entrevistador (IA)</span>
-              {isGeneratingQuestion && <span className="mono" style={{ fontSize: 11 }}>Pensando pregunta…</span>}
-            </div>
-            <div className="sim-card-body">
-              {isGeneratingQuestion ? (
-                <div className="sim-pulse-animation">
-                  <div className="sim-pulse-dot" />
-                  <div className="sim-pulse-dot" />
-                  <div className="sim-pulse-dot" />
-                </div>
+          <div className="sim-stage">
+            <Avatar state={avatarState} analyser={analyser} />
+
+            {(currentQuestion || phase === "asking") && (
+              <div className="sim-subtitle">
+                {currentQuestion || (
+                  <span className="sim-pulse-inline" aria-label="Preparando pregunta">
+                    …
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="sim-pip">
+              {cameraOn ? (
+                <video ref={videoRef} muted playsInline autoPlay />
               ) : (
-                <p className="sim-question-text">{currentQuestion || "(esperando pregunta…)"}</p>
+                <div className="sim-pip-off">
+                  <span className="sim-pip-off-emoji">📷</span>
+                  <span>Cámara desactivada</span>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="sim-card" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <div className="sim-card-header">
-              <span>👤 Tu Respuesta</span>
-              <div className="sim-live-badge">
-                <span className="sim-live-dot" />
-                <span>En Vivo</span>
-              </div>
+          <div className="sim-status-strip">
+            <div className="sim-status-label">
+              {(phase === "listening" || phase === "confirming") && <span className="sim-live-dot" aria-hidden="true" />}
+              {statusLabel}
             </div>
-            <div className="sim-card-body" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: 12 }}>
-              <textarea
-                value={currentAnswer}
-                onChange={(e) => setCurrentAnswer(e.target.value)}
-                placeholder="El micrófono está encendido. Respondé hablando en voz alta, o podés escribir/editar tu respuesta acá directamente..."
-                className="sim-answer-textarea"
-                style={{ flex: 1 }}
-              />
-              <div style={{ marginTop: 8, fontSize: 12, color: "var(--ink-dim)", fontStyle: "italic", height: 18, overflow: "hidden" }}>
-                {lines.length > 0 && `Transcribiendo: ${lines[lines.length - 1].text}`}
-              </div>
-            </div>
+            {(phase === "listening" || phase === "confirming") && interim && (
+              <div className="sim-interim">{interim}</div>
+            )}
           </div>
 
-          <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
+          <div className="sim-controls">
+            <button className="sim-mute-btn" onClick={toggleMute} disabled={connecting}>
+              {isVoiceMuted ? "🔇 Voz apagada" : "🔊 Voz"}
+            </button>
             <button
-              onClick={submitAnswer}
-              disabled={!currentAnswer.trim() || isGeneratingQuestion}
               className="btn-action btn-primary"
+              onClick={() => closeAnswerRef.current(false)}
+              disabled={!canFinishAnswer}
             >
-              {history.length + 1 === questionsCount ? "Enviar y Ver Feedback 🏆" : "Enviar y Siguiente Pregunta →"}
+              {isLastQuestion ? "Terminé — Ver Feedback 🏆" : "Terminé mi respuesta →"}
             </button>
-            <button
-              onClick={stopSimulation}
-              className="clear-pill mono"
-              style={{ alignSelf: "center" }}
-            >
-              ✕ Cancelar Simulación
-            </button>
-          </footer>
+          </div>
+
+          {historyPanel("sim-side-panel-desktop")}
+
+          <button className="sim-history-toggle" onClick={() => setShowHistory((s) => !s)}>
+            {showHistory ? "Ocultar transcripción" : "Ver transcripción"}
+          </button>
+          {showHistory && historyPanel("")}
         </div>
       )}
 
-      {stage === "feedback" && (
+      {phase === "feedback" && (
         <div className="sim-feedback-container">
           {isGeneratingFeedback ? (
             <div className="sim-loading-feedback">
               <div className="sim-loading-spinner" />
               <h2 className="mono" style={{ fontSize: 16, fontWeight: 700 }}>Generando reporte de feedback…</h2>
               <p className="tagline" style={{ maxWidth: 360 }}>
-                El Coach de IA está evaluando tu respuesta en base a la señal, fit cultural y claridad de comunicación. Esto demora unos segundos.
+                El Coach de IA está evaluando tus respuestas en base a la señal, fit cultural y claridad de
+                comunicación. Esto demora unos segundos.
               </p>
+            </div>
+          ) : error && !feedbackReport ? (
+            <div className="sim-loading-feedback">
+              <div className="mono sim-error-box">⚠️ {error}</div>
+              <button onClick={() => setPhaseBoth("setup")} className="btn-action btn-primary">
+                Volver al inicio
+              </button>
             </div>
           ) : (
             <>
               <div className="sim-score-circle-wrapper">
-                <div className="sim-score-circle">
-                  {feedbackReport?.score ?? 0}
-                </div>
+                <div className="sim-score-circle">{feedbackReport?.score ?? 0}</div>
                 <div className="sim-score-label">PUNTAJE GENERAL</div>
               </div>
 
               <div className="sim-card">
                 <div className="sim-card-header">📊 Resumen del Coach</div>
                 <div className="sim-card-body">
-                  <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--ink)" }}>
-                    {feedbackReport?.summary}
-                  </p>
+                  <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--ink)" }}>{feedbackReport?.summary}</p>
                 </div>
               </div>
 
@@ -1334,11 +1295,7 @@ export default function SimuladorPage() {
                 ))}
               </div>
 
-              <button
-                onClick={() => setStage("setup")}
-                className="btn-action btn-primary"
-                style={{ marginTop: 10 }}
-              >
+              <button onClick={() => setPhaseBoth("setup")} className="btn-action btn-primary" style={{ marginTop: 10 }}>
                 🔄 Iniciar Nueva Simulación
               </button>
             </>

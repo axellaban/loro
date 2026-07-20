@@ -2,22 +2,20 @@
 // siguiente chunk mientras suena el actual, para que la latencia percibida sea
 // la de la primera oración y no la del texto completo.
 
-export function splitSentences(text: string): string[] {
-  const parts = text
-    .split(/(?<=[.!?…])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  // Fragmentos muy cortos ("Bien.", "Ok.") se fusionan con el siguiente para
-  // no pagar un round-trip de TTS por dos palabras.
-  const merged: string[] = [];
-  for (const p of parts) {
-    if (merged.length && merged[merged.length - 1].length < 25) {
-      merged[merged.length - 1] += " " + p;
-    } else {
-      merged.push(p);
-    }
+// Extrae las oraciones completas de un buffer en streaming y devuelve el
+// resto (posible oración a medio llegar). Sin lookbehind: los regex no se
+// transpilan y el lookbehind rompe el bundle entero en Safari iOS < 16.4.
+export function extractSentences(pending: string): { complete: string[]; rest: string } {
+  const complete: string[] = [];
+  const re = /[.!?…]+\s+/g;
+  let start = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(pending))) {
+    const sentence = pending.slice(start, m.index + m[0].length).trim();
+    if (sentence) complete.push(sentence);
+    start = re.lastIndex;
   }
-  return merged;
+  return { complete, rest: pending.slice(start) };
 }
 
 type QueueItem = {
@@ -38,8 +36,10 @@ export class TtsQueue {
   private stopped = false;
   private hadError = false;
 
+  onStart?: () => void;
   onAllEnded?: () => void;
   onError?: () => void;
+  private started = false;
 
   constructor(ctx: AudioContext, lang: "es" | "en") {
     this.ctx = ctx;
@@ -112,6 +112,10 @@ export class TtsQueue {
       const buffer = await item.bufferPromise;
       if (this.stopped) break;
       if (!buffer) continue;
+      if (!this.started) {
+        this.started = true;
+        this.onStart?.();
+      }
       await new Promise<void>((resolve) => {
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
