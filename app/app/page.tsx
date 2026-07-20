@@ -301,12 +301,13 @@ type ModelOption = { id: string; label: string; provider: Provider; model: strin
 // Cualquiera se puede pisar por env en el backend (OPENAI_MODEL/ANTHROPIC_MODEL/GEMINI_MODEL).
 // IDs reales de la API de Gemini (los que responden con la key actual). El
 // backend igual cae a un modelo estable si alguno fallara, así nunca queda sin
-// respuesta. Por ahora solo Gemini (OpenAI/Claude ocultos); el backend soporta
-// los tres proveedores: para reactivarlos, descomentar sus líneas y cargar la key.
+// respuesta. Requiere ANTHROPIC_API_KEY / OPENAI_API_KEY cargadas en Vercel;
+// si falta alguna, esa opción devuelve el error claro del backend en vez de
+// tirar la app entera.
 const MODELS: ModelOption[] = [
-  // { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
-  // { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
-  // { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
+  { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
+  { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
+  { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
   { id: "gemini-flash", label: "Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
   { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
 ];
