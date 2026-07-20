@@ -5,7 +5,7 @@ import "./globals.css";
 
 // Dominio base para resolver OG/Twitter images y URLs absolutas. Se puede
 // pisar con NEXT_PUBLIC_SITE_URL en Vercel; default al dominio de producción.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://copiloto-mvp.vercel.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://loreado.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

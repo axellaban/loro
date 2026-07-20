@@ -104,7 +104,7 @@ en vez de vender, y UN solo link. Adaptar el tono a cada comunidad — nunca
 pegar el mismo texto dos veces (los mods y los usuarios lo huelen).
 
 **Tracking por canal**: agregar `?ref=nombre` al link en cada lugar
-(ej. `https://copiloto-mvp.vercel.app?ref=devsarg`). PostHog captura la URL
+(ej. `https://loreado.vercel.app?ref=devsarg`). PostHog captura la URL
 completa del pageview, así que se ve qué comunidad convierte sin tocar código.
 
 **Secuencia**: un canal por vez. Semana 1: r/devsarg (lunes 10-12hs, quedarse
@@ -146,7 +146,7 @@ Título (elegir uno):
 > tengo mi postura pero es válido el debate.
 >
 > Si tenés una entrevista esta semana, probalo en serio y contame qué
-> respondió mal: https://copiloto-mvp.vercel.app?ref=devsarg
+> respondió mal: https://loreado.vercel.app?ref=devsarg
 
 Cuándo: lunes 10-12hs. Quedarse las primeras 2 horas respondiendo TODO.
 
@@ -159,7 +159,7 @@ Tono de mensaje al pasar, no de lanzamiento. Si preguntan, ahí se desarrolla.
 > soplando las respuestas en tiempo real, ancladas en tu CV. Gratis, sin
 > registro, el costo lo banco yo así que hay cuota. Si alguno está en
 > proceso y la quiere probar en una entrevista real, me sirve muchísimo el
-> feedback: https://copiloto-mvp.vercel.app?ref=sysarmy
+> feedback: https://loreado.vercel.app?ref=sysarmy
 
 ## 3. Grupos de Facebook/Telegram de empleo — semana 2, cero jerga (`?ref=empleos`)
 
@@ -177,7 +177,7 @@ Tono de mensaje al pasar, no de lanzamiento. Si preguntan, ahí se desarrolla.
 > yo solo y la pago yo, por eso las sesiones gratis son limitadas.
 >
 > Si la usan en una entrevista de verdad me encantaría que me cuenten cómo
-> les fue: https://copiloto-mvp.vercel.app?ref=empleos
+> les fue: https://loreado.vercel.app?ref=empleos
 
 ## 4. Comunidades de egresados de bootcamps (`?ref=bootcamp`)
 
@@ -192,7 +192,7 @@ Tono de mensaje al pasar, no de lanzamiento. Si preguntan, ahí se desarrolla.
 > sesiones gratis son limitadas porque las APIs las pago yo.
 >
 > Ojo: no reemplaza prepararse — es la red de seguridad para el bloqueo.
-> https://copiloto-mvp.vercel.app?ref=bootcamp
+> https://loreado.vercel.app?ref=bootcamp
 
 ## 5. Plantilla de comentario para hilos existentes (`?ref=hilo`)
 
@@ -203,7 +203,7 @@ adaptando la primera frase al hilo concreto:
 > Me pasaba igual, y terminé haciéndome una herramienta para eso (aviso:
 > la hice yo, es gratis y sin registro). Escucha la entrevista y te va
 > soplando las respuestas armadas con tu CV en tiempo real. Por si te
-> sirve para la próxima: https://copiloto-mvp.vercel.app?ref=hilo
+> sirve para la próxima: https://loreado.vercel.app?ref=hilo
 
 ## FAQ defensivo — respuestas para los comentarios que van a venir
 

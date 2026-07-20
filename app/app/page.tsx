@@ -672,7 +672,7 @@ export default function Page() {
   // cuota client-side), pero convierte a cada usuario en distribuidor.
   const shareForBonus = useCallback(() => {
     const url =
-      typeof window !== "undefined" ? window.location.origin : "https://copiloto-mvp.vercel.app";
+      typeof window !== "undefined" ? window.location.origin : "https://loreado.vercel.app";
     const msg = `Mirá esto… me voló la cabeza 🦜\nUn Loro con IA que te sopla las respuestas en la entrevista, armadas con tu CV, la empresa y el puesto. Tocás un botón y listo. Sin login, sin vueltas.\n${url}`;
     try {
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
