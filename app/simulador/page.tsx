@@ -41,6 +41,8 @@ type FeedbackIndicator = { name: string; score: number };
 
 type FeedbackReport = {
   score: number;
+  level?: string;
+  verdict?: string;
   summary: string;
   indicators?: FeedbackIndicator[];
   strengths: string[];
@@ -1556,6 +1558,22 @@ export default function SimuladorPage() {
             <>
               <div className="sim-score-circle-wrapper">
                 <ScoreGauge score={feedbackReport?.score ?? 0} />
+                {(feedbackReport?.level || feedbackReport?.verdict) && (
+                  <div className="sim-verdict">
+                    {feedbackReport?.level && (
+                      <span
+                        className="sim-verdict-level"
+                        style={{
+                          color: scoreColor(feedbackReport.score ?? 0),
+                          borderColor: scoreColor(feedbackReport.score ?? 0),
+                        }}
+                      >
+                        Nivel: {feedbackReport.level}
+                      </span>
+                    )}
+                    {feedbackReport?.verdict && <p className="sim-verdict-text">{feedbackReport.verdict}</p>}
+                  </div>
+                )}
               </div>
 
               {feedbackReport?.indicators && feedbackReport.indicators.length > 0 && (

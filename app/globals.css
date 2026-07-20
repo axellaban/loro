@@ -1476,11 +1476,12 @@ input {
   transition: filter 0.45s ease, transform 0.45s ease, opacity 0.3s ease;
 }
 .sim-avatar-video-paused {
-  filter: saturate(0.85) brightness(0.97);
+  /* El video sigue en loop lento mientras el loro no habla; el zoom tipo Ken
+     Burns le suma vida. Atenuación mínima para distinguir del estado hablando.
+     Scale mínimo 1.02 mantiene overscan: el translate/rotate nunca revela el
+     fondo de la caja. */
+  filter: saturate(0.95) brightness(0.99);
   transform: scale(1.02);
-  /* Micro "respiración" mientras el loro no habla (pensando/escuchando), para
-     que el frame no se vea congelado. El scale mínimo 1.02 mantiene overscan
-     así el translate/rotate nunca revela el fondo de la caja. */
   animation: simAvatarIdle 4.5s ease-in-out infinite;
 }
 @keyframes simAvatarIdle {
@@ -2160,6 +2161,33 @@ input {
   color: var(--ink-dim);
   margin-left: 2px;
 }
+/* Titular de veredicto + nivel del informe */
+.sim-verdict {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  max-width: 460px;
+}
+.sim-verdict-level {
+  border: 1.5px solid;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: #fff;
+  text-transform: uppercase;
+}
+.sim-verdict-text {
+  font-size: 15.5px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+}
+
 .sim-indicators {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

@@ -1,16 +1,20 @@
 "use client";
 
 // Avatar del entrevistador: video real del loro (public/loro-interviewer.mp4).
-// El pico se mueve porque el video se reproduce solo durante `speaking` y
-// queda pausado (frame congelado, con transición suave) el resto del tiempo.
-// El SVG animado anterior queda como fallback si el video no puede cargar o
-// reproducirse (y como placeholder mientras carga).
+// El video reproduce SIEMPRE en loop: a ritmo normal cuando habla (`speaking`)
+// y ralentizado el resto del tiempo, para que el loro se vea vivo mientras
+// piensa/escucha en lugar de quedar congelado. El SVG animado queda como
+// fallback si el video no puede cargar o reproducirse (y como placeholder
+// mientras carga).
 
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/track";
 import { createLevelReader } from "./tts";
 
 export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
+
+// Ritmo del loop según estado: normal al hablar, lento y calmo el resto.
+const IDLE_RATE = 0.6;
 
 export default function Avatar({
   state,
@@ -20,7 +24,6 @@ export default function Avatar({
   analyser: AnalyserNode | null;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
 
@@ -31,34 +34,16 @@ export default function Avatar({
     });
   };
 
-  // Play durante speaking, pause diferido en el resto. El delay de 250ms +
-  // la transición CSS evitan que el corte se sienta seco, y limpiar el timer
-  // cubre la reentrada rápida a speaking.
+  // Un solo loop continuo; solo cambia la velocidad. Ralentizar en idle da la
+  // sensación de "vivo pero calmo" sin cortes ni pausas.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || videoFailed) return;
-    if (pauseTimerRef.current) {
-      clearTimeout(pauseTimerRef.current);
-      pauseTimerRef.current = null;
-    }
-    if (state === "speaking") {
-      v.play().catch(() => {
-        // Si nunca llegó a reproducir (autoplay bloqueado o codec), caer al SVG.
-        if (v.currentTime === 0) failVideo();
-      });
-    } else {
-      pauseTimerRef.current = setTimeout(() => {
-        try {
-          v.pause();
-        } catch {}
-      }, 250);
-    }
-    return () => {
-      if (pauseTimerRef.current) {
-        clearTimeout(pauseTimerRef.current);
-        pauseTimerRef.current = null;
-      }
-    };
+    v.playbackRate = state === "speaking" ? 1 : IDLE_RATE;
+    v.play().catch(() => {
+      // Si nunca llegó a reproducir (autoplay bloqueado o codec), caer al SVG.
+      if (v.currentTime === 0) failVideo();
+    });
   }, [state, videoFailed]);
 
   const showVideo = !videoFailed && videoReady;

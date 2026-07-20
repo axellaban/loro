@@ -37,6 +37,8 @@ Recibís:
 Tu tarea: Generar un reporte en formato JSON con la siguiente estructura exacta:
 {
   "score": 85,
+  "level": "Sólido",
+  "verdict": "En una entrevista real para este puesto, estarías cerca de avanzar a la siguiente ronda.",
   "summary": "Resumen general del desempeño...",
   "indicators": [
     { "name": "Claridad", "score": 80 },
@@ -64,6 +66,8 @@ Tu tarea: Generar un reporte en formato JSON con la siguiente estructura exacta:
 }
 
 Sobre "indicators": son SIEMPRE esos 4 nombres exactos (Claridad, Estructura, Fit con el puesto, Confianza), cada uno con un score 0-100 honesto. Cada pregunta lleva también su "score" 0-100 individual.
+Sobre "level": una etiqueta corta (1-2 palabras) del nivel general acorde al score (ej. "Inicial", "En desarrollo", "Sólido", "Muy sólido", "Sobresaliente").
+Sobre "verdict": UNA sola oración con el desenlace simulado de esta entrevista para ESTE puesto ("avanzarías a la siguiente ronda", "quedarías en duda", "todavía no avanzarías"), basada en las respuestas reales. Honesta pero motivadora, en segunda persona (vos).
 
 Reglas críticas:
 - Sé honesto pero motivador. Valora la señal técnica, el fit cultural y la comunicación.
