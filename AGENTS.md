@@ -11,7 +11,7 @@ cargó el usuario. Producto en español, sin login, sin fricción — pensado pa
 por WhatsApp.
 
 Deploy: Next.js 14 (App Router) en Vercel. Proyecto de Vercel: `copiloto-mvp`. URL de
-producción: `https://copiloto-mvp.vercel.app`.
+producción: `https://loreado.vercel.app`.
 
 ## Cómo correrlo
 
