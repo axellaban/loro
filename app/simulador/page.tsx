@@ -519,8 +519,6 @@ export default function SimuladorPage() {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const wakeLockRef = useRef<any>(null);
-  // En qué pregunta (además de la 1) el entrevistador "mira" la cámara.
-  const visionQuestionRef = useRef(0);
 
   const selectedModel = MODELS.find((m) => m.id === modelId) || MODELS[0];
 
@@ -838,7 +836,9 @@ export default function SimuladorPage() {
 
     try {
       const questionIndex = currentHistory.length + 1;
-      const withVision = questionIndex === 1 || questionIndex === visionQuestionRef.current;
+      // Frame en las preguntas 1 y 2: garantiza el comentario "te estoy
+      // viendo" temprano (en la 1 la cámara puede no tener frames todavía).
+      const withVision = questionIndex <= 2;
       const image = withVision ? captureFrame() : null;
       const res = await fetch("/api/simulador", {
         method: "POST",
@@ -1077,8 +1077,6 @@ export default function SimuladorPage() {
     setElapsed(0);
     setMicOn(true);
     setConnectStep(0);
-    // Además de la primera, una pregunta al azar (2..5) lleva frame de cámara.
-    visionQuestionRef.current = 2 + Math.floor(Math.random() * Math.max(1, questionsCount - 1));
     sessionLangRef.current = lang;
     intentionalCloseRef.current = false;
     reconnectAttemptsRef.current = 0;

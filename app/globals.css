@@ -2115,14 +2115,14 @@ input {
   gap: 2px;
 }
 .sim-gauge-svg {
-  width: min(64vw, 260px);
+  width: min(56vw, 230px);
   height: auto;
 }
 .sim-gauge-value {
-  font-size: 40px;
+  font-size: 38px;
   font-weight: 800;
   line-height: 1;
-  margin-top: -34px;
+  margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
 .sim-gauge-total {
