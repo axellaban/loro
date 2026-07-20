@@ -1001,7 +1001,11 @@ input {
   justify-content: center;
   padding: 24px;
   position: relative;
-  overflow: hidden;
+  /* Scroll-safe: sin scroll horizontal, pero si el contenido es más alto que
+     el viewport (títulos largos en pantallas bajas) se puede scrollear y el
+     CTA nunca queda recortado. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .landing-main {
@@ -1014,6 +1018,17 @@ input {
   text-align: center;
   z-index: 1;
   text-transform: uppercase; /* todo en mayúscula: rústico / anti-marketing */
+  /* margin auto centra y, a diferencia de justify-content, no recorta el tope
+     cuando el contenido desborda en alto (scroll-safe). */
+  margin: auto;
+  padding: 32px 0;
+}
+
+/* Título del simulador: palabras largas ("DESBLOQUEA", "ENTREVISTA") necesitan
+   un mínimo más chico para no desbordar en pantallas angostas. */
+.landing-sim .landing-title {
+  font-size: clamp(1.5rem, 6.2vw, 5rem);
+  overflow-wrap: break-word;
 }
 
 .landing-title {
@@ -1109,6 +1124,22 @@ input {
   width: min(380px, 78vw);
   height: auto;
   margin: 8px 0 24px;
+}
+
+/* Nota inferior de la landing del simulador: como .landing-warn pero en blanco
+   tenue (es beneficio, no advertencia de escasez). */
+.landing-note {
+  color: #fff;
+  font-size: clamp(10px, 2.6vw, 13px);
+  font-weight: 400;
+  text-transform: none;
+  max-width: 34rem;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  margin: 36px auto 0;
+  padding: 0 4px;
+  text-align: center;
+  opacity: 0.6;
 }
 
 /* ===================== Paywall / lista de espera ===================== */
