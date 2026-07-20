@@ -1357,7 +1357,7 @@ export default function SimuladorPage() {
             />
           </div>
 
-          <footer style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+          <footer className="sim-setup-footer">
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
               ▶ Generar Sala de Entrevista
             </button>
