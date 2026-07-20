@@ -141,6 +141,60 @@ function CheckIcon() {
   );
 }
 
+// Íconos de la sala (header de videollamada)
+const ctlIconProps = {
+  width: 17,
+  height: 17,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+function BackIcon() {
+  return (
+    <svg {...ctlIconProps}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+}
+function CamIcon({ off }: { off?: boolean }) {
+  return (
+    <svg {...ctlIconProps}>
+      <path d="M23 7l-7 5 7 5V7z" />
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+      {off && <line x1="2" y1="2" x2="22" y2="22" />}
+    </svg>
+  );
+}
+function MicIcon({ off }: { off?: boolean }) {
+  return (
+    <svg {...ctlIconProps}>
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4" />
+      {off && <line x1="2" y1="2" x2="22" y2="22" />}
+    </svg>
+  );
+}
+function SpeakerIcon({ off }: { off?: boolean }) {
+  return (
+    <svg {...ctlIconProps}>
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      {off ? <line x1="16" y1="9" x2="22" y2="15" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7" />}
+      {off && <line x1="22" y1="9" x2="16" y2="15" />}
+    </svg>
+  );
+}
+function PhoneIcon() {
+  return (
+    <svg {...ctlIconProps} width={15} height={15}>
+      <path d="M10.7 13.3a15 15 0 0 1-2.8-4l2-2a1 1 0 0 0 .2-1L9.4 2.6a1 1 0 0 0-1-.6H4.6a1 1 0 0 0-1 1.1A19 19 0 0 0 20.9 20.4a1 1 0 0 0 1.1-1v-3.8a1 1 0 0 0-.6-1l-3.7-1.7a1 1 0 0 0-1 .2l-2 2a15 15 0 0 1-4-1.8z" transform="rotate(135 12 12)" />
+    </svg>
+  );
+}
+
 // Info tip
 function InfoTip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -286,10 +340,6 @@ function fmtElapsed(secs: number): string {
 }
 
 const LS_KEY_CONTEXT = "simulador:context:v1";
-const SESSIONS_KEY = "loreado:sessions:v1";
-const BONUS_KEY = "loreado:bonus:v1";
-const FREE_SESSIONS = 5;
-const MAX_BONUS = 3;
 
 // Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
 // turno por un carraspeo transcripto).
@@ -332,20 +382,27 @@ export default function SimuladorPage() {
   const [confirmCountdown, setConfirmCountdown] = useState(CONFIRM_SECONDS);
   const [elapsed, setElapsed] = useState(0);
   const [cameraOn, setCameraOn] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [camAvailable, setCamAvailable] = useState(false);
+  const [micOn, setMicOn] = useState(true);
+  // Pasos reales de conexión para el panel de chat: 0=media, 1=WS, 2=primera
+  // pregunta en camino, 3=todo listo.
+  const [connectStep, setConnectStep] = useState(0);
 
   // Feedback state
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [feedbackReport, setFeedbackReport] = useState<FeedbackReport | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // Session limits (same system as /app)
-  const [sessionsUsed, setSessionsUsed] = useState(0);
-  const sessionsUsedRef = useRef(0);
-  const [bonus, setBonus] = useState(0);
-  const bonusRef = useRef(0);
-  const freeSessions = FREE_SESSIONS + bonus;
-  const sessionsLeft = Math.max(0, freeSessions - sessionsUsed);
+  // Social proof simulada del setup: número que deriva lentamente entre 35 y
+  // 90 para que parezca actividad real. Decisión de producto explícita.
+  const [practicing, setPracticing] = useState(0);
+  useEffect(() => {
+    setPracticing(35 + Math.floor(Math.random() * 56));
+    const iv = setInterval(() => {
+      setPracticing((p) => Math.min(90, Math.max(35, p + Math.floor(Math.random() * 5) - 2)));
+    }, 4000);
+    return () => clearInterval(iv);
+  }, []);
 
   // Refs de audio / red
   const wsRef = useRef<WebSocket | null>(null);
@@ -402,21 +459,6 @@ export default function SimuladorPage() {
       );
     } catch {}
   }, [company, role, profile, modelId, lang, interviewType, questionsCount]);
-
-  // Load session counter
-  useEffect(() => {
-    try {
-      const n = parseInt(localStorage.getItem(SESSIONS_KEY) || "0", 10);
-      const used = Number.isFinite(n) ? Math.max(0, n) : 0;
-      sessionsUsedRef.current = used;
-      setSessionsUsed(used);
-
-      const b = parseInt(localStorage.getItem(BONUS_KEY) || "0", 10);
-      const earned = Number.isFinite(b) ? Math.min(MAX_BONUS, Math.max(0, b)) : 0;
-      bonusRef.current = earned;
-      setBonus(earned);
-    } catch {}
-  }, []);
 
   // ---------- Timers del turno ----------
 
@@ -632,10 +674,15 @@ export default function SimuladorPage() {
       // Troceo incremental: cada oración completa entra a la cola TTS mientras
       // el LLM sigue streameando, para que la voz arranque con la primera.
       let pending = "";
+      let firstChunk = true;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        if (firstChunk) {
+          firstChunk = false;
+          setConnectStep(3);
+        }
         const chunk = dec.decode(value, { stream: true });
         questionText += chunk;
         questionRef.current = questionText;
@@ -742,6 +789,7 @@ export default function SimuladorPage() {
     audioCtxRef.current = null;
     streamRef.current = null;
     setCameraOn(false);
+    setCamAvailable(false);
   };
 
   const finishToFeedback = (finalHistory: HistoryItem[]) => {
@@ -810,13 +858,9 @@ export default function SimuladorPage() {
 
   // ---------- Inicio de sesión ----------
 
+  // El simulador es gratis e ilimitado a propósito (motor de adquisición):
+  // acá no se consume la cuota de sesiones de /app.
   const startSimulation = async () => {
-    if (sessionsUsedRef.current >= freeSessions) {
-      setError("Beta pausada: Límite de sesiones gratuitas alcanzado.");
-      track("sim_paywall_shown");
-      return;
-    }
-
     setError("");
     setHistory([]);
     historyRef.current = [];
@@ -827,7 +871,8 @@ export default function SimuladorPage() {
     questionRef.current = "";
     setFeedbackReport(null);
     setElapsed(0);
-    setShowHistory(false);
+    setMicOn(true);
+    setConnectStep(0);
     sessionLangRef.current = lang;
     intentionalCloseRef.current = false;
     reconnectAttemptsRef.current = 0;
@@ -850,7 +895,10 @@ export default function SimuladorPage() {
         track("sim_camera_denied");
       }
       streamRef.current = stream;
-      setCameraOn(!camDenied && stream.getVideoTracks().length > 0);
+      const hasCam = !camDenied && stream.getVideoTracks().length > 0;
+      setCamAvailable(hasCam);
+      setCameraOn(hasCam);
+      setConnectStep(1);
 
       const audioCtx = new AudioContext();
       audioCtxRef.current = audioCtx;
@@ -871,14 +919,8 @@ export default function SimuladorPage() {
       source.connect(worklet);
 
       await connectWs(true);
+      setConnectStep(2);
 
-      // Cuota
-      const used = sessionsUsedRef.current + 1;
-      sessionsUsedRef.current = used;
-      setSessionsUsed(used);
-      try {
-        localStorage.setItem(SESSIONS_KEY, String(used));
-      } catch {}
       track("sim_session_start", { model: selectedModel.model, questions: questionsCount, lang });
 
       // Wake lock: que no se apague la pantalla en el celular a mitad de entrevista.
@@ -935,6 +977,22 @@ export default function SimuladorPage() {
     ttsRef.current?.setMuted(m);
   };
 
+  const toggleCamera = () => {
+    const t = streamRef.current?.getVideoTracks()[0];
+    if (!t) return;
+    t.enabled = !t.enabled;
+    setCameraOn(t.enabled);
+    track("sim_camera_toggled", { on: t.enabled });
+  };
+
+  const toggleMic = () => {
+    const t = streamRef.current?.getAudioTracks()[0];
+    if (!t) return;
+    t.enabled = !t.enabled;
+    setMicOn(t.enabled);
+    track("sim_mic_toggled", { on: t.enabled });
+  };
+
   const copyOptimalAnswer = useCallback(
     (index: number, text: string) => {
       navigator.clipboard?.writeText(text).then(() => {
@@ -958,44 +1016,34 @@ export default function SimuladorPage() {
           ? "listening"
           : "idle";
 
-  const statusLabel =
-    phase === "connecting"
-      ? "Conectando micrófono y cámara…"
-      : phase === "asking"
-        ? "El entrevistador está preparando la pregunta…"
-        : phase === "speaking"
-          ? "El entrevistador está hablando"
-          : phase === "listening"
-            ? "Te escuchamos — respondé hablando"
-            : phase === "confirming"
-              ? `¿Terminaste? Avanzando en ${confirmCountdown}…`
-              : "";
-
-  const interim = lines.length > 0 ? lines[lines.length - 1].text : "";
+  const interim = lines.length > 0 && !lines[lines.length - 1].final ? lines[lines.length - 1].text : "";
   const canFinishAnswer =
     (phase === "listening" || phase === "confirming") && currentAnswer.trim().length > 0;
   const isLastQuestion = history.length + 1 >= questionsCount;
+  const isListening = phase === "listening" || phase === "confirming";
 
-  const historyPanel = (extraClass: string) => (
-    <aside className={`sim-side-panel ${extraClass}`}>
-      <div className="sim-side-title">Transcripción</div>
-      {history.length === 0 ? (
-        <p className="sim-history-empty">Acá van a aparecer tus respuestas a medida que avance la entrevista.</p>
-      ) : (
-        history.map((h, i) => (
-          <div className="sim-history-item" key={i}>
-            <div className="sim-history-q">
-              P{i + 1}. {h.question}
-            </div>
-            <div className="sim-history-a">{h.answer}</div>
-          </div>
-        ))
-      )}
-    </aside>
-  );
+  // Autoscroll del chat: el volumen de mensajes es bajo, forzarlo siempre es
+  // más simple que detectar scroll manual.
+  const chatBodyRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = chatBodyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [history, currentQuestion, currentAnswer, lines, phase, confirmCountdown, connectStep]);
+
+  const CONNECT_STEPS = ["Preparando tu sala de entrevista", "Cargando tu contexto y CV", "Generando la primera pregunta"];
+  const showSteps = phase === "connecting" || (phase === "asking" && history.length === 0 && !currentQuestion);
+
+  const interviewTypeLabel =
+    interviewType === "technical"
+      ? "Técnica / Hard Skills"
+      : interviewType === "behavioral"
+        ? "De Comportamiento (STAR)"
+        : interviewType === "hr"
+          ? "Inicial / RRHH"
+          : "General / Fit Cultural";
 
   return (
-    <main className="app-container">
+    <main className={`app-container ${inInterview ? "sim-wide" : ""}`}>
       {!inInterview && (
         <header className="brand-header">
           <div className="brand">
@@ -1007,9 +1055,16 @@ export default function SimuladorPage() {
 
       {phase === "setup" && (
         <>
+          {practicing > 0 && (
+            <div className="sim-social-pill">
+              <span className="sim-social-dot" aria-hidden="true" />
+              {practicing} personas practicando ahora
+            </div>
+          )}
+
           <p className="tagline">
-            El Loro te entrevista cara a cara: te hace preguntas por voz, te escucha responder y al final te da un
-            reporte de feedback completo. 🦜
+            Practicá entrevistas de trabajo gratis con el Loro simulador de entrevistas. Recibí feedback al instante,
+            mejorá tus respuestas y ganá confianza para cualquier entrevista.
           </p>
 
           <div className="selectors-row" style={{ marginTop: 8 }}>
@@ -1119,87 +1174,184 @@ export default function SimuladorPage() {
 
           <footer style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
-              ▶ Iniciar Entrevista (micrófono y cámara)
+              ▶ Entrar a la Sala de Entrevista
             </button>
             <p className="mono btn-hint" style={{ textAlign: "center" }}>
-              La cámara es opcional y nunca sale de tu navegador. Se consumirá 1 sesión de tu cuota ({sessionsLeft}{" "}
-              restantes).
+              Gratis e ilimitado. Usa tu micrófono; la cámara es opcional y nunca sale de tu navegador.
             </p>
           </footer>
         </>
       )}
 
       {inInterview && (
-        <div className="sim-live-grid">
-          <div className="sim-live-header">
-            <div className="sim-live-header-left">
-              <span className="sim-rec-dot" aria-hidden="true" />
-              <span className="sim-timer mono">{fmtElapsed(elapsed)}</span>
-              <span className="sim-qcount">
-                Pregunta {Math.min(history.length + 1, questionsCount)} de {questionsCount}
+        <div className="sim-room">
+          <header className="sim-room-header">
+            <div className="sim-room-header-left">
+              <button className="sim-back-btn" onClick={endInterview} aria-label="Volver">
+                <BackIcon />
+              </button>
+              <h1 className="sim-room-title">Sala de Entrevista</h1>
+              <span className="sim-room-meta mono">
+                {fmtElapsed(elapsed)} · Pregunta {Math.min(history.length + 1, questionsCount)} de {questionsCount}
               </span>
             </div>
-            <button className="sim-end-btn" onClick={endInterview}>
-              Finalizar
-            </button>
-          </div>
+            <div className="sim-room-header-right">
+              <button
+                className={`sim-ctl-btn ${cameraOn ? "sim-ctl-on" : ""}`}
+                onClick={toggleCamera}
+                disabled={!camAvailable}
+                aria-label={cameraOn ? "Apagar cámara" : "Prender cámara"}
+                title={!camAvailable ? "Cámara no autorizada" : cameraOn ? "Apagar cámara" : "Prender cámara"}
+              >
+                <CamIcon off={!cameraOn} />
+              </button>
+              <button
+                className={`sim-ctl-btn ${micOn ? "sim-ctl-on" : ""}`}
+                onClick={toggleMic}
+                aria-label={micOn ? "Silenciar micrófono" : "Activar micrófono"}
+                title={micOn ? "Silenciar micrófono" : "Activar micrófono"}
+              >
+                <MicIcon off={!micOn} />
+              </button>
+              <button
+                className="sim-ctl-btn"
+                onClick={toggleMute}
+                aria-label={isVoiceMuted ? "Activar voz del entrevistador" : "Silenciar voz del entrevistador"}
+                title={isVoiceMuted ? "Activar voz del entrevistador" : "Silenciar voz del entrevistador"}
+              >
+                <SpeakerIcon off={isVoiceMuted} />
+              </button>
+              <button className="sim-finish-btn" onClick={endInterview}>
+                <PhoneIcon /> Finalizar
+              </button>
+            </div>
+          </header>
 
           {error && <div className="mono sim-error-box">⚠️ {error}</div>}
 
-          <div className="sim-stage">
-            <Avatar state={avatarState} analyser={analyser} />
+          <div className="sim-room-grid">
+            <section className="sim-room-left">
+              <div className="sim-stage">
+                <Avatar state={avatarState} analyser={analyser} />
 
-            {(currentQuestion || phase === "asking") && (
-              <div className="sim-subtitle">
-                {currentQuestion || (
-                  <span className="sim-pulse-inline" aria-label="Preparando pregunta">
-                    …
-                  </span>
+                <span className={`sim-stage-badge ${connecting ? "sim-stage-badge-connecting" : ""}`}>
+                  <span className="sim-stage-badge-dot" aria-hidden="true" />
+                  {connecting ? "Conectando…" : "Entrevistador IA conectado"}
+                </span>
+
+                <div className="sim-pip">
+                  {cameraOn ? (
+                    <video ref={videoRef} muted playsInline autoPlay />
+                  ) : (
+                    <div className="sim-pip-off">
+                      <span className="sim-pip-off-emoji">📷</span>
+                      <span>Cámara desactivada</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <details className="sim-context-panel">
+                <summary>Contexto de la entrevista</summary>
+                <div className="sim-context-rows">
+                  <div className="sim-context-row">
+                    <span>Empresa</span>
+                    <b>{company || "—"}</b>
+                  </div>
+                  <div className="sim-context-row">
+                    <span>Puesto</span>
+                    <b>{role ? `${role.slice(0, 80)}${role.length > 80 ? "…" : ""}` : "—"}</b>
+                  </div>
+                  <div className="sim-context-row">
+                    <span>Tipo</span>
+                    <b>{interviewTypeLabel}</b>
+                  </div>
+                  <div className="sim-context-row">
+                    <span>Idioma</span>
+                    <b>{sessionLangRef.current === "en" ? "English" : "Español"}</b>
+                  </div>
+                  <div className="sim-context-row">
+                    <span>Modelo</span>
+                    <b>{selectedModel.label}</b>
+                  </div>
+                  <div className="sim-context-row">
+                    <span>Preguntas</span>
+                    <b>{questionsCount}</b>
+                  </div>
+                </div>
+              </details>
+            </section>
+
+            <aside className="sim-chat">
+              <div className="sim-chat-header">
+                <span className="sim-chat-title">Entrevista</span>
+                <span className={`sim-chat-chip ${connecting ? "sim-chat-chip-prep" : ""}`}>
+                  <span className="sim-chat-chip-dot" aria-hidden="true" />
+                  {connecting ? "Preparando" : "En vivo"}
+                </span>
+              </div>
+
+              <div className="sim-chat-body" ref={chatBodyRef}>
+                {showSteps && (
+                  <ol className="sim-steps">
+                    {CONNECT_STEPS.map((label, i) => (
+                      <li
+                        key={i}
+                        className={i < connectStep ? "sim-step-done" : i === connectStep ? "sim-step-active" : ""}
+                      >
+                        <span className="sim-step-mark" aria-hidden="true">
+                          {i < connectStep ? "✓" : i === connectStep ? <span className="sim-step-spinner" /> : "·"}
+                        </span>
+                        {label}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+
+                {history.map((h, i) => (
+                  <div key={i} className="sim-turn">
+                    <div className="sim-bubble sim-bubble-q">{h.question}</div>
+                    <div className="sim-bubble sim-bubble-a">{h.answer}</div>
+                  </div>
+                ))}
+
+                {phase === "asking" && !currentQuestion && !showSteps && (
+                  <div className="sim-bubble sim-bubble-q sim-bubble-typing" aria-label="El entrevistador está escribiendo">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                )}
+
+                {currentQuestion && <div className="sim-bubble sim-bubble-q">{currentQuestion}</div>}
+
+                {isListening && (currentAnswer || interim) && (
+                  <div className="sim-bubble sim-bubble-a">
+                    {currentAnswer}
+                    {interim && <em className="sim-bubble-interim"> {interim}</em>}
+                  </div>
+                )}
+
+                {phase === "listening" && !currentAnswer && !interim && (
+                  <div className="sim-chat-hint">
+                    {micOn ? "🎙 Te escuchamos — respondé hablando" : "Micrófono silenciado — activalo para responder"}
+                  </div>
+                )}
+
+                {phase === "confirming" && (
+                  <div className="sim-chat-hint">¿Terminaste? Avanzando en {confirmCountdown}…</div>
                 )}
               </div>
-            )}
 
-            <div className="sim-pip">
-              {cameraOn ? (
-                <video ref={videoRef} muted playsInline autoPlay />
-              ) : (
-                <div className="sim-pip-off">
-                  <span className="sim-pip-off-emoji">📷</span>
-                  <span>Cámara desactivada</span>
+              {canFinishAnswer && (
+                <div className="sim-chat-foot">
+                  <button className="sim-skip-link" onClick={() => closeAnswerRef.current(false)}>
+                    {isLastQuestion ? "Ver feedback →" : "Siguiente pregunta →"}
+                  </button>
                 </div>
               )}
-            </div>
+            </aside>
           </div>
-
-          <div className="sim-status-strip">
-            <div className="sim-status-label">
-              {(phase === "listening" || phase === "confirming") && <span className="sim-live-dot" aria-hidden="true" />}
-              {statusLabel}
-            </div>
-            {(phase === "listening" || phase === "confirming") && interim && (
-              <div className="sim-interim">{interim}</div>
-            )}
-          </div>
-
-          <div className="sim-controls">
-            <button className="sim-mute-btn" onClick={toggleMute} disabled={connecting}>
-              {isVoiceMuted ? "🔇 Voz apagada" : "🔊 Voz"}
-            </button>
-            <button
-              className="btn-action btn-primary"
-              onClick={() => closeAnswerRef.current(false)}
-              disabled={!canFinishAnswer}
-            >
-              {isLastQuestion ? "Terminé — Ver Feedback 🏆" : "Terminé mi respuesta →"}
-            </button>
-          </div>
-
-          {historyPanel("sim-side-panel-desktop")}
-
-          <button className="sim-history-toggle" onClick={() => setShowHistory((s) => !s)}>
-            {showHistory ? "Ocultar transcripción" : "Ver transcripción"}
-          </button>
-          {showHistory && historyPanel("")}
         </div>
       )}
 

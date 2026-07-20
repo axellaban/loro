@@ -1214,211 +1214,198 @@ input {
 
 /* ===== Simulador (/simulador) ===== */
 
-/* --- Avatar del entrevistador (loro) --- */
-.sim-avatar {
-  position: relative;
-  width: min(52vw, 220px);
-  aspect-ratio: 1;
-  display: flex;
+/* --- Social proof del setup --- */
+.sim-social-pill {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-}
-.sim-avatar-circle {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, #ffffff 0%, #ecfdf5 70%, #d1fae5 100%);
-  border: 1px solid #a7f3d0;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  box-shadow: 0 10px 30px -12px rgba(16, 185, 129, 0.35);
-}
-.sim-avatar-svg {
-  width: 82%;
-  height: 82%;
-  margin-bottom: -6%;
-  animation: simBob 4s ease-in-out infinite;
-}
-@keyframes simBob {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(3px) rotate(0.8deg); }
-}
-
-/* Cabeza: leve inclinación cuando escucha. */
-.sim-head {
-  transform-box: fill-box;
-  transform-origin: 50% 65%;
-  transition: transform 0.45s ease;
-}
-.sim-avatar-listening .sim-head { transform: rotate(-5deg); }
-.sim-avatar-thinking .sim-head { transform: rotate(3deg) translateY(-1px); }
-
-/* Párpado: cerrado = scaleY(1) tapando el ojo. */
-.sim-eyelid {
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
-  transform: scaleY(0);
-  transition: transform 0.07s linear;
-}
-.sim-blink .sim-eyelid { transform: scaleY(1); }
-
-/* Pico: la mandíbula rota alrededor de la comisura según --mouth (0–1),
-   que setea el rAF del lip-sync. */
-.sim-beak-upper {
-  transform-box: fill-box;
-  transform-origin: 90% 85%;
-  transform: rotate(calc(var(--mouth, 0) * 7deg));
-}
-.sim-beak-lower {
-  transform-box: fill-box;
-  transform-origin: 95% 5%;
-  transform: rotate(calc(var(--mouth, 0) * -24deg));
-}
-
-/* Anillo de "escuchando". */
-.sim-avatar-ring {
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  border: 2px solid var(--loro-green);
-  opacity: 0;
-  pointer-events: none;
-}
-.sim-avatar-listening .sim-avatar-ring { animation: simRingPulse 1.8s ease-out infinite; }
-@keyframes simRingPulse {
-  0% { opacity: 0.7; transform: scale(0.96); }
-  70% { opacity: 0; transform: scale(1.12); }
-  100% { opacity: 0; transform: scale(1.12); }
-}
-
-/* Puntitos de "pensando". */
-.sim-thinking-dots {
-  position: absolute;
-  top: -4px;
-  right: 8%;
-  display: flex;
-  gap: 5px;
-  background: #fff;
-  border: 1px solid var(--line);
+  gap: 8px;
+  background: #fff5f0;
+  border: 1px solid #ffe4d6;
   border-radius: 999px;
-  padding: 7px 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  align-self: flex-start;
+  margin-top: 4px;
 }
-.sim-thinking-dots span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--loro-green);
-  animation: simPulse 1.4s infinite ease-in-out both;
-}
-.sim-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-.sim-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes simPulse {
-  0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
-}
-
-/* --- Layout de videollamada --- */
-.sim-live-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-}
-.sim-live-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-.sim-live-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.sim-rec-dot {
+.sim-social-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--loro-red);
-  animation: simBlink 1.5s infinite;
+  background: #ef4444;
+  animation: simBlink 2s infinite;
   flex: none;
 }
 @keyframes simBlink {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
 }
-.sim-timer {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
+
+/* --- Sala: header de videollamada --- */
+.sim-room {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
 }
-.sim-qcount {
-  font-size: 12.5px;
+/* La sala usa más ancho que el resto de la app (experiencia de videollamada). */
+.app-container.sim-wide { max-width: 1160px; }
+.sim-room-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.sim-room-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.sim-room-header-right { flex: none; }
+.sim-room-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sim-room-meta {
+  font-size: 12px;
   color: var(--ink-dim);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.sim-end-btn {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: var(--loro-red-deep);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 600;
+.sim-room-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sim-back-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  flex: none;
   transition: background 0.15s;
 }
-.sim-end-btn:hover { background: rgba(239, 68, 68, 0.15); }
+.sim-back-btn:hover { background: #f8fafc; }
+.sim-ctl-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+  transition: all 0.15s;
+}
+.sim-ctl-btn:hover { background: #f8fafc; color: var(--ink); }
+.sim-ctl-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Activa = naranja, como la referencia de sala de videollamada. */
+.sim-ctl-on {
+  background: #f97316;
+  border-color: #f97316;
+  color: #fff;
+}
+.sim-ctl-on:hover { background: #ea6a0a; color: #fff; }
+.sim-finish-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--loro-red);
+  border: none;
+  color: #fff;
+  border-radius: 12px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.sim-finish-btn:hover { background: var(--loro-red-deep); }
 
+/* --- Grid de la sala --- */
+.sim-room-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.sim-room-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* --- Stage de video --- */
 .sim-stage {
   position: relative;
   background: linear-gradient(180deg, #f0fdf9 0%, #ffffff 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  aspect-ratio: 4 / 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
 }
-.sim-subtitle {
+.sim-stage-badge {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
-  max-width: 64%;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14.5px;
-  line-height: 1.5;
-  color: var(--ink);
-  max-height: 42%;
-  overflow-y: auto;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--loro-green);
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 3;
 }
+.sim-stage-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: simBlink 2s infinite;
+  flex: none;
+}
+.sim-stage-badge-connecting { background: #64748b; }
+
 .sim-pip {
   position: absolute;
   right: 12px;
   bottom: 12px;
-  width: 28%;
-  max-width: 170px;
+  width: 26%;
+  max-width: 180px;
   aspect-ratio: 4 / 3;
   border-radius: 12px;
   overflow: hidden;
   border: 2px solid #fff;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   background: #17181a;
+  z-index: 3;
 }
 .sim-pip video {
   width: 100%;
@@ -1441,137 +1428,362 @@ input {
 }
 .sim-pip-off-emoji { font-size: 20px; }
 
-.sim-status-strip {
+/* --- Avatar del entrevistador (video con fallback SVG) --- */
+.sim-avatar {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  min-height: 58px;
+  align-items: center;
   justify-content: center;
 }
-.sim-status-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
+.sim-avatar-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.04);
+  transition: filter 0.45s ease, transform 0.45s ease, opacity 0.3s ease;
 }
-.sim-status-label .sim-live-dot {
-  width: 8px;
-  height: 8px;
-  background: var(--loro-green);
-  border-radius: 50%;
-  animation: simBlink 1.5s infinite;
-  flex: none;
+.sim-avatar-video-paused {
+  filter: saturate(0.85) brightness(0.97);
+  transform: scale(1);
 }
-.sim-interim {
-  font-size: 12.5px;
-  color: var(--ink-dim);
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Oculto pero en el DOM para que precargue mientras se muestra el SVG. */
+.sim-avatar-video-hidden { opacity: 0; }
+
+/* Anillo de "escuchando": marco interno pulsante sobre el stage. */
+.sim-avatar-ring {
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  border: 2px solid var(--loro-green);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
 }
-.sim-controls {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-.sim-controls .btn-action { flex: 1; }
-.sim-mute-btn {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-dim);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-.sim-mute-btn:hover {
-  background: #f8fafc;
-  border-color: var(--line-strong);
-  color: var(--ink);
+.sim-avatar-listening .sim-avatar-ring { animation: simRingPulse 1.8s ease-out infinite; }
+@keyframes simRingPulse {
+  0% { opacity: 0.7; }
+  70% { opacity: 0; }
+  100% { opacity: 0; }
 }
 
-/* Historial: panel lateral en desktop, colapsable en mobile. */
-.sim-side-panel {
+/* Puntitos de "pensando". */
+.sim-thinking-dots {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 5px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  z-index: 3;
+}
+.sim-thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--loro-green);
+  animation: simPulse 1.4s infinite ease-in-out both;
+}
+.sim-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.sim-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes simPulse {
+  0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* Fallback SVG del loro (si el video no carga/reproduce). */
+.sim-avatar-circle {
+  width: min(46%, 220px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #ffffff 0%, #ecfdf5 70%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  box-shadow: 0 10px 30px -12px rgba(16, 185, 129, 0.35);
+}
+.sim-avatar-svg {
+  width: 82%;
+  height: 82%;
+  margin-bottom: -6%;
+  animation: simBob 4s ease-in-out infinite;
+}
+@keyframes simBob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(3px) rotate(0.8deg); }
+}
+.sim-head {
+  transform-box: fill-box;
+  transform-origin: 50% 65%;
+  transition: transform 0.45s ease;
+}
+.sim-avatar-listening .sim-head { transform: rotate(-5deg); }
+.sim-avatar-thinking .sim-head { transform: rotate(3deg) translateY(-1px); }
+.sim-eyelid {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transform: scaleY(0);
+  transition: transform 0.07s linear;
+}
+.sim-blink .sim-eyelid { transform: scaleY(1); }
+.sim-beak-upper {
+  transform-box: fill-box;
+  transform-origin: 90% 85%;
+  transform: rotate(calc(var(--mouth, 0) * 7deg));
+}
+.sim-beak-lower {
+  transform-box: fill-box;
+  transform-origin: 95% 5%;
+  transform: rotate(calc(var(--mouth, 0) * -24deg));
+}
+
+/* --- Panel de contexto colapsable --- */
+.sim-context-panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 12px;
-  overflow-y: auto;
+  padding: 0;
 }
-.sim-history-item { margin-bottom: 12px; }
-.sim-history-q {
-  font-size: 12.5px;
+.sim-context-panel summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: var(--loro-green-deep);
-  margin-bottom: 3px;
+  color: var(--ink);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
-.sim-history-a {
+.sim-context-panel summary::-webkit-details-marker { display: none; }
+.sim-context-panel summary::after {
+  content: "▾";
+  color: var(--ink-faint);
+  transition: transform 0.2s;
+}
+.sim-context-panel[open] summary::after { transform: rotate(180deg); }
+.sim-context-rows {
+  padding: 4px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sim-context-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 12.5px;
-  color: var(--ink-dim);
-  line-height: 1.5;
 }
-.sim-history-toggle {
+.sim-context-row span { color: var(--ink-dim); flex: none; }
+.sim-context-row b {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Panel de chat --- */
+.sim-chat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sim-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.sim-chat-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sim-chat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: var(--loro-green-bright);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.sim-chat-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--loro-green);
+  animation: simBlink 2s infinite;
+  flex: none;
+}
+.sim-chat-chip-prep {
+  background: #f8fafc;
+  border-color: var(--line);
+  color: var(--ink-dim);
+}
+.sim-chat-chip-prep .sim-chat-chip-dot { background: #94a3b8; }
+.sim-chat-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 45vh;
+  scroll-behavior: smooth;
+}
+.sim-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sim-bubble {
+  max-width: 88%;
+  padding: 10px 13px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  animation: simBubbleIn 0.25s ease;
+}
+@keyframes simBubbleIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* Pregunta del entrevistador: durazno, a la izquierda (como la referencia). */
+.sim-bubble-q {
+  align-self: flex-start;
+  background: #fff5f0;
+  border: 1px solid #ffe4d6;
+  border-radius: 12px 12px 12px 4px;
+}
+/* Respuesta del usuario: verde de marca, a la derecha. */
+.sim-bubble-a {
+  align-self: flex-end;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px 12px 4px 12px;
+}
+.sim-bubble-interim {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+.sim-bubble-typing {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 13px 15px;
+}
+.sim-bubble-typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fdba74;
+  animation: simPulse 1.4s infinite ease-in-out both;
+}
+.sim-bubble-typing span:nth-child(2) { animation-delay: 0.2s; }
+.sim-bubble-typing span:nth-child(3) { animation-delay: 0.4s; }
+.sim-chat-hint {
+  align-self: center;
+  font-size: 12px;
+  color: var(--ink-dim);
+  text-align: center;
+  padding: 2px 6px;
+}
+.sim-chat-foot {
+  border-top: 1px solid var(--line);
+  padding: 8px 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+.sim-skip-link {
   background: transparent;
   border: none;
   color: var(--ink-dim);
   font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
-  align-self: center;
-  padding: 4px;
+  padding: 4px 6px;
+  transition: color 0.15s;
 }
-.sim-history-empty {
-  font-size: 12.5px;
+.sim-skip-link:hover { color: var(--loro-green-bright); }
+
+/* --- Pasos de conexión --- */
+.sim-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px;
+}
+.sim-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
   color: var(--ink-faint);
+  font-family: 'JetBrains Mono', monospace;
 }
-.sim-side-title {
-  font-size: 11px;
+.sim-steps li.sim-step-done { color: var(--ink-dim); }
+.sim-steps li.sim-step-active { color: var(--ink); }
+.sim-step-mark {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--loro-green-bright);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-dim);
-  margin-bottom: 10px;
 }
-@media (max-width: 879px) {
-  .sim-side-panel-desktop { display: none; }
-}
-@media (min-width: 880px) {
-  .sim-live-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    grid-template-rows: auto auto auto auto;
-    align-items: start;
-  }
-  .sim-live-header { grid-column: 1 / -1; }
-  .sim-stage { aspect-ratio: 16 / 9; }
-  .sim-side-panel-desktop {
-    display: block;
-    grid-column: 2;
-    grid-row: 2 / span 3;
-    align-self: stretch;
-    max-height: 100%;
-  }
-  .sim-stage, .sim-status-strip, .sim-controls { grid-column: 1; }
-  .sim-live-grid > .sim-error-box { grid-column: 1 / -1; }
-  /* En desktop el historial vive en el panel lateral; el colapsable es solo mobile. */
-  .sim-live-grid > .sim-side-panel:not(.sim-side-panel-desktop) { display: none; }
-  .sim-history-toggle { display: none; }
+.sim-step-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(16, 185, 129, 0.2);
+  border-radius: 50%;
+  border-left-color: var(--loro-green);
+  animation: simSpin 0.9s linear infinite;
 }
 
-/* --- Tarjetas / feedback (migrado del bloque inline de f66c6df) --- */
+/* --- Desktop --- */
+@media (min-width: 880px) {
+  .sim-room-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: stretch;
+  }
+  /* height:0 + min-height:100% ancla el chat a la altura de la columna
+     izquierda; los mensajes scrollean adentro. */
+  .sim-chat {
+    height: 0;
+    min-height: 100%;
+    overflow: hidden;
+  }
+  .sim-chat-body { max-height: none; }
+}
+@media (max-width: 560px) {
+  .sim-room-meta { display: none; }
+  .sim-room-title { display: none; }
+}
+
+/* --- Tarjetas / feedback --- */
 .sim-badge {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
@@ -1785,8 +1997,12 @@ input {
 
 @media (prefers-reduced-motion: reduce) {
   .sim-avatar-svg,
-  .sim-rec-dot,
   .sim-avatar-ring,
   .sim-thinking-dots span,
-  .sim-live-dot { animation: none !important; }
+  .sim-bubble-typing span,
+  .sim-social-dot,
+  .sim-stage-badge-dot,
+  .sim-chat-chip-dot,
+  .sim-bubble { animation: none !important; }
+  .sim-avatar-video { transition: none; transform: none; }
 }

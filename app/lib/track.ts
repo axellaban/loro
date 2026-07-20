@@ -32,7 +32,9 @@ export type FunnelEvent =
   | "sim_camera_denied"
   | "sim_feedback_shown"
   | "sim_session_finished"
-  | "sim_paywall_shown";
+  | "sim_avatar_video_fallback"
+  | "sim_camera_toggled"
+  | "sim_mic_toggled";
 
 export function track(event: FunnelEvent, props?: Record<string, string | number | boolean>) {
   try {
