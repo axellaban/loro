@@ -295,21 +295,25 @@ const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en" };
 // pueden pisar por env var en el backend (ANTHROPIC_MODEL / OPENAI_MODEL).
 type Provider = "gemini" | "anthropic" | "openai";
 type ModelOption = { id: string; label: string; provider: Provider; model: string; tag: string };
-// Misma lista que Parakeet (mismo orden y tags). Los `model` son los IDs reales
-// de API: para Claude va el ID canónico (claude-haiku-4-5) y para Gemini los IDs
-// que funcionan con la key actual; el resto usa el ID que matchea el nombre.
+// Misma lista que Parakeet (mismo orden), verificada contra la doc oficial de
+// cada provider al 2026-07-20 — no copiada a ciegas de la captura de Parakeet.
+// Un caso puntual: Parakeet muestra "GPT-5.5 Mini", pero ese modelo no existe
+// en el catálogo de OpenAI (404 en developers.openai.com y confirmado como
+// alucinación en su propio foro); se reemplaza acá por gpt-5.4-mini, el mini
+// real más cercano ("nuestro mini model más fuerte hasta ahora" según OpenAI).
 // Cualquiera se puede pisar por env en el backend (OPENAI_MODEL/ANTHROPIC_MODEL/GEMINI_MODEL).
-// IDs reales de la API de Gemini (los que responden con la key actual). El
-// backend igual cae a un modelo estable si alguno fallara, así nunca queda sin
-// respuesta. Requiere ANTHROPIC_API_KEY / OPENAI_API_KEY cargadas en Vercel;
-// si falta alguna, esa opción devuelve el error claro del backend en vez de
-// tirar la app entera.
+// El backend igual cae a un modelo estable si alguno fallara, así nunca queda
+// sin respuesta. Requiere ANTHROPIC_API_KEY / OPENAI_API_KEY cargadas en
+// Vercel; si falta alguna, esa opción devuelve el error claro del backend en
+// vez de tirar la app entera.
 const MODELS: ModelOption[] = [
-  { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
+  { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Inteligente" },
   { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
+  { id: "gpt-5.5", label: "GPT-5.5", provider: "openai", model: "gpt-5.5", tag: "" },
+  { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", provider: "openai", model: "gpt-5.4-mini", tag: "" },
   { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
-  { id: "gemini-flash", label: "Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
-  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash-lite", label: "Gemini 3.1 Flash Lite", provider: "gemini", model: "gemini-3.1-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash", label: "Gemini 3.5 Flash", provider: "gemini", model: "gemini-3.5-flash", tag: "Recomendado" },
 ];
 const DEFAULT_MODEL_ID = "gemini-flash";
 
