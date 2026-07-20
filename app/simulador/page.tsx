@@ -385,7 +385,6 @@ export default function SimuladorPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const currentAnswerRef = useRef("");
-  const [confirmCountdown, setConfirmCountdown] = useState(CONFIRM_SECONDS);
   const [elapsed, setElapsed] = useState(0);
   const [cameraOn, setCameraOn] = useState(false);
   const [camAvailable, setCamAvailable] = useState(false);
@@ -512,21 +511,15 @@ export default function SimuladorPage() {
     setPhaseBoth("listening");
   };
 
+  // Espera silenciosa antes de cerrar la respuesta: sin countdown visible
+  // (decisión de producto), pero hablar de nuevo la cancela igual.
   const enterConfirming = () => {
     clearTurnTimers();
     setPhaseBoth("confirming");
-    let n = CONFIRM_SECONDS;
-    setConfirmCountdown(n);
-    confirmIntervalRef.current = setInterval(() => {
-      n -= 1;
-      if (n <= 0) {
-        if (confirmIntervalRef.current) clearInterval(confirmIntervalRef.current);
-        confirmIntervalRef.current = null;
-        closeAnswerRef.current(true);
-      } else {
-        setConfirmCountdown(n);
-      }
-    }, 1000);
+    confirmIntervalRef.current = setTimeout(() => {
+      confirmIntervalRef.current = null;
+      closeAnswerRef.current(true);
+    }, CONFIRM_SECONDS * 1000) as unknown as ReturnType<typeof setInterval>;
   };
 
   // ---------- Deepgram ----------
@@ -1096,9 +1089,6 @@ export default function SimuladorPage() {
           : "idle";
 
   const interim = lines.length > 0 && !lines[lines.length - 1].final ? lines[lines.length - 1].text : "";
-  const canFinishAnswer =
-    (phase === "listening" || phase === "confirming") && currentAnswer.trim().length > 0;
-  const isLastQuestion = history.length + 1 >= questionsCount;
   const isListening = phase === "listening" || phase === "confirming";
 
   // Autoscroll del chat: el volumen de mensajes es bajo, forzarlo siempre es
@@ -1107,7 +1097,7 @@ export default function SimuladorPage() {
   useEffect(() => {
     const el = chatBodyRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [history, currentQuestion, spokenQuestion, currentAnswer, lines, phase, confirmCountdown, connectStep]);
+  }, [history, currentQuestion, spokenQuestion, currentAnswer, lines, phase, connectStep]);
 
   const CONNECT_STEPS = ["Preparando tu sala de entrevista", "Cargando tu contexto y CV", "Generando la primera pregunta"];
   const showSteps = phase === "connecting" || (phase === "asking" && history.length === 0 && !currentQuestion);
@@ -1239,9 +1229,6 @@ export default function SimuladorPage() {
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
               ▶ Entrar a la Sala de Entrevista
             </button>
-            <p className="mono btn-hint" style={{ textAlign: "center" }}>
-              Si activás la cámara, el entrevistador puede verte durante la entrevista para una experiencia más real.
-            </p>
           </footer>
         </>
       )}
@@ -1403,19 +1390,7 @@ export default function SimuladorPage() {
                 {phase === "listening" && !micOn && (
                   <div className="sim-chat-hint">Micrófono silenciado — activalo para responder</div>
                 )}
-
-                {phase === "confirming" && (
-                  <div className="sim-chat-hint">¿Terminaste? Avanzando en {confirmCountdown}…</div>
-                )}
               </div>
-
-              {canFinishAnswer && (
-                <div className="sim-chat-foot">
-                  <button className="sim-skip-link" onClick={() => closeAnswerRef.current(false)}>
-                    {isLastQuestion ? "Ver feedback →" : "Siguiente pregunta →"}
-                  </button>
-                </div>
-              )}
             </aside>
           </div>
         </div>

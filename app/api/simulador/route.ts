@@ -168,7 +168,7 @@ ${historyText}`;
   const FALLBACK: Record<Provider, string[]> = {
     openai: ["gpt-4.1-mini", "gpt-4o-mini"],
     anthropic: ["claude-haiku-4-5"],
-    gemini: ["gemini-2.5-flash"],
+    gemini: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
   };
   const candidates = [model, ...FALLBACK[provider].filter((m) => m !== model)];
 
@@ -405,7 +405,12 @@ async function getFeedback(
       });
       if (res.ok) {
         const j = await res.json();
-        return Response.json(parseModelJson(j.choices?.[0]?.message?.content || "{}"));
+        try {
+          return Response.json(parseModelJson(j.choices?.[0]?.message?.content || "{}"));
+        } catch {
+          detail = "JSON inválido del modelo";
+          continue;
+        }
       }
       detail = await res.text().catch(() => "");
     }
@@ -433,7 +438,12 @@ async function getFeedback(
       });
       if (res.ok) {
         const j = await res.json();
-        return Response.json(parseModelJson(j.content?.[0]?.text || "{}"));
+        try {
+          return Response.json(parseModelJson(j.content?.[0]?.text || "{}"));
+        } catch {
+          detail = "JSON inválido del modelo";
+          continue;
+        }
       }
       detail = await res.text().catch(() => "");
     }
@@ -454,15 +464,24 @@ async function getFeedback(
           systemInstruction: { parts: [{ text: systemPrompt }] },
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 2048,
+            // Sin thinking y con margen de tokens: el reporte tiene que
+            // empezar a responder antes del límite de 25s de Vercel Edge, y
+            // 2048 se quedaba corto con 5 preguntas (JSON truncado = parse roto).
+            maxOutputTokens: 4096,
             responseMimeType: "application/json",
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       }
     );
     if (res.ok) {
       const j = await res.json();
-      return Response.json(parseModelJson(j.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
+      try {
+        return Response.json(parseModelJson(j.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
+      } catch {
+        detail = "JSON inválido del modelo";
+        continue;
+      }
     }
     detail = await res.text().catch(() => "");
   }
