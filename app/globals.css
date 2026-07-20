@@ -1434,6 +1434,10 @@ input {
   z-index: 3;
 }
 .sim-pip video {
+  /* Absoluto + inset:0 para llenar la caja exacta: en iOS Safari el <video>
+     con solo width/height 100% no siempre cubre el alto y dejaba banda negra. */
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1843,8 +1847,11 @@ input {
     top: calc(64px + env(safe-area-inset-top));
     bottom: auto;
     right: 12px;
-    width: 30%;
-    max-width: 130px;
+    /* Retrato en mobile: la cámara frontal del teléfono es vertical, como en
+       Meet/Zoom/FaceTime. Encuadra la cara sin recorte raro ni banda negra. */
+    aspect-ratio: 3 / 4;
+    width: 27%;
+    max-width: 116px;
   }
   .sim-avatar-ring { inset: 0; border-radius: 0; border-width: 3px; }
 
