@@ -252,7 +252,8 @@ input {
   border-radius: 8px;
   color: var(--ink);
   padding: 10px 12px;
-  font-size: 15px;
+  /* 16px evita el zoom-on-focus de iOS al no estar bloqueado el pinch-zoom. */
+  font-size: 16px;
   outline: none;
   font-family: inherit;
   width: 100%;
@@ -1217,6 +1218,23 @@ input {
 
 /* ===== Simulador (/simulador) ===== */
 
+/* Solo para lectores de pantalla (aria-live, labels invisibles). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.sim-turn-hint {
+  font-weight: 700;
+  color: var(--loro-green-deep);
+}
+
 /* --- Social proof del setup --- */
 .sim-social-pill {
   display: inline-flex;
@@ -1882,7 +1900,9 @@ input {
   .sim-chat-header { display: none; }
   .sim-chat-body {
     max-height: none;
-    padding: 24px 12px 10px;
+    /* safe-area inferior: en iPhone con home indicator la última burbuja no
+       queda tapada. */
+    padding: 24px 12px calc(10px + env(safe-area-inset-bottom));
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
     mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
   }
@@ -1906,6 +1926,8 @@ input {
     padding: 6px 14px;
     font-size: 12.5px;
   }
+  /* En el overlay oscuro mobile el verde profundo no contrasta: usar claro. */
+  .sim-turn-hint { color: #6ee7b7; }
   .sim-steps {
     background: rgba(23, 24, 26, 0.55);
     backdrop-filter: blur(6px);
@@ -2133,8 +2155,12 @@ input {
   .sim-social-dot,
   .sim-stage-badge-dot,
   .sim-chat-chip-dot,
-  .sim-bubble { animation: none !important; }
+  .sim-bubble,
+  .sim-loading-spinner,
+  .sim-step-spinner { animation: none !important; }
   .sim-avatar-video { transition: none; transform: none; animation: none; }
+  .sim-gauge-needle { transition: none !important; }
+  .sim-ind-bar-fill { transition: none !important; }
 }
 
 /* --- Reporte visual: velocímetro, semáforos y scores por pregunta --- */

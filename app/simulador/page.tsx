@@ -52,9 +52,13 @@ type FeedbackReport = {
   questions: FeedbackQuestion[];
 };
 
-// Colores de semáforo según score.
+// Colores de semáforo según score. Vivo para barras/íconos; "ink" (más oscuro)
+// para texto chico, donde el vivo no llega al contraste AA 4.5:1.
 function scoreColor(score: number): string {
   return score >= 75 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
+}
+function scoreInk(score: number): string {
+  return score >= 75 ? "#047857" : score >= 50 ? "#b45309" : "#dc2626";
 }
 
 // El modelo puede devolver un JSON válido pero incompleto; normalizamos para
@@ -111,6 +115,7 @@ function ScoreGauge({ score }: { score: number }) {
         })}
         {/* Aguja */}
         <g
+          className="sim-gauge-needle"
           style={{
             transform: `rotate(${needleDeg}deg)`,
             transformOrigin: "100px 104px",
@@ -122,7 +127,7 @@ function ScoreGauge({ score }: { score: number }) {
           <circle cx="100" cy="104" r="3" fill="#fff" />
         </g>
       </svg>
-      <div className="sim-gauge-value" style={{ color: scoreColor(clamped) }}>
+      <div className="sim-gauge-value" style={{ color: scoreInk(clamped) }}>
         {clamped}
         <span className="sim-gauge-total">/100</span>
       </div>
@@ -1096,6 +1101,19 @@ export default function SimuladorPage() {
     setPhaseBoth("setup");
   };
 
+  // Los botones del header confirman si hay progreso, para no cortar la
+  // entrevista por un toque accidental.
+  const confirmEndInterview = () => {
+    if (
+      historyRef.current.length > 0 &&
+      typeof window !== "undefined" &&
+      !window.confirm("¿Terminar la entrevista? Vas a ver el feedback de lo que respondiste.")
+    ) {
+      return;
+    }
+    endInterview();
+  };
+
   const fetchFeedback = async (finalHistory: HistoryItem[]) => {
     setIsGeneratingFeedback(true);
     setError("");
@@ -1213,7 +1231,12 @@ export default function SimuladorPage() {
       timerIntervalRef.current = setInterval(() => setElapsed(elapsedNow()), 1000);
     } catch (err: any) {
       cleanupMedia();
-      setError(err?.message || "No se pudo iniciar el simulador. Revisá los permisos de micrófono.");
+      const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
+      setError(
+        denied
+          ? "Necesitamos el micrófono para la entrevista. Activá el permiso desde el candado 🔒 en la barra del navegador y volvé a intentar."
+          : err?.message || "No se pudo iniciar el simulador. Revisá los permisos de micrófono."
+      );
       setPhaseBoth("setup");
     }
   };
@@ -1317,6 +1340,20 @@ export default function SimuladorPage() {
 
   const interim = lines.length > 0 && !lines[lines.length - 1].final ? lines[lines.length - 1].text : "";
   const isListening = phase === "listening" || phase === "confirming";
+
+  // Anuncio para lectores de pantalla (aria-live): la fase no es visible a SR.
+  const liveMsg =
+    phase === "connecting"
+      ? "Preparando la sala de entrevista"
+      : phase === "asking" || phase === "speaking"
+        ? "El entrevistador está hablando"
+        : phase === "listening"
+          ? "Es tu turno, hablá"
+          : phase === "feedback"
+            ? isGeneratingFeedback
+              ? "Generando tu informe"
+              : "Informe listo"
+            : "";
 
   // Autoscroll del chat: el volumen de mensajes es bajo, forzarlo siempre es
   // más simple que detectar scroll manual.
@@ -1462,9 +1499,10 @@ export default function SimuladorPage() {
 
       {inInterview && (
         <div className="sim-room">
+          <div className="sr-only" role="status" aria-live="polite">{liveMsg}</div>
           <header className="sim-room-header">
             <div className="sim-room-header-left">
-              <button className="sim-back-btn" onClick={endInterview} aria-label="Volver">
+              <button className="sim-back-btn" onClick={confirmEndInterview} aria-label="Volver">
                 <BackIcon />
               </button>
               <h1 className="sim-room-title">Sala de Entrevista</h1>
@@ -1498,7 +1536,7 @@ export default function SimuladorPage() {
               >
                 <SpeakerIcon off={isVoiceMuted} />
               </button>
-              <button className="sim-finish-btn" onClick={endInterview}>
+              <button className="sim-finish-btn" onClick={confirmEndInterview}>
                 <PhoneIcon /> Finalizar
               </button>
             </div>
@@ -1623,6 +1661,10 @@ export default function SimuladorPage() {
                   </div>
                 )}
 
+                {phase === "listening" && micOn && !currentAnswer && !interim && !stuck && (
+                  <div className="sim-chat-hint sim-turn-hint">🎙 Tu turno — hablá</div>
+                )}
+
                 {phase === "listening" && !micOn && (
                   <div className="sim-chat-hint">Micrófono silenciado — activalo para responder</div>
                 )}
@@ -1675,7 +1717,7 @@ export default function SimuladorPage() {
                       <span
                         className="sim-verdict-level"
                         style={{
-                          color: scoreColor(feedbackReport.score ?? 0),
+                          color: scoreInk(feedbackReport.score ?? 0),
                           borderColor: scoreColor(feedbackReport.score ?? 0),
                         }}
                       >
@@ -1711,7 +1753,7 @@ export default function SimuladorPage() {
                           <span className="sim-ind-name">{ind.name}</span>
                           <TrafficLight score={s} />
                         </div>
-                        <div className="sim-ind-score" style={{ color: scoreColor(s) }}>{s}</div>
+                        <div className="sim-ind-score" style={{ color: scoreInk(s) }}>{s}</div>
                         <div className="sim-ind-bar">
                           <div className="sim-ind-bar-fill" style={{ width: `${s}%`, background: scoreColor(s) }} />
                         </div>
@@ -1766,7 +1808,7 @@ export default function SimuladorPage() {
                       {typeof q.score === "number" && (
                         <span
                           className="sim-qscore"
-                          style={{ color: scoreColor(q.score), borderColor: scoreColor(q.score) }}
+                          style={{ color: scoreInk(q.score), borderColor: scoreColor(q.score) }}
                         >
                           {Math.round(q.score)}
                         </span>
