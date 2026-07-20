@@ -1240,7 +1240,6 @@ input {
     padding: 5px 10px;
     gap: 6px;
   }
-  .brand-header .sim-badge { display: none; }
 }
 .sim-social-dot {
   width: 9px;
@@ -1921,15 +1920,6 @@ input {
 }
 
 /* --- Tarjetas / feedback --- */
-.sim-badge {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: var(--loro-green-bright);
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-}
 .sim-card {
   border-radius: var(--radius);
   border: 1px solid var(--line);

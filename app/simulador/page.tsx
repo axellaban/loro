@@ -364,7 +364,8 @@ export default function SimuladorPage() {
   const [lang, setLang] = useState<Lang>("es");
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [interviewType, setInterviewType] = useState<InterviewType>("general");
-  const [questionsCount, setQuestionsCount] = useState<number>(5);
+  // Largo fijo de la entrevista (el selector se quitó del setup a pedido).
+  const questionsCount = 5;
 
   // Voz del entrevistador
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
@@ -447,7 +448,6 @@ export default function SimuladorPage() {
       if (saved.modelId && MODELS.some((m) => m.id === saved.modelId)) setModelId(saved.modelId);
       if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
       if (saved.interviewType) setInterviewType(saved.interviewType);
-      if (saved.questionsCount) setQuestionsCount(saved.questionsCount);
     } catch {}
   }, []);
 
@@ -455,10 +455,10 @@ export default function SimuladorPage() {
     try {
       localStorage.setItem(
         LS_KEY_CONTEXT,
-        JSON.stringify({ company, role, profile, modelId, lang, interviewType, questionsCount })
+        JSON.stringify({ company, role, profile, modelId, lang, interviewType })
       );
     } catch {}
-  }, [company, role, profile, modelId, lang, interviewType, questionsCount]);
+  }, [company, role, profile, modelId, lang, interviewType]);
 
   // ---------- Timers del turno ----------
 
@@ -1048,7 +1048,6 @@ export default function SimuladorPage() {
         <header className="brand-header">
           <div className="brand">
             <span className="brand-title">Loreado.IA 🦜</span>
-            <span className="sim-badge">Simulador Beta</span>
           </div>
           {phase === "setup" && practicing > 0 && (
             <div className="sim-social-pill">
@@ -1097,7 +1096,7 @@ export default function SimuladorPage() {
             </div>
           </div>
 
-          <div className="selectors-row" style={{ marginTop: 8 }}>
+          <div className="selectors-row" style={{ marginTop: 8, gridTemplateColumns: "1fr" }}>
             <div className="field">
               <label className="mono form-label">Tipo de Entrevista</label>
               <Dropdown
@@ -1109,20 +1108,6 @@ export default function SimuladorPage() {
                   { id: "technical", label: "Técnica / Hard Skills" },
                   { id: "behavioral", label: "De Comportamiento (STAR)" },
                   { id: "hr", label: "Inicial / Recursos Humanos" },
-                ]}
-              />
-            </div>
-            <div className="field">
-              <label className="mono form-label">Cantidad de Preguntas</label>
-              <Dropdown
-                value={String(questionsCount)}
-                onChange={(id) => setQuestionsCount(Number(id))}
-                ariaLabel="Cantidad de preguntas"
-                alignRight
-                options={[
-                  { id: "3", label: "Corta (3 preguntas)" },
-                  { id: "5", label: "Estándar (5 preguntas)" },
-                  { id: "7", label: "Exhaustiva (7 preguntas)" },
                 ]}
               />
             </div>

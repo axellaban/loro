@@ -129,7 +129,7 @@ export async function POST(req: Request) {
   const answerLangLabel =
     answerLang === "en"
       ? "Inglés (English). Formula tus preguntas en inglés."
-      : "Español. Formula tus preguntas en español.";
+      : "Español rioplatense (Argentina). Formulá tus preguntas con voseo (vos, contame, tenés), como un entrevistador porteño.";
 
   const userContent = `## EMPRESA
 ${company || "(sin especificar)"}
