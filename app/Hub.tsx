@@ -36,56 +36,154 @@ function IaFlag() {
   );
 }
 
-// Mano de Morfeo ofreciendo la cápsula en la palma
+// Mano de Morfeo emergiendo de la oscuridad — palma abierta hacia arriba
 function MorpheusHandSvg({ side }: { side: "left" | "right" }) {
   const isRight = side === "right";
-  const idSuffix = isRight ? "Right" : "Left";
+  const id = isRight ? "R" : "L";
   return (
     <div className="hub-morpheus-hand-wrap" aria-hidden="true">
       <svg
-        width="150"
-        height="100"
-        viewBox="0 0 160 120"
+        width="180"
+        height="140"
+        viewBox="0 0 200 180"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        style={{
-          transform: isRight ? "scaleX(-1)" : "none",
-          filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.85))",
-        }}
+        style={{ transform: isRight ? "scaleX(-1)" : "none" }}
       >
         <defs>
-          <linearGradient id={`handSkinGrad${idSuffix}`} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#4a3b32" />
-            <stop offset="40%" stopColor="#2c221c" />
-            <stop offset="85%" stopColor="#140f0c" />
-            <stop offset="100%" stopColor="#080605" />
+          {/* Gradiente principal de piel oscura cinematográfica */}
+          <radialGradient id={`skin${id}`} cx="50%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#5a463a" />
+            <stop offset="40%" stopColor="#3d2e25" />
+            <stop offset="75%" stopColor="#1f1510" />
+            <stop offset="100%" stopColor="#0a0705" />
+          </radialGradient>
+
+          {/* Rim light lateral dramático (iluminación de borde estilo Matrix) */}
+          <linearGradient id={`rim${id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(180,140,110,0.5)" />
+            <stop offset="50%" stopColor="rgba(180,140,110,0)" />
+            <stop offset="100%" stopColor="rgba(180,140,110,0.35)" />
           </linearGradient>
-          <linearGradient id={`handHighlight${idSuffix}`} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(255,210,185,0.4)" />
-            <stop offset="100%" stopColor="rgba(255,210,185,0)" />
+
+          {/* Luz especular cálida en el centro de la palma */}
+          <radialGradient id={`palmLight${id}`} cx="50%" cy="45%" r="40%">
+            <stop offset="0%" stopColor="rgba(255,220,190,0.35)" />
+            <stop offset="100%" stopColor="rgba(255,220,190,0)" />
+          </radialGradient>
+
+          {/* Desvanecimiento a negro en la muñeca (emerge de la oscuridad) */}
+          <linearGradient id={`fadeBlack${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="65%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="88%" stopColor="rgba(0,0,0,0.7)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,1)" />
           </linearGradient>
+
+          {/* Sombra difusa */}
+          <filter id={`handBlur${id}`} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
         </defs>
 
-        {/* Silueta y contorno de la mano de Morfeo ofreciendo la cápsula */}
+        {/* Sombra proyectada oscura debajo de la mano */}
+        <ellipse cx="100" cy="165" rx="65" ry="8" fill="rgba(0,0,0,0.6)" filter={`url(#handBlur${id})`} />
+
+        {/* ====== MUÑECA Y ANTEBRAZO (emergiendo de la oscuridad) ====== */}
         <path
-          d="M30 120 C 30 100 25 80 20 70 C 15 60 10 50 15 35 C 18 26 26 22 32 30 C 36 35 40 45 42 50 C 44 40 48 20 54 12 C 58 6 66 8 68 18 C 70 28 70 42 70 48 C 74 38 80 16 86 10 C 90 6 98 8 100 18 C 102 28 100 42 99 50 C 103 42 108 24 114 20 C 119 16 126 18 126 28 C 126 38 120 54 118 60 C 122 55 128 45 134 44 C 139 43 145 48 144 56 C 142 68 132 82 122 92 C 108 106 80 120 50 120 Z"
-          fill={`url(#handSkinGrad${idSuffix})`}
-          stroke="rgba(255, 190, 150, 0.4)"
+          d="M55 180 C 55 160 50 145 52 135 L 148 135 C 150 145 145 160 145 180 Z"
+          fill={`url(#skin${id})`}
+        />
+
+        {/* ====== PALMA PRINCIPAL ====== */}
+        <path
+          d="M52 135 C 48 120 42 105 38 95 C 34 85 32 75 38 65
+             C 42 58 48 60 50 68 C 53 76 55 88 56 95
+             L 144 95
+             C 145 88 147 76 150 68 C 152 60 158 58 162 65
+             C 168 75 166 85 162 95 C 158 105 152 120 148 135
+             Z"
+          fill={`url(#skin${id})`}
+          stroke="rgba(180,140,110,0.15)"
+          strokeWidth="0.8"
+        />
+
+        {/* ====== DEDOS ====== */}
+        {/* Pulgar (izquierdo) */}
+        <path
+          d="M38 95 C 30 85 22 70 18 58 C 14 48 16 38 24 36
+             C 32 34 36 42 38 52 C 40 60 40 72 42 82"
+          fill={`url(#skin${id})`}
+          stroke="rgba(180,140,110,0.2)"
+          strokeWidth="0.8"
+        />
+
+        {/* Dedo índice */}
+        <path
+          d="M56 95 C 54 82 50 60 48 42 C 46 28 50 16 58 14
+             C 66 12 70 22 70 36 C 70 48 68 68 68 82"
+          fill={`url(#skin${id})`}
+          stroke="rgba(180,140,110,0.18)"
+          strokeWidth="0.8"
+        />
+
+        {/* Dedo medio (el más largo) */}
+        <path
+          d="M78 90 C 76 74 74 48 73 30 C 72 16 76 4 84 2
+             C 92 0 96 12 96 28 C 96 44 94 68 92 84"
+          fill={`url(#skin${id})`}
+          stroke="rgba(180,140,110,0.18)"
+          strokeWidth="0.8"
+        />
+
+        {/* Dedo anular */}
+        <path
+          d="M102 90 C 102 74 102 50 103 34 C 104 20 108 10 116 10
+             C 124 10 126 22 125 36 C 124 50 122 70 120 84"
+          fill={`url(#skin${id})`}
+          stroke="rgba(180,140,110,0.18)"
+          strokeWidth="0.8"
+        />
+
+        {/* Meñique */}
+        <path
+          d="M132 95 C 134 82 138 64 140 50 C 142 38 144 28 150 28
+             C 156 28 158 38 156 50 C 154 62 150 78 148 90"
+          fill={`url(#skin${id})`}
+          stroke="rgba(180,140,110,0.18)"
+          strokeWidth="0.8"
+        />
+
+        {/* ====== RIM LIGHT (borde de luz dramático) ====== */}
+        <path
+          d="M38 95 C 30 85 22 70 18 58 C 14 48 16 38 24 36
+             C 32 34 36 42 38 52"
+          fill="none"
+          stroke="rgba(200,160,130,0.5)"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M162 65 C 168 75 166 85 162 95 C 158 105 152 120 148 135"
+          fill="none"
+          stroke="rgba(200,160,130,0.35)"
           strokeWidth="1.2"
         />
 
-        {/* Contornos de nudillos y dedos */}
-        <path d="M 58 6 C 66 16 70 32 72 46" stroke="rgba(255,190,150,0.3)" strokeWidth="2" strokeLinecap="round" />
-        <path d="M 90 4 C 96 16 100 32 101 46" stroke="rgba(255,190,150,0.3)" strokeWidth="2" strokeLinecap="round" />
-        <path d="M 120 14 C 125 24 124 38 122 52" stroke="rgba(255,190,150,0.35)" strokeWidth="2" strokeLinecap="round" />
+        {/* ====== PLIEGUES DE LA PALMA ====== */}
+        <path d="M 55 98 C 70 112 100 118 140 108" stroke="rgba(0,0,0,0.5)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M 60 115 C 78 124 110 128 142 120" stroke="rgba(0,0,0,0.4)" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M 48 80 C 52 90 58 100 62 112" stroke="rgba(0,0,0,0.45)" strokeWidth="1.5" strokeLinecap="round" />
 
-        {/* Líneas y pliegues de la palma */}
-        <path d="M 38 52 C 50 65 75 75 105 70" stroke="rgba(0,0,0,0.7)" strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M 45 72 C 60 82 85 88 115 82" stroke="rgba(0,0,0,0.6)" strokeWidth="2" strokeLinecap="round" />
-        <path d="M 32 45 C 38 55 48 65 52 75" stroke="rgba(0,0,0,0.65)" strokeWidth="2" strokeLinecap="round" />
+        {/* Pliegues entre dedos */}
+        <path d="M 68 82 C 72 88 78 90 82 86" stroke="rgba(0,0,0,0.35)" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M 92 84 C 96 88 102 88 106 84" stroke="rgba(0,0,0,0.35)" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M 120 84 C 124 90 130 92 134 88" stroke="rgba(0,0,0,0.35)" strokeWidth="1.2" strokeLinecap="round" />
 
-        {/* Brillo especular en el centro de la palma donde reposa la cápsula */}
-        <ellipse cx="78" cy="62" rx="34" ry="16" fill={`url(#handHighlight${idSuffix})`} />
+        {/* ====== LUZ ESPECULAR EN LA PALMA ====== */}
+        <ellipse cx="100" cy="105" rx="36" ry="16" fill={`url(#palmLight${id})`} />
+
+        {/* ====== VELO DE OSCURIDAD (fade to black en la muñeca) ====== */}
+        <rect x="0" y="0" width="200" height="180" fill={`url(#fadeBlack${id})`} />
       </svg>
     </div>
   );
