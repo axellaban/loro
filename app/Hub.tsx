@@ -36,6 +36,53 @@ function IaFlag() {
   );
 }
 
+// Mano de Morfeo ofreciendo la cápsula en la palma
+function MorpheusHandSvg({ side }: { side: "left" | "right" }) {
+  const isRight = side === "right";
+  return (
+    <div className="hub-morpheus-hand-wrap" aria-hidden="true">
+      <svg
+        width="150"
+        height="100"
+        viewBox="0 0 160 120"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{
+          transform: isRight ? "scaleX(-1)" : "none",
+        }}
+      >
+        <defs>
+          <linearGradient id="handSkinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#443932" />
+            <stop offset="50%" stopColor="#29211c" />
+            <stop offset="100%" stopColor="#120e0c" />
+          </linearGradient>
+          <linearGradient id="handHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgba(255,200,170,0.3)" />
+            <stop offset="100%" stopColor="rgba(255,200,170,0)" />
+          </linearGradient>
+        </defs>
+
+        {/* Silueta y contorno de la mano de Morfeo ofreciendo la cápsula */}
+        <path
+          d="M30 120 C 30 100 25 80 20 70 C 15 60 10 50 15 35 C 18 26 26 22 32 30 C 36 35 40 45 42 50 C 44 40 48 20 54 12 C 58 6 66 8 68 18 C 70 28 70 42 70 48 C 74 38 80 16 86 10 C 90 6 98 8 100 18 C 102 28 100 42 99 50 C 103 42 108 24 114 20 C 119 16 126 18 126 28 C 126 38 120 54 118 60 C 122 55 128 45 134 44 C 139 43 145 48 144 56 C 142 68 132 82 122 92 C 108 106 80 120 50 120 Z"
+          fill="url(#handSkinGrad)"
+          stroke="rgba(255, 190, 150, 0.35)"
+          strokeWidth="1.5"
+        />
+
+        {/* Líneas y pliegues de la palma */}
+        <path d="M 38 52 C 50 65 75 75 105 70" stroke="rgba(0,0,0,0.6)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M 45 72 C 60 82 85 88 115 82" stroke="rgba(0,0,0,0.5)" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M 32 45 C 38 55 48 65 52 75" stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+
+        {/* Brillo especular en el centro de la palma */}
+        <ellipse cx="75" cy="65" rx="35" ry="18" fill="url(#handHighlight)" />
+      </svg>
+    </div>
+  );
+}
+
 // Cápsula 3D realista idéntica a la imagen de referencia Matrix
 function MatrixPill3D({ type }: { type: "blue" | "red" }) {
   const isRed = type === "red";
@@ -137,7 +184,11 @@ export default function Hub() {
             className="hub-option-btn hub-option-blue"
             onClick={() => track("hub_practice_click")}
           >
-            <MatrixPill3D type="blue" />
+            <span className="hub-glow-blue" />
+            <div className="hub-pill-wrapper">
+              <MatrixPill3D type="blue" />
+              <MorpheusHandSvg side="left" />
+            </div>
             <span className="hub-option-label hub-label-blue">Simulador</span>
             <span className="hub-option-sub">practicá con un entrevistador muy simpático</span>
           </Link>
@@ -147,8 +198,11 @@ export default function Hub() {
             className="hub-option-btn hub-option-red"
             onClick={() => track("hub_copilot_click")}
           >
-            <span className="hub-option-glow" />
-            <MatrixPill3D type="red" />
+            <span className="hub-glow-red" />
+            <div className="hub-pill-wrapper">
+              <MatrixPill3D type="red" />
+              <MorpheusHandSvg side="right" />
+            </div>
             <span className="hub-option-label hub-label-red">Copiloto</span>
             <span className="hub-option-sub">te acompaña durante tu entrevista en tiempo real</span>
           </Link>

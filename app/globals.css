@@ -1164,15 +1164,15 @@ input {
   margin-bottom: clamp(40px, 7vh, 68px);
 }
 
-/* ===================== Matrix Options (Clean 3D Pills) ===================== */
+/* ===================== Matrix Options (3D Pills + Morpheus Hand) ===================== */
 .hub-doors-pills {
   display: flex;
   flex-direction: row;
   justify-content: center;
   align-items: flex-start;
-  gap: 48px;
+  gap: 52px;
   width: 100%;
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 20px 0;
 }
@@ -1181,14 +1181,14 @@ input {
   .hub-doors-pills {
     flex-direction: column;
     align-items: center;
-    gap: 36px;
+    gap: 40px;
   }
 }
 
 .hub-option-btn {
   flex: 1;
   width: 100%;
-  max-width: 260px;
+  max-width: 270px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1207,72 +1207,108 @@ input {
   transform: scale(1.08) translateY(-6px);
 }
 
+.hub-pill-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 90px;
+  margin-bottom: 4px;
+}
+
 .hub-3d-pill-svg {
+  position: relative;
+  z-index: 5;
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  margin-bottom: 8px;
 }
 
 .hub-option-btn:hover .hub-3d-pill-svg {
-  transform: scale(1.15) rotate(-15deg) translateY(-4px) !important;
+  transform: scale(1.15) rotate(-15deg) translateY(-8px) !important;
 }
 
+/* Morpheus Hand extending underneath the pill on hover */
+.hub-morpheus-hand-wrap {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%) translateY(22px) scale(0.85);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hub-option-btn:hover .hub-morpheus-hand-wrap {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px) scale(1);
+}
+
+/* Title labels are pure white */
 .hub-option-label {
-  font-size: 1.5rem;
+  font-size: 1.55rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: #ffffff !important;
   margin-top: 4px;
 }
 
 .hub-label-blue {
-  color: #60a5fa;
-  text-shadow: 0 0 12px rgba(96, 165, 250, 0.7);
+  text-shadow: 0 0 16px rgba(56, 189, 248, 0.8), 0 0 30px rgba(2, 132, 199, 0.5);
 }
 
 .hub-label-red {
-  color: #fca5a5;
-  text-shadow: 0 0 12px rgba(252, 165, 165, 0.8);
+  text-shadow: 0 0 16px rgba(248, 113, 113, 0.8), 0 0 30px rgba(239, 68, 68, 0.5);
 }
 
 .hub-option-sub {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   letter-spacing: 0.02em;
   line-height: 1.35;
-  max-width: 210px;
+  max-width: 220px;
 }
 
-/* Multi-color gradient outline and blur glow behind the Copiloto option */
-.hub-option-glow {
+/* Intense monochromatic color aura glow behind the blue option */
+.hub-glow-blue {
   position: absolute;
-  top: 10px;
-  left: 20px;
-  right: 20px;
-  bottom: 20px;
+  top: 0;
+  left: 10px;
+  right: 10px;
+  bottom: 30px;
   border-radius: 50%;
-  background: linear-gradient(
-    90deg,
-    #10b981,
-    #34d399,
-    #a3e635,
-    #fbbf24,
-    #f59e0b,
-    #fb7185,
-    #22d3ee,
-    #10b981
-  );
-  background-size: 300% 100%;
-  animation: loroGlow 4s linear infinite;
-  filter: blur(28px);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.85) 0%, rgba(2, 132, 199, 0.4) 50%, transparent 80%);
+  filter: blur(26px);
   z-index: -1;
-  opacity: 0.45;
+  opacity: 0.35;
   transition: opacity 0.35s ease, filter 0.35s ease;
 }
 
-.hub-option-red:hover .hub-option-glow {
-  opacity: 0.8;
-  filter: blur(34px);
+.hub-option-blue:hover .hub-glow-blue {
+  opacity: 0.9;
+  filter: blur(32px);
+}
+
+/* Intense monochromatic color aura glow behind the red option */
+.hub-glow-red {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  right: 10px;
+  bottom: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.85) 0%, rgba(185, 28, 28, 0.4) 50%, transparent 80%);
+  filter: blur(26px);
+  z-index: -1;
+  opacity: 0.35;
+  transition: opacity 0.35s ease, filter 0.35s ease;
+}
+
+.hub-option-red:hover .hub-glow-red {
+  opacity: 0.9;
+  filter: blur(32px);
 }
 
 /* Multi-color gradient outline and blur glow for the red pill */
