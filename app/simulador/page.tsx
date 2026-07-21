@@ -453,10 +453,35 @@ const LS_KEY_CONTEXT = "simulador:context:v1";
 // Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
 // turno por un carraspeo transcripto).
 const MIN_ANSWER_CHARS = 10;
-// Ventana de gracia (cancelable si el candidato sigue hablando) antes de cerrar.
-// En una entrevista la gente hace pausas para pensar mid-respuesta, así que
-// damos margen amplio para no cortarla: ~2.5-3.5s de silencio total.
-const CONFIRM_MS = 1500;
+// Endpointing adaptativo: esperamos poco si la respuesta SONÓ completa y mucho
+// si quedó a media frase o en muletilla. Total percibido = umbral + gracia.
+const COMPLETE_MS = 900; // frase terminada con puntuación → responder rápido
+const INCOMPLETE_MS = 2600; // a media frase / muletilla → esperar (pausa para pensar)
+// Ventana de gracia cancelable si el candidato retoma la palabra.
+const CONFIRM_MS = 600;
+
+// Muletillas y conjunciones: si la respuesta termina así, casi seguro sigue.
+const TRAILING_INCOMPLETE = new Set([
+  "y", "o", "u", "e", "pero", "porque", "que", "entonces", "asi", "así",
+  "tipo", "eh", "este", "esto", "mmm", "em", "digamos", "bueno", "aver",
+  "a", "de", "en", "con", "para", "como", "cuando", "si", "más", "mas",
+  "o", "sea", "osea", "ta", "nada",
+]);
+
+// ¿La respuesta suena terminada? Requiere puntuación terminal (la da
+// smart_format en los finales) y que la última palabra no sea muletilla.
+// Mientras hay interinos sin puntuar cuenta como incompleta → paciente.
+function looksComplete(text: string): boolean {
+  const t = text.trim();
+  if (t.length < MIN_ANSWER_CHARS) return false;
+  if (!/[.!?…]$/.test(t)) return false;
+  const lastWord = t
+    .toLowerCase()
+    .replace(/[.,!?…"”'’)\]]+$/g, "")
+    .split(/\s+/)
+    .pop();
+  return !!lastWord && !TRAILING_INCOMPLETE.has(lastWord);
+}
 // Sin respuesta real: a los 12s ofrecemos pasar de pregunta; a los 25s la
 // sala avanza sola, para que un candidato que se queda mudo no quede colgado.
 const STUCK_MS = 12000;
@@ -638,22 +663,23 @@ export default function SimuladorPage() {
     }
   };
 
-  const SILENCE_MS = 1800;
-
   const startWatchdog = () => {
     if (watchdogRef.current) clearInterval(watchdogRef.current);
     lastSpeechAtRef.current = Date.now();
     listeningStartedAtRef.current = Date.now();
     watchdogRef.current = setInterval(() => {
       if (phaseRef.current !== "listening") return;
-      const hasAnswer = currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS;
+      const answer = currentAnswerRef.current.trim();
+      const hasAnswer = answer.length >= MIN_ANSWER_CHARS;
       if (hasAnswer) {
-        // Ya hay respuesta real: cerrar por silencio (camino feliz).
+        // Ya hay respuesta real: cerrar por silencio, adaptando el tiempo a si
+        // la frase sonó completa o quedó a media.
         if (stuckRef.current) {
           stuckRef.current = false;
           setStuck(false);
         }
-        if (Date.now() - lastSpeechAtRef.current >= SILENCE_MS) enterConfirming();
+        const needed = looksComplete(answer) ? COMPLETE_MS : INCOMPLETE_MS;
+        if (Date.now() - lastSpeechAtRef.current >= needed) enterConfirming();
         return;
       }
       // Sin respuesta real: red de seguridad para no colgar la sala.
@@ -720,7 +746,12 @@ export default function SimuladorPage() {
     }
 
     if (msg.type === "UtteranceEnd") {
-      if (phaseRef.current === "listening" && currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS) {
+      // Deepgram marca 1s de silencio. Solo cerramos ya si la frase sonó
+      // completa; si quedó a media, el watchdog espera su umbral largo.
+      if (
+        phaseRef.current === "listening" &&
+        looksComplete(currentAnswerRef.current.trim())
+      ) {
         enterConfirming();
       }
       return;
@@ -761,17 +792,8 @@ export default function SimuladorPage() {
       const acc = `${currentAnswerRef.current} ${text}`.trim();
       currentAnswerRef.current = acc;
       setCurrentAnswer(acc);
-      // Respaldo por si Deepgram nunca emite UtteranceEnd: sin habla nueva
-      // después de un final, entra en la ventana de gracia.
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = setTimeout(() => {
-        if (phaseRef.current === "listening" && currentAnswerRef.current.trim().length >= MIN_ANSWER_CHARS) {
-          enterConfirming();
-        }
-      }, 1800);
-    } else if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
+      // El cierre lo decide el watchdog con el umbral adaptativo (según si la
+      // frase sonó completa) — no hace falta un timer de respaldo fijo.
     }
   };
   dgMessageRef.current = onDgMessage;
