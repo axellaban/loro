@@ -1111,6 +1111,209 @@ input {
   margin: 8px 0 24px;
 }
 
+/* ======================= Home hub (escalera de valor) ======================= */
+/* La home (/) lidera con el simulador gratis y ofrece el copiloto como upgrade.
+   Estética negra/glow de marca; reusa .landing-btn-wrap/.landing-glow/.landing-btn
+   para el CTA primario (halo de loro idéntico al botón "Responder"). */
+.hub {
+  background: #000;
+  color: #fff;
+  min-height: 100dvh;
+  width: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(48px, 9vh, 96px) 24px calc(56px + env(safe-area-inset-bottom, 0px));
+  gap: clamp(72px, 14vh, 132px);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.hub section {
+  width: 100%;
+  max-width: 46rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  z-index: 1;
+}
+
+.hub-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.hub-brand-name {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: 1.05rem;
+  color: #e8eef0;
+}
+
+.hub-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 18px;
+  border-radius: 999px;
+  font-size: clamp(0.72rem, 2.2vw, 0.85rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #06231a;
+  background: linear-gradient(
+    90deg, #10b981, #34d399, #a3e635, #fbbf24, #f59e0b, #fb7185, #22d3ee
+  );
+  margin-bottom: 22px;
+}
+
+.hub-h1 {
+  font-size: clamp(2.1rem, 7vw, 4rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.hub-sub {
+  font-size: clamp(0.98rem, 2.6vw, 1.2rem);
+  line-height: 1.55;
+  color: #b9c1c6;
+  max-width: 34rem;
+  margin-bottom: 38px;
+}
+
+.hub-cta-primary {
+  margin-bottom: 20px;
+}
+
+.hub-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(0.78rem, 2.2vw, 0.92rem);
+  color: #9aa2a7;
+  letter-spacing: 0.01em;
+}
+.hub-counter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--loro-green);
+  box-shadow: 0 0 8px var(--loro-green);
+  animation: hubPulse 1.8s ease-in-out infinite;
+}
+@keyframes hubPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+/* Bloque 2 — upgrade al copiloto */
+.hub-upgrade {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: clamp(48px, 9vh, 88px);
+}
+.hub-kicker {
+  font-size: clamp(0.82rem, 2.4vw, 0.98rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--loro-green);
+  margin-bottom: 14px;
+}
+.hub-h2 {
+  font-size: clamp(1.7rem, 5.4vw, 2.9rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: #fff;
+  margin-bottom: 20px;
+}
+.hub-sub-upgrade {
+  margin-bottom: 30px;
+}
+
+.hub-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 40px;
+  border-radius: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(1rem, 2.8vw, 1.2rem);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+}
+.hub-cta-secondary:hover {
+  border-color: var(--loro-green);
+  background: rgba(16, 185, 129, 0.08);
+  transform: scale(1.02);
+}
+.hub-note {
+  margin-top: 14px;
+  font-size: clamp(0.72rem, 2.1vw, 0.82rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7f888d;
+}
+
+/* Bloque 3 — cómo funciona + anti-marketing */
+.hub-how {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: clamp(48px, 9vh, 88px);
+}
+.hub-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 0 34px;
+  padding: 0;
+}
+.hub-step {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+}
+.hub-step-n {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #06231a;
+  background: var(--loro-green);
+}
+.hub-step-t {
+  font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+  color: #d4dadd;
+  line-height: 1.4;
+}
+.hub-anti {
+  font-size: clamp(0.82rem, 2.3vw, 0.95rem);
+  line-height: 1.55;
+  color: #868e93;
+  max-width: 32rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-counter-dot { animation: none; }
+  .hub-cta-secondary { transition: none; }
+}
+
 /* ===================== Paywall / lista de espera ===================== */
 .paywall-overlay {
   position: fixed;
