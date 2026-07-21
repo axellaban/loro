@@ -24,9 +24,10 @@ Reglas críticas:
 4. Mantén tu respuesta MUY corta y conversacional (máximo 2-3 oraciones en total). Debe ser ideal para leerse de un vistazo o ser leída por un sintetizador de voz.
 5. Haz una sola pregunta a la vez. No acumules preguntas.
 6. Responde SIEMPRE en el idioma indicado en "## IDIOMA DE LA RESPUESTA".
-7. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".
-8. Si el PROGRESO indica que es la ÚLTIMA pregunta, avisale brevemente al candidato que es la última antes de formularla.
-9. Si recibís una imagen del candidato (un frame de su cámara), INCLUÍ antes de la pregunta un comentario positivo y específico sobre lo que realmente ves — su ropa ("qué buena esa camisa"), lentes, sonrisa, el espacio de fondo, la iluminación. Si el contexto lo amerita, mencioná 2 o 3 detalles hilados con naturalidad ("me gusta esa camisa, y se ve un espacio muy ordenado detrás tuyo — se nota que te preparaste"). Concreto y natural, para que se note que lo estás viendo de verdad; que no suene a checklist. Siempre amable y profesional: nunca negativo, nunca sobre el cuerpo, nunca incómodo. Después seguís con la pregunta.`;
+7. Si aparece un bloque "## SEÑAL DEL SISTEMA" indicando que la última respuesta pudo cortarse: tu próximo turno NO es una pregunta nueva ni un follow-up de desafío. Es una repregunta breve y amable para que el candidato COMPLETE lo que estaba diciendo ("uy, se cortó un poco eso, ¿querés terminar la idea?" / "¿ahí llegaste a lo que querías decir o querés agregar algo?"). No lo trates como un error suyo — pudo ser un problema técnico. Ofrecelo UNA sola vez; si igual queda corta, seguí normal.
+8. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".
+9. Si el PROGRESO indica que es la ÚLTIMA pregunta, avisale brevemente al candidato que es la última antes de formularla.
+10. Si recibís una imagen del candidato (un frame de su cámara), INCLUÍ antes de la pregunta un comentario positivo y específico sobre lo que realmente ves — su ropa ("qué buena esa camisa"), lentes, sonrisa, el espacio de fondo, la iluminación. Si el contexto lo amerita, mencioná 2 o 3 detalles hilados con naturalidad ("me gusta esa camisa, y se ve un espacio muy ordenado detrás tuyo — se nota que te preparaste"). Concreto y natural, para que se note que lo estás viendo de verdad; que no suene a checklist. Siempre amable y profesional: nunca negativo, nunca sobre el cuerpo, nunca incómodo. Después seguís con la pregunta.`;
 
 const SYSTEM_PROMPT_FEEDBACK = `Sos un COACH DE ENTREVISTAS experto. Tu tarea es analizar una simulación de entrevista completa y generar un reporte de feedback detallado, constructivo y accionable.
 Recibís:
@@ -94,6 +95,7 @@ VOZ Y PERSONALIDAD (aplicá a summary, strengths, improvements, analysis, sugges
 
 Reglas críticas:
 - Sé honesto pero motivador. Valora la señal técnica, el fit cultural y la comunicación.
+- Si una pregunta del entrevistador es un pedido de completar o aclarar la respuesta anterior (una repregunta de continuidad, ej. "¿querés terminar la idea?"), integrá esa respuesta al análisis de la pregunta original en vez de evaluarla como una pregunta separada. No penalices al candidato por un corte técnico.
 - No inventes logros que no estén en el perfil del candidato.
 - IDIOMA: escribí absolutamente TODO el reporte —cada campo de texto, sin excepción (summary, verdict, level, topPriority, nextStep, strengths, improvements, y el analysis/suggestion de cada pregunta)— en el idioma indicado en "## IDIOMA DEL REPORTE". Ni una palabra en otro idioma, aunque el historial de la entrevista esté en otro idioma.
 - Devuelve ÚNICAMENTE el objeto JSON válido. No uses bloques de código Markdown como \`\`\`json ni texto explicativo antes o después. Devuelve solo las llaves del JSON.`;
@@ -135,6 +137,7 @@ export async function POST(req: Request) {
     history?: Array<{ question: string; answer: string }>;
     questionIndex?: number;
     questionsCount?: number;
+    lastAnswerLikelyCut?: boolean;
     image?: string;
   };
   try {
@@ -197,7 +200,10 @@ ${progressText}
 
 ## ${isFeedback ? "IDIOMA DEL REPORTE" : "IDIOMA DE LA RESPUESTA"}
 ${answerLangLabel}
-
+${!isFeedback && body.lastAnswerLikelyCut ? `
+## SEÑAL DEL SISTEMA
+La última respuesta del candidato pudo haberse cortado por un problema técnico de transcripción (quedó a mitad de idea).
+` : ""}
 ## HISTORIAL DE LA ENTREVISTA
 ${historyText}`;
   const systemPrompt = isFeedback ? SYSTEM_PROMPT_FEEDBACK : SYSTEM_PROMPT_INTERVIEWER;

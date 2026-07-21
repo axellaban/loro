@@ -602,6 +602,11 @@ export default function SimuladorPage() {
   // de cada función de flujo a través de estos refs.
   const beginTurnRef = useRef<(h: HistoryItem[]) => void>(() => {});
   const closeAnswerRef = useRef<(auto: boolean) => void>(() => {});
+  // Señal para el entrevistador: la última respuesta pudo cortarse (silencio
+  // cerró a media frase). `recoveryOfferedRef` evita encadenar repreguntas de
+  // "¿algo más?" (si ya se ofreció, no se vuelve a ofrecer al toque).
+  const lastCutRef = useRef(false);
+  const recoveryOfferedRef = useRef(false);
   const dgMessageRef = useRef<(raw: string) => void>(() => {});
   const connectWsRef = useRef<(first: boolean) => Promise<void>>(async () => {});
   const scheduleReconnectRef = useRef<() => void>(() => {});
@@ -980,6 +985,7 @@ export default function SimuladorPage() {
           history: currentHistory,
           questionIndex,
           questionsCount,
+          lastAnswerLikelyCut: lastCutRef.current,
           ...(image ? { image } : {}),
         }),
       });
@@ -1047,13 +1053,26 @@ export default function SimuladorPage() {
       return;
     }
 
+    // ¿La respuesta quedó cortada? Solo si la cerró el silencio (auto) y terminó
+    // en palabra colgada (conjunción/preposición/muletilla) → casi seguro seguía.
+    // Anti-loop: si el turno anterior ya ofreció completar, no volvemos a ofrecer.
+    const lastWord = answer
+      .toLowerCase()
+      .replace(/[.,!?…"”'’)\]]+$/g, "")
+      .split(/\s+/)
+      .pop();
+    const seemsCut = auto && !!lastWord && TRAILING_INCOMPLETE.has(lastWord);
+    const offerRecovery = seemsCut && !recoveryOfferedRef.current;
+    lastCutRef.current = offerRecovery;
+    recoveryOfferedRef.current = offerRecovery;
+
     const updated = [...historyRef.current, { question: questionRef.current, answer }];
     historyRef.current = updated;
     setHistory(updated);
     currentAnswerRef.current = "";
     setCurrentAnswer("");
     setLines([]);
-    track("sim_answer_closed", { auto, question_index: updated.length });
+    track("sim_answer_closed", { auto, question_index: updated.length, cut: offerRecovery });
 
     if (updated.length >= questionsCount) {
       finishToFeedback(updated);
@@ -1215,6 +1234,8 @@ export default function SimuladorPage() {
     currentAnswerRef.current = "";
     setCurrentQuestion("");
     questionRef.current = "";
+    lastCutRef.current = false;
+    recoveryOfferedRef.current = false;
     setFeedbackReport(null);
     setElapsed(0);
     setMicOn(true);
