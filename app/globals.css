@@ -1260,21 +1260,21 @@ input {
   transform: scale(1.1) translateY(-10px) !important;
 }
 
-/* Mano de Morfeo emergiendo desde la OSCURIDAD INFERIOR */
+/* Mano emergiendo desde abajo ofreciendo la pastilla */
 .hub-morpheus-hand-wrap {
   position: absolute;
-  bottom: -80px;
+  bottom: -60px;
   left: 50%;
-  transform: translateX(-50%) scale(0.92);
+  transform: translateX(-50%) scale(0.9);
   opacity: 0;
   pointer-events: none;
   z-index: 2; /* Mano por debajo de la pastilla */
-  transition: opacity 0.5s ease, bottom 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.35s ease, bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s ease;
 }
 
 .hub-option-btn:hover .hub-morpheus-hand-wrap {
   opacity: 1;
-  bottom: -28px;
+  bottom: 0px;
   transform: translateX(-50%) scale(1);
 }
 
