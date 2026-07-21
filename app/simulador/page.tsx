@@ -161,6 +161,16 @@ const MODELS: ModelOption[] = [
 ];
 const DEFAULT_MODEL_ID = "gemini-flash";
 
+// Destello del botón "mágico" (mismo que el "Responder" de /app).
+function SparkleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2.5l1.9 4.9 4.9 1.9-4.9 1.9L12 16l-1.9-4.8L5.2 9.3l4.9-1.9L12 2.5z" />
+      <path d="M18.5 14.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
+    </svg>
+  );
+}
+
 // Provider Marks
 function OpenAIMark() {
   return (
@@ -1870,8 +1880,11 @@ export default function SimuladorPage() {
                   El mismo Loro, pero en tu entrevista de verdad: escucha la pregunta y te arma la respuesta al
                   instante con tu CV, la empresa y el puesto.
                 </div>
-                <button onClick={goToCopilot} className="btn-action btn-primary sim-cross-btn">
-                  Probá el copiloto en vivo →
+                <button onClick={goToCopilot} className="btn-action btn-primary btn-answer sim-cross-btn">
+                  <span className="btn-answer-inner">
+                    <SparkleIcon />
+                    Probá el copiloto en vivo →
+                  </span>
                 </button>
                 <button onClick={shareSimulator} className="btn-action btn-whatsapp">
                   Compartí el simulador por WhatsApp

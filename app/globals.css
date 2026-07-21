@@ -2246,11 +2246,16 @@ input {
   margin: 0 auto 4px;
 }
 .sim-cross-btn { margin-top: 4px; }
-.sim-cross .btn-primary {
+/* El botón del copiloto usa el efecto "Responder" (.btn-answer): cara oscura
+   en ::after + halo de loro animado. El texto va blanco (el override verde de
+   abajo dejaría el label invisible sobre la cara oscura). */
+.sim-cross .btn-answer .btn-answer-inner { color: #fff; }
+/* El otro botón (WhatsApp) no se ve afectado; este override aplica al resto. */
+.sim-cross .btn-primary:not(.btn-answer) {
   background: var(--loro-green);
   color: #06371c;
 }
-.sim-cross .btn-primary:hover { background: var(--loro-green-bright); color: #fff; }
+.sim-cross .btn-primary:not(.btn-answer):hover { background: var(--loro-green-bright); color: #fff; }
 .sim-restart-link {
   align-self: center;
   background: transparent;
