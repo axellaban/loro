@@ -1164,170 +1164,115 @@ input {
   margin-bottom: clamp(40px, 7vh, 68px);
 }
 
-/* ===================== Matrix Pills ===================== */
-.hub-matrix-prompt {
-  margin-bottom: 24px;
-  display: flex;
-  justify-content: center;
-}
-
-.hub-matrix-tag {
-  font-family: "JetBrains Mono", monospace, sans-serif;
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.25em;
-  color: #a3e635;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(162, 230, 53, 0.35);
-  padding: 6px 16px;
-  border-radius: 9999px;
-  text-shadow: 0 0 8px rgba(163, 230, 53, 0.6);
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.18);
-  animation: simPulse 2.5s ease-in-out infinite;
-}
-
+/* ===================== Matrix Options (Clean 3D Pills) ===================== */
 .hub-doors-pills {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  align-items: center;
-  gap: 36px;
+  align-items: flex-start;
+  gap: 48px;
   width: 100%;
-  max-width: 720px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 10px 0;
+  padding: 20px 0;
 }
 
 @media (max-width: 640px) {
   .hub-doors-pills {
     flex-direction: column;
-    gap: 28px;
+    align-items: center;
+    gap: 36px;
   }
 }
 
-.hub-pill-btn {
+.hub-option-btn {
   flex: 1;
   width: 100%;
-  max-width: 320px;
+  max-width: 260px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 26px 20px 30px;
-  border-radius: 9999px; /* Real Pill Capsule Shape */
+  padding: 16px 12px;
   text-decoration: none;
   text-align: center;
   position: relative;
+  border: none;
+  background: transparent;
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 1;
-  overflow: visible; /* crucial for glows */
 }
 
-.hub-pill-btn:hover {
-  transform: scale(1.07) translateY(-6px);
+.hub-option-btn:hover {
+  transform: scale(1.08) translateY(-6px);
 }
 
 .hub-3d-pill-svg {
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  margin-bottom: 2px;
+  margin-bottom: 8px;
 }
 
-.hub-pill-btn:hover .hub-3d-pill-svg {
-  transform: scale(1.12) rotate(-20deg) translateY(-2px) !important;
+.hub-option-btn:hover .hub-3d-pill-svg {
+  transform: scale(1.15) rotate(-15deg) translateY(-4px) !important;
 }
 
-.hub-pill-inner {
-  position: relative;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.hub-pill-label {
+.hub-option-label {
   font-size: 1.5rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #fff;
+  margin-top: 4px;
 }
 
-.hub-pill-sub {
+.hub-label-blue {
+  color: #60a5fa;
+  text-shadow: 0 0 12px rgba(96, 165, 250, 0.7);
+}
+
+.hub-label-red {
+  color: #fca5a5;
+  text-shadow: 0 0 12px rgba(252, 165, 165, 0.8);
+}
+
+.hub-option-sub {
   font-size: 0.8rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.7);
   letter-spacing: 0.02em;
   line-height: 1.35;
-  max-width: 220px;
+  max-width: 210px;
 }
 
-/* Center seam dividing the capsule button in two */
-.hub-pill-seam {
+/* Multi-color gradient outline and blur glow behind the Copiloto option */
+.hub-option-glow {
   position: absolute;
-  top: 15%;
-  bottom: 15%;
-  left: 50%;
-  width: 1px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
-  z-index: 3;
-  pointer-events: none;
+  top: 10px;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    #10b981,
+    #34d399,
+    #a3e635,
+    #fbbf24,
+    #f59e0b,
+    #fb7185,
+    #22d3ee,
+    #10b981
+  );
+  background-size: 300% 100%;
+  animation: loroGlow 4s linear infinite;
+  filter: blur(28px);
+  z-index: -1;
+  opacity: 0.45;
+  transition: opacity 0.35s ease, filter 0.35s ease;
 }
 
-/* 3D Glossy Reflection on top of every pill button */
-.hub-pill-gloss {
-  position: absolute;
-  top: 3px;
-  left: 14px;
-  right: 14px;
-  height: 44%;
-  border-radius: 9999px 9999px 0 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  z-index: 4;
-}
-
-/* Blue Pill - Simulador */
-.hub-pill-blue {
-  background: radial-gradient(circle at 50% 30%, #1e3a8a 0%, #090f1d 80%);
-  border: 2.5px solid #2563eb;
-  box-shadow: 0 0 24px rgba(37, 99, 235, 0.4), inset 0 2px 6px rgba(255, 255, 255, 0.35), inset 0 -6px 12px rgba(0, 0, 0, 0.6);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, background 0.3s ease;
-}
-
-.hub-pill-blue:hover {
-  border-color: #60a5fa;
-  box-shadow: 0 0 45px rgba(59, 130, 246, 0.85), inset 0 2px 10px rgba(255, 255, 255, 0.55), inset 0 -6px 16px rgba(0, 0, 0, 0.7);
-  background: radial-gradient(circle at 50% 30%, #2563eb 0%, #0d162a 80%);
-}
-
-.hub-pill-blue .hub-pill-label {
-  color: #93c5fd;
-  text-shadow: 0 0 12px rgba(147, 197, 253, 0.8);
-}
-
-/* Red Pill - Copiloto */
-.hub-pill-red {
-  background: transparent;
-  border: none;
-}
-
-/* The actual 3D background card of the red pill */
-.hub-pill-red-card {
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background: radial-gradient(circle at 50% 30%, #450a0a 0%, #0f070e 80%);
-  z-index: 2;
-  border: 2.5px solid rgba(239, 68, 68, 0.5);
-  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.3), inset 0 -6px 12px rgba(0, 0, 0, 0.7);
-  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.hub-pill-red:hover .hub-pill-red-card {
-  background: radial-gradient(circle at 50% 30%, #7f1d1d 0%, #170a16 80%);
-  border-color: rgba(248, 113, 113, 0.85);
-  box-shadow: inset 0 2px 10px rgba(255, 255, 255, 0.45), inset 0 -6px 16px rgba(0, 0, 0, 0.8);
+.hub-option-red:hover .hub-option-glow {
+  opacity: 0.8;
+  filter: blur(34px);
 }
 
 /* Multi-color gradient outline and blur glow for the red pill */

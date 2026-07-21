@@ -43,8 +43,8 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
 
   return (
     <svg
-      width="130"
-      height="54"
+      width="140"
+      height="58"
       viewBox="0 0 140 60"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -131,39 +131,26 @@ export default function Hub() {
 
         <h1 className="hub-h1">Metele el Loro (IA) a tus entrevistas</h1>
 
-        <div className="hub-matrix-prompt">
-          <span className="hub-matrix-tag">¿CUÁL TE TOMÁS?</span>
-        </div>
-
         <div className="hub-doors-pills">
           <Link
             href="/simulador"
-            className="hub-pill-btn hub-pill-blue"
+            className="hub-option-btn hub-option-blue"
             onClick={() => track("hub_practice_click")}
           >
-            <span className="hub-pill-gloss" />
-            <span className="hub-pill-seam" />
-            <span className="hub-pill-inner">
-              <MatrixPill3D type="blue" />
-              <span className="hub-pill-label">Simulador</span>
-              <span className="hub-pill-sub">practicá con un entrevistador muy simpático</span>
-            </span>
+            <MatrixPill3D type="blue" />
+            <span className="hub-option-label hub-label-blue">Simulador</span>
+            <span className="hub-option-sub">practicá con un entrevistador muy simpático</span>
           </Link>
 
           <Link
             href="/app?ref=copiloto"
-            className="hub-pill-btn hub-pill-red"
+            className="hub-option-btn hub-option-red"
             onClick={() => track("hub_copilot_click")}
           >
-            <span className="hub-pill-glow" />
-            <span className="hub-pill-red-card" />
-            <span className="hub-pill-gloss" />
-            <span className="hub-pill-seam" />
-            <span className="hub-pill-inner">
-              <MatrixPill3D type="red" />
-              <span className="hub-pill-label">Copiloto</span>
-              <span className="hub-pill-sub">te acompaña durante tu entrevista en tiempo real</span>
-            </span>
+            <span className="hub-option-glow" />
+            <MatrixPill3D type="red" />
+            <span className="hub-option-label hub-label-red">Copiloto</span>
+            <span className="hub-option-sub">te acompaña durante tu entrevista en tiempo real</span>
           </Link>
         </div>
       </main>
