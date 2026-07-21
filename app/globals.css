@@ -1140,6 +1140,18 @@ input {
 
 .hub-brand {
   margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.hub-brand-text {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1;
 }
 
 .hub-h1 {
@@ -1152,51 +1164,158 @@ input {
   margin-bottom: clamp(40px, 7vh, 68px);
 }
 
-.hub-doors {
+/* ===================== Matrix Pills ===================== */
+.hub-doors-pills {
   display: flex;
-  gap: 18px;
-  width: 100%;
+  flex-direction: row;
   justify-content: center;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 10px 0;
 }
 
-.hub-door {
-  flex: 1 1 220px;
+@media (max-width: 640px) {
+  .hub-doors-pills {
+    flex-direction: column;
+    gap: 24px;
+  }
+}
+
+.hub-pill-btn {
+  flex: 1;
+  width: 100%;
   max-width: 300px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 34px 24px;
+  justify-content: center;
+  padding: 28px 24px;
+  border-radius: 9999px; /* Pill shape */
   text-decoration: none;
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.02);
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+  text-align: center;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+  overflow: visible; /* crucial for glows */
 }
 
-.hub-door:hover {
-  border-color: var(--loro-green);
-  background: rgba(16, 185, 129, 0.08);
-  transform: translateY(-2px);
+.hub-pill-btn:hover {
+  transform: scale(1.05) translateY(-4px);
 }
 
-.hub-door-label {
-  font-size: clamp(1.3rem, 4.5vw, 1.85rem);
-  font-weight: 800;
-  letter-spacing: 0.01em;
+.hub-pill-inner {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hub-pill-label {
+  font-size: 1.4rem;
+  font-weight: 850;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: #fff;
 }
 
-.hub-door-sub {
-  font-size: clamp(0.72rem, 2.2vw, 0.88rem);
-  color: #9aa2a7;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.hub-pill-sub {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  max-width: 220px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hub-door { transition: none; }
+/* Blue Pill - Simulador */
+.hub-pill-blue {
+  background: #090f1d;
+  border: 2.5px solid #0052FF;
+  box-shadow: 0 0 15px rgba(0, 82, 255, 0.3), inset 0 0 10px rgba(0, 82, 255, 0.1);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, background 0.25s ease;
+}
+
+.hub-pill-blue:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.7), inset 0 0 15px rgba(59, 130, 246, 0.2);
+  background: #0d162a;
+}
+
+.hub-pill-blue .hub-pill-label {
+  color: #60a5fa;
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+}
+
+/* Red Pill - Copiloto */
+.hub-pill-red {
+  background: transparent;
+  border: none;
+}
+
+/* The actual background element of the red pill */
+.hub-pill-red-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #0f0913;
+  z-index: 2;
+  border: 2px solid rgba(255, 90, 31, 0.2);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.hub-pill-red:hover .hub-pill-red-card {
+  background: #190e21;
+  border-color: rgba(255, 90, 31, 0.4);
+}
+
+/* Multi-color gradient outline and blur glow */
+.hub-pill-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    #10b981,
+    #34d399,
+    #a3e635,
+    #fbbf24,
+    #f59e0b,
+    #fb7185,
+    #22d3ee,
+    #10b981
+  );
+  background-size: 300% 100%;
+  animation: loroGlow 5s linear infinite;
+  z-index: 1;
+  opacity: 0.9;
+  transition: opacity 0.25s ease;
+}
+
+/* Blur backing */
+.hub-pill-glow::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: inherit;
+  background-size: inherit;
+  filter: blur(14px);
+  z-index: -1;
+  opacity: 0.8;
+}
+
+.hub-pill-red:hover .hub-pill-glow {
+  opacity: 1;
+}
+
+.hub-pill-red .hub-pill-label {
+  color: #fb7185;
+  text-shadow: 0 0 10px rgba(251, 113, 133, 0.6);
 }
 
 /* ===================== Paywall / lista de espera ===================== */
