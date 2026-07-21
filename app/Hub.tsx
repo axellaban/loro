@@ -36,86 +36,128 @@ function IaFlag() {
   );
 }
 
-// Mano estilo cartoon emergiendo desde abajo ofreciendo la pastilla
+// Mano de Morfeo en perspectiva frontal emergiendo del fondo negro — yemas de dedos mirando al frente
 function HandSvg({ side }: { side: "left" | "right" }) {
   const isRight = side === "right";
+  const id = isRight ? "R" : "L";
+
   return (
     <div className="hub-morpheus-hand-wrap" aria-hidden="true">
       <svg
-        width="100"
-        height="90"
-        viewBox="0 0 120 110"
+        width="220"
+        height="160"
+        viewBox="0 0 220 160"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         style={{ transform: isRight ? "scaleX(-1)" : "none" }}
       >
-        {/* Muñeca (emerge desde abajo) */}
-        <rect x="30" y="75" width="55" height="40" rx="6" fill="#c4956a" stroke="#2d2017" strokeWidth="2.5" />
+        <defs>
+          {/* Gradiente de piel oscura/cuero Morfeo en escena cinematográfica */}
+          <radialGradient id={`handSkin${id}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#58463a" />
+            <stop offset="45%" stopColor="#3a2c23" />
+            <stop offset="80%" stopColor="#1e150f" />
+            <stop offset="100%" stopColor="#080504" />
+          </radialGradient>
 
-        {/* Palma */}
+          {/* Brillo en las yemas de los dedos que apuntan al frente */}
+          <linearGradient id={`padHighlight${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgba(255,215,185,0.6)" />
+            <stop offset="100%" stopColor="rgba(255,215,185,0.15)" />
+          </linearGradient>
+
+          {/* Resplandor suave en el cuenco de la palma */}
+          <radialGradient id={`palmGlow${id}`} cx="50%" cy="55%" r="40%">
+            <stop offset="0%" stopColor="rgba(255,200,160,0.35)" />
+            <stop offset="100%" stopColor="rgba(255,200,160,0)" />
+          </radialGradient>
+
+          {/* Sombra de desvanecimiento hacia el fondo negro en la base */}
+          <radialGradient id={`fadeBg${id}`} cx="50%" cy="50%" r="50%">
+            <stop offset="65%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.95)" />
+          </radialGradient>
+        </defs>
+
+        {/* ====== MUÑECA Y ANTEBRAZO (viniendo desde el fondo oscuro) ====== */}
         <path
-          d="M25 78 C 25 55 30 42 38 35 L 80 35 C 88 42 93 55 93 78 Z"
-          fill="#d4a574"
-          stroke="#2d2017"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
+          d="M 75 160 C 70 135 75 115 85 105 L 135 105 C 145 115 150 135 145 160 Z"
+          fill={`url(#handSkin${id})`}
         />
 
-        {/* Dedo índice (curvado hacia abajo) */}
+        {/* ====== PALMA CENTRAL VISTA DE FRENTE ====== */}
         <path
-          d="M38 35 C 36 28 34 18 35 10 C 36 4 42 2 46 6 C 49 10 49 22 48 32"
-          fill="#d4a574"
-          stroke="#2d2017"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          d="M 45 95 C 40 85 45 70 55 65 C 65 60 85 58 110 58 C 135 58 155 60 165 65 C 175 70 180 85 175 95 C 165 110 145 120 110 120 C 75 120 55 110 45 95 Z"
+          fill={`url(#handSkin${id})`}
+          stroke="rgba(255,190,150,0.22)"
+          strokeWidth="1"
         />
 
-        {/* Dedo medio */}
+        {/* ====== PULGAR EXTENDIDO HACIA EL COSTADO ====== */}
         <path
-          d="M48 32 C 48 24 47 12 48 5 C 49 -1 55 -2 58 3 C 61 8 60 20 59 30"
-          fill="#d4a574"
-          stroke="#2d2017"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          d="M 50 82 C 35 78 20 72 12 62 C 6 54 10 44 20 44 C 30 44 42 55 52 68 Z"
+          fill={`url(#handSkin${id})`}
+          stroke="rgba(255,190,150,0.25)"
+          strokeWidth="1"
         />
+        {/* Yema del pulgar */}
+        <ellipse cx="16" cy="54" rx="7" ry="9" fill={`url(#padHighlight${id})`} opacity="0.75" />
 
-        {/* Dedo anular */}
+        {/* ====== LOS 4 DEDOS CON LAS YEMAS APUNTANDO AL FRENTE (HACIA LA CÁMARA) ====== */}
+        {/* 1. Dedo Índice */}
         <path
-          d="M59 30 C 60 22 60 12 62 6 C 64 0 70 0 72 5 C 74 10 72 22 70 32"
-          fill="#d4a574"
-          stroke="#2d2017"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          d="M 58 66 C 56 75 58 92 62 108 C 65 122 75 128 84 126 C 90 124 92 112 88 100 C 82 85 76 68 74 62 Z"
+          fill={`url(#handSkin${id})`}
+          stroke="rgba(255,190,150,0.25)"
+          strokeWidth="1"
         />
+        {/* Yema del Índice (frente a la cámara) */}
+        <ellipse cx="73" cy="116" rx="10" ry="8" fill={`url(#padHighlight${id})`} />
 
-        {/* Meñique */}
+        {/* 2. Dedo Medio (el más frontal) */}
         <path
-          d="M70 35 C 72 28 74 18 76 12 C 78 7 83 8 84 13 C 85 18 82 28 80 36"
-          fill="#d4a574"
-          stroke="#2d2017"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          d="M 82 60 C 82 72 85 92 90 112 C 94 128 106 134 114 132 C 122 130 122 116 116 100 C 108 82 102 65 98 58 Z"
+          fill={`url(#handSkin${id})`}
+          stroke="rgba(255,190,150,0.25)"
+          strokeWidth="1"
         />
+        {/* Yema del Medio (frente a la cámara) */}
+        <ellipse cx="102" cy="120" rx="11" ry="9" fill={`url(#padHighlight${id})`} />
 
-        {/* Pulgar (costado izquierdo) */}
+        {/* 3. Dedo Anular */}
         <path
-          d="M25 60 C 18 55 12 48 10 40 C 8 33 12 28 18 30 C 24 32 26 42 26 52"
-          fill="#d4a574"
-          stroke="#2d2017"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          d="M 106 60 C 108 72 112 90 118 108 C 122 122 132 128 140 124 C 146 120 144 108 138 94 C 130 78 124 64 120 60 Z"
+          fill={`url(#handSkin${id})`}
+          stroke="rgba(255,190,150,0.25)"
+          strokeWidth="1"
         />
+        {/* Yema del Anular */}
+        <ellipse cx="128" cy="114" rx="10" ry="8" fill={`url(#padHighlight${id})`} />
 
-        {/* Líneas de los nudillos */}
-        <path d="M 42 33 C 43 30 45 29 47 31" stroke="#b8875c" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M 53 30 C 54 27 56 26 58 28" stroke="#b8875c" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M 64 31 C 65 28 67 27 69 30" stroke="#b8875c" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M 74 35 C 75 32 77 32 79 34" stroke="#b8875c" strokeWidth="1.8" strokeLinecap="round" />
+        {/* 4. Meñique */}
+        <path
+          d="M 128 64 C 132 75 138 90 144 102 C 148 112 156 116 162 112 C 168 108 166 98 158 86 C 150 72 142 64 138 64 Z"
+          fill={`url(#handSkin${id})`}
+          stroke="rgba(255,190,150,0.2)"
+          strokeWidth="1"
+        />
+        {/* Yema del Meñique */}
+        <ellipse cx="151" cy="103" rx="8" ry="7" fill={`url(#padHighlight${id})`} opacity="0.85" />
+
+        {/* ====== PLIEGUES Y SOMBRAS DE ANATOMÍA ====== */}
+        {/* Pliegues de las yemas */}
+        <path d="M 64 106 C 72 110 82 108 86 102" stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M 91 108 C 101 114 112 112 115 104" stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M 118 102 C 127 108 136 106 139 98" stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" strokeLinecap="round" />
+
+        {/* Pliegue principal de la palma */}
+        <path d="M 52 82 C 80 92 130 90 162 76" stroke="rgba(0,0,0,0.7)" strokeWidth="2" strokeLinecap="round" />
+
+        {/* Luz cenital en el cuenco de la palma */}
+        <ellipse cx="108" cy="82" rx="38" ry="16" fill={`url(#palmGlow${id})`} />
+
+        {/* Sombra de desvanecimiento hacia el fondo negro en la base */}
+        <rect x="0" y="0" width="220" height="160" fill={`url(#fadeBg${id})`} />
       </svg>
     </div>
   );

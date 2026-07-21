@@ -1244,38 +1244,43 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 190px;
-  height: 110px;
+  width: 210px;
+  height: 135px;
   margin-bottom: 0;
-  overflow: hidden; /* Recorta la mano para que emerja desde abajo */
+  overflow: visible; /* Permite que la mano emerja desde la profundidad 3D del fondo */
 }
 
 .hub-3d-pill-svg {
   position: relative;
-  z-index: 5; /* Pastilla arriba de la mano */
+  z-index: 10; /* Pastilla flotando arriba sin ser tocada */
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.75));
 }
 
 .hub-option-btn:hover .hub-3d-pill-svg {
-  transform: scale(1.1) translateY(-10px) !important;
+  transform: scale(1.12) translateY(-12px) !important;
 }
 
-/* Mano emergiendo desde abajo ofreciendo la pastilla */
+/* Mano emergiendo desde la PROFUNDIDAD DEL FONDO NEGRO */
 .hub-morpheus-hand-wrap {
   position: absolute;
-  bottom: -60px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%) scale(0.9);
+  transform: translate(-50%, -40%) scale(0.35); /* Oculta en el fondo oscuro */
   opacity: 0;
+  filter: brightness(0.2) blur(4px); /* Oscura y fuera de foco en la profundidad */
   pointer-events: none;
-  z-index: 2; /* Mano por debajo de la pastilla */
-  transition: opacity 0.35s ease, bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s ease;
+  z-index: 2; /* Por detrás de la pastilla flotante */
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.4s ease,
+              filter 0.5s ease;
 }
 
+/* En hover: La mano avanza de frente desde la oscuridad hacia el usuario, con yemas al frente */
 .hub-option-btn:hover .hub-morpheus-hand-wrap {
   opacity: 1;
-  bottom: 0px;
-  transform: translateX(-50%) scale(1);
+  transform: translate(-50%, -35%) scale(1); /* Avanza hacia el frente */
+  filter: brightness(1) blur(0px); /* Nítida e iluminada */
 }
 
 /* Title labels are pure white */
