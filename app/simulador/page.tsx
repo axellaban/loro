@@ -1904,25 +1904,25 @@ export default function SimuladorPage() {
               {/* Cross-sell al copiloto en vivo (acción primaria) + compartir el
                   simulador. Una sola dirección dominante (Luhmann). */}
               <div className="sim-cross">
-                <div className="sim-cross-eyebrow">¿Te gustó el simulador? 🦜</div>
-                <div className="sim-cross-title">Ahora imaginá tenerlo puesto en la entrevista de verdad.</div>
+                <div className="sim-cross-eyebrow">Esto fue práctica. La entrevista real, no. 🦜</div>
+                <div className="sim-cross-title">El día real, el Loro entra con vos.</div>
                 <div className="sim-cross-text">
-                  Cuando te quedes en blanco, el Loro escucha la pregunta y te sopla la respuesta al instante —armada
-                  con tu CV, la empresa y el puesto—. Vos solo la leés. Nadie se entera.
+                  Escucha la pregunta y te sopla la respuesta al instante —armada con tu CV, la empresa y el
+                  puesto—. Vos solo la leés. Nadie se entera.
                 </div>
                 <button onClick={goToCopilot} className="btn-action btn-primary btn-answer sim-cross-btn">
                   <span className="btn-answer-inner">
                     <SparkleIcon />
-                    Probá el copiloto en vivo →
+                    Soltar el Loro en tu entrevista →
                   </span>
                 </button>
                 <button onClick={shareSimulator} className="btn-action btn-whatsapp">
-                  Compartí el simulador por WhatsApp
+                  Compartíselo a alguien que tiene una entrevista pronto 🦜
                 </button>
               </div>
 
               <button onClick={() => setPhaseBoth("setup")} className="sim-restart-link">
-                🔄 Hacer otra simulación
+                🔄 Otra simulación
               </button>
             </>
           )}
