@@ -601,7 +601,7 @@ export default function SimuladorPage() {
 
   // Los handlers del WebSocket viven entre renders: llaman a la versión fresca
   // de cada función de flujo a través de estos refs.
-  const beginTurnRef = useRef<(h: HistoryItem[]) => void>(() => {});
+  const beginTurnRef = useRef<(h: HistoryItem[], closing?: boolean) => void>(() => {});
   const closeAnswerRef = useRef<(auto: boolean) => void>(() => {});
   // Señal para el entrevistador: la última respuesta pudo cortarse (silencio
   // cerró a media frase). `recoveryOfferedRef` evita encadenar repreguntas de
@@ -917,7 +917,7 @@ export default function SimuladorPage() {
     }
   };
 
-  const beginTurn = async (currentHistory: HistoryItem[]) => {
+  const beginTurn = async (currentHistory: HistoryItem[], closing = false) => {
     setPhaseBoth("asking");
     setCurrentQuestion("");
     questionRef.current = "";
@@ -927,6 +927,10 @@ export default function SimuladorPage() {
 
     const ctx = audioCtxRef.current;
     if (!ctx) return;
+
+    // En el turno de cierre (despedida del entrevistador), al terminar de hablar
+    // vamos al informe en vez de reabrir el mic.
+    const onDone = closing ? () => finishToFeedback(currentHistory) : enterListening;
 
     ttsRef.current?.stop();
     const queue = new TtsQueue(ctx, sessionLangRef.current);
@@ -956,7 +960,7 @@ export default function SimuladorPage() {
           clearRevealTimer();
           setSpokenQuestion(questionRef.current);
           track("session_error", { where: "sim_speak_failsafe" });
-          enterListening();
+          onDone();
         }
       }, ms);
     };
@@ -975,7 +979,7 @@ export default function SimuladorPage() {
       if (postTtsTimerRef.current) clearTimeout(postTtsTimerRef.current);
       postTtsTimerRef.current = setTimeout(() => {
         postTtsTimerRef.current = null;
-        if (phaseRef.current === "asking" || phaseRef.current === "speaking") enterListening();
+        if (phaseRef.current === "asking" || phaseRef.current === "speaking") onDone();
       }, delay);
     };
 
@@ -983,13 +987,14 @@ export default function SimuladorPage() {
       const questionIndex = currentHistory.length + 1;
       // Frame en las preguntas 1 y 2: garantiza el comentario "te estoy
       // viendo" temprano (en la 1 la cámara puede no tener frames todavía).
-      const withVision = questionIndex <= 2;
+      // En el cierre no se manda imagen ni señal de corte.
+      const withVision = !closing && questionIndex <= 2;
       const image = withVision ? captureFrame() : null;
       const res = await fetch("/api/simulador", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "next-question",
+          action: closing ? "closing" : "next-question",
           profile,
           company,
           role,
@@ -1000,7 +1005,7 @@ export default function SimuladorPage() {
           history: currentHistory,
           questionIndex,
           questionsCount,
-          lastAnswerLikelyCut: lastCutRef.current,
+          lastAnswerLikelyCut: closing ? false : lastCutRef.current,
           ...(image ? { image } : {}),
         }),
       });
@@ -1049,12 +1054,18 @@ export default function SimuladorPage() {
       if (!questionText.trim()) throw new Error("El entrevistador no devolvió pregunta.");
     } catch (err: any) {
       queue.stop();
-      endSession();
-      setError(err?.message || "Error al conectar con la IA.");
+      // Si falla el turno de cierre, igual entregamos el informe (el candidato
+      // ya respondió todo); no lo mandamos de vuelta al setup.
+      if (closing) {
+        finishToFeedback(currentHistory);
+      } else {
+        endSession();
+        setError(err?.message || "Error al conectar con la IA.");
+      }
     }
   };
-  beginTurnRef.current = (h) => {
-    void beginTurn(h);
+  beginTurnRef.current = (h, closing) => {
+    void beginTurn(h, closing);
   };
 
   const closeAnswer = (auto: boolean) => {
@@ -1090,7 +1101,9 @@ export default function SimuladorPage() {
     track("sim_answer_closed", { auto, question_index: updated.length, cut: offerRecovery });
 
     if (updated.length >= questionsCount) {
-      finishToFeedback(updated);
+      // Terminación natural: el entrevistador cierra (agradece) y recién ahí
+      // se procesa el informe.
+      beginTurnRef.current(updated, true);
     } else {
       beginTurnRef.current(updated);
     }

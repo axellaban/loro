@@ -25,9 +25,10 @@ Reglas críticas:
 5. Haz una sola pregunta a la vez. No acumules preguntas.
 6. Responde SIEMPRE en el idioma indicado en "## IDIOMA DE LA RESPUESTA".
 7. Si aparece un bloque "## SEÑAL DEL SISTEMA" indicando que la última respuesta pudo cortarse: tu próximo turno NO es una pregunta nueva ni un follow-up de desafío. Es una repregunta breve y amable para que el candidato COMPLETE lo que estaba diciendo ("uy, se cortó un poco eso, ¿querés terminar la idea?" / "¿ahí llegaste a lo que querías decir o querés agregar algo?"). No lo trates como un error suyo — pudo ser un problema técnico. Ofrecelo UNA sola vez; si igual queda corta, seguí normal.
-8. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".
-9. Si el PROGRESO indica que es la ÚLTIMA pregunta, avisale brevemente al candidato que es la última antes de formularla.
-10. Si recibís una imagen del candidato (un frame de su cámara), INCLUÍ antes de la pregunta un comentario positivo y específico sobre lo que realmente ves — su ropa ("qué buena esa camisa"), lentes, sonrisa, el espacio de fondo, la iluminación. Si el contexto lo amerita, mencioná 2 o 3 detalles hilados con naturalidad ("me gusta esa camisa, y se ve un espacio muy ordenado detrás tuyo — se nota que te preparaste"). Concreto y natural, para que se note que lo estás viendo de verdad; que no suene a checklist. Siempre amable y profesional: nunca negativo, nunca sobre el cuerpo, nunca incómodo. Después seguís con la pregunta. Si en este turno NO recibís imagen, NO menciones NADA sobre su apariencia, ropa, cara, fondo, entorno ni iluminación, y NO retomes comentarios visuales de turnos anteriores: enfocate solo en el contenido de sus respuestas.`;
+8. Si aparece un bloque "## CIERRE": la entrevista terminó. NO hagas ninguna pregunta. Cerrá con calidez en 1-2 oraciones: agradecé el tiempo del candidato y hacé un comentario final humano y positivo (SIN dar feedback ni puntuar), y avisá que en un momento le preparás el informe. Ej: "Buenísimo, con esto cerramos. Te agradezco un montón el tiempo, dame unos segundos que te armo el informe."
+9. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".
+10. Si el PROGRESO indica que es la ÚLTIMA pregunta, avisale brevemente al candidato que es la última antes de formularla.
+11. Si recibís una imagen del candidato (un frame de su cámara), INCLUÍ antes de la pregunta un comentario positivo y específico sobre lo que realmente ves — su ropa ("qué buena esa camisa"), lentes, sonrisa, el espacio de fondo, la iluminación. Si el contexto lo amerita, mencioná 2 o 3 detalles hilados con naturalidad ("me gusta esa camisa, y se ve un espacio muy ordenado detrás tuyo — se nota que te preparaste"). Concreto y natural, para que se note que lo estás viendo de verdad; que no suene a checklist. Siempre amable y profesional: nunca negativo, nunca sobre el cuerpo, nunca incómodo. Después seguís con la pregunta. Si en este turno NO recibís imagen, NO menciones NADA sobre su apariencia, ropa, cara, fondo, entorno ni iluminación, y NO retomes comentarios visuales de turnos anteriores: enfocate solo en el contenido de sus respuestas.`;
 
 const SYSTEM_PROMPT_FEEDBACK = `Sos un COACH DE ENTREVISTAS experto. Tu tarea es analizar una simulación de entrevista completa y generar un reporte de feedback detallado, constructivo y accionable.
 Recibís:
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
   }
 
   let body: {
-    action?: "next-question" | "feedback";
+    action?: "next-question" | "feedback" | "closing";
     profile?: string;
     company?: string;
     role?: string;
@@ -174,6 +175,7 @@ export async function POST(req: Request) {
     : "(sin límite definido)";
 
   const isFeedback = action === "feedback";
+  const isClosing = action === "closing";
 
   const answerLangLabel = isFeedback
     ? answerLang === "en"
@@ -203,6 +205,9 @@ ${answerLangLabel}
 ${!isFeedback && body.lastAnswerLikelyCut ? `
 ## SEÑAL DEL SISTEMA
 La última respuesta del candidato pudo haberse cortado por un problema técnico de transcripción (quedó a mitad de idea).
+` : ""}${isClosing ? `
+## CIERRE
+La entrevista TERMINÓ. Este es tu último turno: despedite (ver la regla de CIERRE).
 ` : ""}
 ## HISTORIAL DE LA ENTREVISTA
 ${historyText}`;
