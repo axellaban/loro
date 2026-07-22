@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Loreado.IA — Simulador de Entrevistas",
   description: "Desbloquea el 'Modo Dios' en tu próxima entrevista.",
+  alternates: { canonical: "/mock" },
 };
 
 export default function MockLanding() {

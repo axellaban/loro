@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Loreado.IA — Acceso Beta",
   description: "El copiloto de IA que RRHH no quiere que uses. Acceso beta cerrado.",
+  alternates: { canonical: "/copiloto" },
 };
 
 export default function Copiloto() {
