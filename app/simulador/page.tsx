@@ -443,7 +443,7 @@ function buildDgUrl(sttLang: string): string {
     smart_format: "true",
     interim_results: "true",
     endpointing: "500",
-    utterance_end_ms: "1000",
+    utterance_end_ms: "1500",
     vad_events: "true",
     encoding: "linear16",
     sample_rate: "16000",
@@ -466,7 +466,7 @@ const LS_KEY_REPORT = "simulador:lastReport:v1";
 const MIN_ANSWER_CHARS = 10;
 // Endpointing adaptativo: esperamos poco si la respuesta SONÓ completa y mucho
 // si quedó a media frase o en muletilla. Total percibido = umbral + gracia.
-const COMPLETE_MS = 900; // frase terminada con puntuación → responder rápido
+const COMPLETE_MS = 1700; // frase terminada con puntuación → responder ágil sin cortar pausas naturales
 const INCOMPLETE_MS = 2600; // a media frase / muletilla → esperar (pausa para pensar)
 // Ventana de gracia cancelable si el candidato retoma la palabra.
 const CONFIRM_MS = 600;
