@@ -592,6 +592,7 @@ export default function SimuladorPage() {
   // Tope duro de la fase "hablando": si algo se cuelga (stream, TTS), la sala
   // pasa igual a escuchar en vez de quedar trabada.
   const speakFailsafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const postTtsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const wakeLockRef = useRef<any>(null);
@@ -690,6 +691,10 @@ export default function SimuladorPage() {
       clearTimeout(speakFailsafeRef.current);
       speakFailsafeRef.current = null;
     }
+    if (postTtsTimerRef.current) {
+      clearTimeout(postTtsTimerRef.current);
+      postTtsTimerRef.current = null;
+    }
   };
 
   const startWatchdog = () => {
@@ -698,6 +703,14 @@ export default function SimuladorPage() {
     listeningStartedAtRef.current = Date.now();
     watchdogRef.current = setInterval(() => {
       if (phaseRef.current !== "listening") return;
+      // Corte de red: mientras el socket no está OPEN no oímos al candidato, así
+      // que no cerramos ni saltamos por "silencio" (sería un falso corte). Al
+      // reconectar, el reloj de silencio arranca fresco.
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        lastSpeechAtRef.current = Date.now();
+        listeningStartedAtRef.current = Date.now();
+        return;
+      }
       const answer = currentAnswerRef.current.trim();
       const hasAnswer = answer.length >= MIN_ANSWER_CHARS;
       if (hasAnswer) {
@@ -959,7 +972,9 @@ export default function SimuladorPage() {
       // pasar a escuchar de inmediato. El margen de 300ms deja drenar el
       // parlante antes de reabrir el mic (anti-eco).
       const delay = ttsFailed ? Math.max(1800, questionRef.current.length * 45) : 300;
-      setTimeout(() => {
+      if (postTtsTimerRef.current) clearTimeout(postTtsTimerRef.current);
+      postTtsTimerRef.current = setTimeout(() => {
+        postTtsTimerRef.current = null;
         if (phaseRef.current === "asking" || phaseRef.current === "speaking") enterListening();
       }, delay);
     };
@@ -1323,6 +1338,11 @@ export default function SimuladorPage() {
             wakeLockRef.current = wl;
           })
           .catch(() => {});
+        // En mobile el AudioContext queda suspended al bloquear/cambiar de app;
+        // sin resume, al volver el Loro no habla ni escucha (mismo ctx para TTS y STT).
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume().catch(() => {});
+        }
       }
     };
     document.addEventListener("visibilitychange", onVis);
