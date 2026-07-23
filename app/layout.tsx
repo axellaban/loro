@@ -48,15 +48,15 @@ export const metadata: Metadata = {
     locale: "es_AR",
     url: SITE_URL,
     siteName: "Loreado.IA",
-    title: "El copiloto de IA que RRHH no quiere que uses.",
+    title: "Nadie se entera de que usás IA en tu entrevista 🤫🦜",
     description:
-      "Transcribe tu entrevista en tiempo real y te sopla las respuestas ancladas en tu CV. Gratis, sin instalar nada. 🦜",
+      "Practicá gratis con un entrevistador de IA y, el día real, el Loro te sopla la respuesta en vivo —armada con tu CV—. 🦜",
   },
   twitter: {
     card: "summary_large_image",
-    title: "El copiloto de IA que RRHH no quiere que uses.",
+    title: "Nadie se entera de que usás IA en tu entrevista 🤫🦜",
     description:
-      "Transcribe tu entrevista en tiempo real y te sopla las respuestas ancladas en tu CV. 🦜",
+      "Practicá gratis con un entrevistador de IA y, el día real, el Loro te sopla la respuesta en vivo —armada con tu CV—. 🦜",
   },
 };
 

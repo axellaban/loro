@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { ParrotSvg } from "./parrot";
 import { LORO_PHOTO, LORO_PHOTO_V } from "./ogLoro";
+import { INTER_800_B64, INTER_900_B64 } from "./ogFonts";
 
 // Tamaño estándar de Open Graph / Twitter card.
 export const ogSize = { width: 1200, height: 630 };
@@ -15,9 +16,20 @@ const LORO_GRADIENT =
 const LORO_TEXT_GRADIENT =
   "linear-gradient(90deg,#34d399,#a3e635,#fbbf24,#f59e0b,#fb7185,#22d3ee)";
 
+// Inter (la fuente de la marca) subseteada, en peso ExtraBold (800) y Black (900),
+// para que el texto de la card se vea bien grueso. Embebida en base64 (sin fetch,
+// así funciona en el prerender del build).
+function loadInterFonts() {
+  return [
+    { name: "Inter", data: Buffer.from(INTER_800_B64, "base64"), weight: 800 as const, style: "normal" as const },
+    { name: "Inter", data: Buffer.from(INTER_900_B64, "base64"), weight: 900 as const, style: "normal" as const },
+  ];
+}
+
 // Card VERTICAL de compartir (WhatsApp/IG muestran verticales enteras): foto del
 // loro a pantalla completa con la frase abajo sobre un degradado oscuro.
-export function ogHomeImageVertical() {
+export async function ogHomeImageVertical() {
+  const fonts = loadInterFonts();
   return new ImageResponse(
     (
       <div
@@ -38,7 +50,7 @@ export function ogHomeImageVertical() {
             background: "#0a0a0f",
             borderRadius: 28,
             overflow: "hidden",
-            fontFamily: "sans-serif",
+            fontFamily: "Inter",
           }}
         >
           {/* Foto del loro a pantalla completa */}
@@ -55,7 +67,7 @@ export function ogHomeImageVertical() {
               inset: 0,
               display: "flex",
               background:
-                "linear-gradient(180deg, rgba(10,10,15,0.72) 0%, rgba(10,10,15,0) 20%, rgba(10,10,15,0) 40%, rgba(10,10,15,0.82) 66%, #0a0a0f 100%)",
+                "linear-gradient(180deg, rgba(10,10,15,0.72) 0%, rgba(10,10,15,0) 20%, rgba(10,10,15,0) 38%, rgba(10,10,15,0.9) 62%, #0a0a0f 100%)",
             }}
           />
 
@@ -98,16 +110,16 @@ export function ogHomeImageVertical() {
             {/* Frase + pill */}
             <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
               <div style={{ display: "flex", flexDirection: "column", letterSpacing: -1 }}>
-                <div style={{ display: "flex", fontSize: 84, fontWeight: 800, lineHeight: 1.02, color: "#fff" }}>
+                <div style={{ display: "flex", fontSize: 84, fontWeight: 900, lineHeight: 1.02, color: "#fff" }}>
                   METELE EL LORO
                 </div>
-                <div style={{ display: "flex", fontSize: 84, fontWeight: 800, lineHeight: 1.02, color: "#fff" }}>
+                <div style={{ display: "flex", fontSize: 84, fontWeight: 900, lineHeight: 1.02, color: "#fff" }}>
                   A TU
                 </div>
-                <div style={{ display: "flex", fontSize: 84, fontWeight: 800, lineHeight: 1.02, color: "#a3e635" }}>
+                <div style={{ display: "flex", fontSize: 84, fontWeight: 900, lineHeight: 1.02, color: "#a3e635" }}>
                   PRÓXIMA
                 </div>
-                <div style={{ display: "flex", fontSize: 84, fontWeight: 800, lineHeight: 1.02, color: "#a3e635" }}>
+                <div style={{ display: "flex", fontSize: 84, fontWeight: 900, lineHeight: 1.02, color: "#a3e635" }}>
                   ENTREVISTA
                 </div>
               </div>
@@ -134,14 +146,15 @@ export function ogHomeImageVertical() {
         </div>
       </div>
     ),
-    { ...ogSizeVertical }
+    { ...ogSizeVertical, fonts }
   );
 }
 
 // Card de compartir del HOME: foto real del loro (frame del video) a la derecha
 // y la frase a la izquierda sobre fondo oscuro. Horizontal 1200x630 (estándar de
 // preview de links) para que WhatsApp/Twitter/etc. la muestren completa.
-export function ogHomeImage() {
+export async function ogHomeImage() {
+  const fonts = loadInterFonts();
   return new ImageResponse(
     (
       <div
@@ -162,7 +175,7 @@ export function ogHomeImage() {
             background: "#0a0a0f",
             borderRadius: 24,
             overflow: "hidden",
-            fontFamily: "sans-serif",
+            fontFamily: "Inter",
           }}
         >
           {/* Foto del loro (frame del video) a la derecha */}
@@ -239,13 +252,13 @@ export function ogHomeImage() {
 
             {/* Frase */}
             <div style={{ display: "flex", flexDirection: "column", letterSpacing: -1 }}>
-              <div style={{ display: "flex", fontSize: 62, fontWeight: 800, lineHeight: 1.04, color: "#fff" }}>
+              <div style={{ display: "flex", fontSize: 62, fontWeight: 900, lineHeight: 1.04, color: "#fff" }}>
                 METELE EL LORO
               </div>
-              <div style={{ display: "flex", fontSize: 62, fontWeight: 800, lineHeight: 1.04, color: "#fff" }}>
+              <div style={{ display: "flex", fontSize: 62, fontWeight: 900, lineHeight: 1.04, color: "#fff" }}>
                 A TU
               </div>
-              <div style={{ display: "flex", fontSize: 62, fontWeight: 800, lineHeight: 1.04, color: "#a3e635" }}>
+              <div style={{ display: "flex", fontSize: 62, fontWeight: 900, lineHeight: 1.04, color: "#a3e635" }}>
                 PRÓXIMA ENTREVISTA
               </div>
             </div>
@@ -273,7 +286,7 @@ export function ogHomeImage() {
         </div>
       </div>
     ),
-    { ...ogSize }
+    { ...ogSize, fonts }
   );
 }
 
