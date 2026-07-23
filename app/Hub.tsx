@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ParrotSvg } from "./lib/parrot";
 import { track } from "./lib/track";
+
+// Palabras que rotan en la 1ra palabra del título (efecto swap).
+const HERO_WORDS = ["Loreá", "crackeá", "hackeá", "pasá"];
 
 // Banderita tipo Final Round con el texto "IA"
 function IaFlag() {
@@ -120,6 +124,14 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
 
 // Hub minimal (Luhmann): un solo mensaje y dos puertas.
 export default function Hub() {
+  const [wordIdx, setWordIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setWordIdx((i) => (i + 1) % HERO_WORDS.length);
+    }, 2200);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="hub">
       <main className="hub-main">
@@ -129,9 +141,14 @@ export default function Hub() {
           <IaFlag />
         </div>
 
-        <h1 className="hub-h1">Metele el Loro a tus entrevistas</h1>
-
-        <span className="hub-tagline-pill">Asistente de IA en Tiempo Real</span>
+        <h1 className="hub-h1">
+          <span key={wordIdx} className="hub-h1-swap">
+            {HERO_WORDS[wordIdx]}
+          </span>{" "}
+          <span className="hub-h1-rest">
+            todas las entrevistas con el asistente de IA en tiempo real.
+          </span>
+        </h1>
 
         <div className="hub-doors-pills">
           <Link

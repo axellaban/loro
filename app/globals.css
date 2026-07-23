@@ -1173,38 +1173,49 @@ input {
   letter-spacing: -0.02em;
   text-transform: uppercase;
   color: #fff;
-  margin-bottom: 18px;
-}
-
-.hub-tagline-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 16px;
-  border-radius: 999px;
-  background: rgba(255, 79, 18, 0.12);
-  border: 1px solid rgba(255, 79, 18, 0.5);
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1;
   margin-bottom: clamp(40px, 7vh, 68px);
 }
 
-.hub-tagline-pill::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ff4f12;
-  box-shadow: 0 0 8px 1px rgba(255, 79, 18, 0.9);
-  animation: hubPulseDot 1.6s ease-in-out infinite;
+/* Primera palabra: rota (swap) y usa el mismo gradiente "loro" del botón
+   Responder del copiloto, animado para que los colores fluyan. */
+.hub-h1-swap {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    #10b981,
+    #34d399,
+    #a3e635,
+    #fbbf24,
+    #f59e0b,
+    #fb7185,
+    #22d3ee,
+    #10b981
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: loroGlow 5s linear infinite, hubWordIn 0.45s ease-out;
+}
+.hub-h1-rest {
+  display: block;
+}
+@keyframes hubWordIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.28em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@keyframes hubPulseDot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.7); }
+@media (prefers-reduced-motion: reduce) {
+  .hub-h1-swap {
+    animation: none;
+  }
 }
 
 /* ===================== Matrix Options (3D Pills + Morpheus Hand) ===================== */
