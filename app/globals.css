@@ -71,16 +71,17 @@ input {
   align-items: center;
   gap: 8px;
 }
-
-.brand-title {
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--loro-green-deep) 10%, var(--loro-green) 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
+.brand-logo-text {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
 
 .tagline {
   font-size: 13px;

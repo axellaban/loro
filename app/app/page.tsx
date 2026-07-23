@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { track, identify } from "../lib/track";
+import { BrandLogo } from "../lib/BrandLogo";
 
 type Status = "idle" | "connecting" | "live" | "error";
 type Mode = "mic" | "tab";
@@ -1039,7 +1040,7 @@ export default function Page() {
     <main className={`app-container ${live ? "app-live" : ""}`}>
       <header className="brand-header">
         <div className="brand">
-          <span className="brand-title">Loreado.IA 🦜</span>
+          <BrandLogo />
         </div>
         <div className="header-right">
           {live && (

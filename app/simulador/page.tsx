@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { track, identify } from "../lib/track";
 import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
+import { BrandLogo } from "../lib/BrandLogo";
 
 type Line = { id: number; text: string; final: boolean };
 type Lang = "es" | "en";
@@ -1527,7 +1528,7 @@ export default function SimuladorPage() {
       {!inInterview && (
         <header className="brand-header">
           <div className="brand">
-            <span className="brand-title">Loreado.IA 🦜</span>
+            <BrandLogo />
           </div>
           {phase === "setup" && practicing > 0 && (
             <div className="sim-social-pill">
