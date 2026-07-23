@@ -3,6 +3,23 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { track, identify } from "../lib/track";
 import { BrandLogo } from "../lib/BrandLogo";
+import { extractSentences } from "../simulador/tts";
+
+// Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
+// las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
+// en "?") alcanza con esa; si no, mostramos las 2 últimas (cubre preguntas
+// armadas en dos frases o pedidos sin signo, ej. "Contame sobre…"). Solo afecta
+// el display: a la IA se le sigue mandando el contexto completo.
+function lastQuestions(text: string): string {
+  const t = text.trim();
+  if (!t) return t;
+  const { complete, rest } = extractSentences(t + " ");
+  const chunks = [...complete, rest].map((s) => s.trim()).filter(Boolean);
+  if (chunks.length === 0) return t;
+  const last = chunks[chunks.length - 1];
+  const take = /[?？]\s*$/.test(last) ? 1 : 2;
+  return chunks.slice(-take).join(" ");
+}
 
 type Status = "idle" | "connecting" | "live" | "error";
 type Mode = "mic" | "tab";
@@ -503,7 +520,14 @@ export default function Page() {
     async (id: number, question: string, controller: AbortController, attempt = 0) => {
       // Crea/resetea la tarjeta (en un reintento la vaciamos para re-streamear).
       setAnswers((prev) => {
-        const card: Answer = { id, question, text: "", done: false, ts: Date.now(), feedback: null };
+        const card: Answer = {
+          id,
+          question: lastQuestions(question),
+          text: "",
+          done: false,
+          ts: Date.now(),
+          feedback: null,
+        };
         return prev.some((a) => a.id === id)
           ? prev.map((a) => (a.id === id ? card : a))
           : [...prev, card].slice(-20); // cronológico: nuevas abajo
