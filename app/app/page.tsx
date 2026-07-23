@@ -337,11 +337,11 @@ const LS_KEY = "copiloto:context:v1";
 // storage / incógnito — a propósito en esta fase de guerrilla).
 const SESSIONS_KEY = "loreado:sessions:v1";
 const BONUS_KEY = "loreado:bonus:v1";
-const FREE_SESSIONS = 5;
+const FREE_SESSIONS = 3;
 // Sesiones extra que se ganan compartiendo (loop viral). Tope para que no sea
 // infinito.
 const MAX_BONUS = 3;
-const SESSION_MAX_MS = 10 * 60 * 1000;
+const SESSION_MAX_MS = 5 * 60 * 1000;
 
 // ---------- Endpointing semántico ----------
 export default function Page() {
@@ -687,6 +687,16 @@ export default function Page() {
       } catch {}
     }
     setShareDone(true);
+  }, []);
+
+  // Pase VIP: abre WhatsApp con un mensaje listo para enviar al creador.
+  const requestVipPass = useCallback(() => {
+    const msg =
+      "Hola Loro creador 🦜! Estuve probando Loreado y quiero solicitar un Pase VIP Early Member para mi próxima entrevista. ¿Cómo avanzo Loro?";
+    track("vip_pass_click");
+    try {
+      window.open(`https://wa.me/5491164090022?text=${encodeURIComponent(msg)}`, "_blank");
+    } catch {}
   }, []);
 
   // ---------- Mensajes Deepgram ----------
@@ -1343,71 +1353,79 @@ export default function Page() {
                   Las APIs son caras y el acceso gratis se abre de a tandas para no fundirme.
                   El cupo de hoy ya se usó entero.
                 </p>
+                <p className="paywall-text paywall-cta">
+                  Dejá tu email y te avisamos apenas abra la próxima tanda.
+                </p>
+                {emailSent ? (
+                  <div className="paywall-sent">Enviado ✔ Te avisamos cuando abramos cupos.</div>
+                ) : (
+                  <div className="paywall-form">
+                    <input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (emailError) setEmailError("");
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && submitWaitlist()}
+                      placeholder="tu@email.com"
+                      className="form-input"
+                    />
+                    <button
+                      className="btn-action btn-primary"
+                      onClick={submitWaitlist}
+                      disabled={!email.trim() || sending}
+                    >
+                      {sending ? "Enviando…" : "Entregá al Loro"}
+                    </button>
+                    {emailError && <div className="paywall-error">{emailError}</div>}
+                  </div>
+                )}
               </>
             ) : (
               <>
-                <div className="paywall-title">🛑 BETA PAUSADA POR COSTOS</div>
+                <div className="paywall-title">🛑 LLEGASTE AL LÍMITE DE TUS SESIONES</div>
                 <p className="paywall-text">
-                  Llegaste al límite de {freeSessions} sesiones. Las APIs son caras y tuve que frenar
-                  el acceso gratuito para no fundirme.
+                  Ya probaste cómo funciona. Las APIs de IA son caras y tuve que frenar el acceso
+                  gratuito para no fundirme. Elegí cómo seguir:
                 </p>
+
+                {/* Opción primaria: Pase VIP (WhatsApp directo al creador). */}
+                <div className="paywall-vip">
+                  <div className="paywall-vip-title">👑 Pase VIP Ilimitado (7 Días) — $19.99 USD</div>
+                  <p className="paywall-text">
+                    No vayas a tu entrevista real a ciegas. Usalo sin restricciones.
+                  </p>
+                  <button className="btn-action btn-whatsapp" onClick={requestVipPass}>
+                    Entregá al Loro
+                  </button>
+                </div>
+
+                {/* Opción secundaria: loop viral, compartir = +1 sesión. */}
+                {shareDone && sessionsLeft > 0 ? (
+                  <div className="paywall-share paywall-share-done">
+                    <div className="paywall-share-title">🦜 ¡Ganaste 1 sesión más!</div>
+                    <button
+                      className="btn-action btn-primary"
+                      onClick={() => setShowPaywall(false)}
+                    >
+                      Seguir gratis →
+                    </button>
+                  </div>
+                ) : bonusRef.current < MAX_BONUS ? (
+                  <div className="paywall-share">
+                    <div className="paywall-share-title">🦜 Regalale un Loro a un amigo</div>
+                    <p className="paywall-text">
+                      ¿Andás ajustado? Compartí el link y ganate +1 sesión gratis.
+                    </p>
+                    <button className="btn-action btn-ghost" onClick={shareForBonus}>
+                      Lorealo por WhatsApp
+                    </button>
+                  </div>
+                ) : null}
               </>
-            )}
-
-            {/* Loop viral: compartir = +1 sesión. Es la vía primaria de salida
-                cuando el límite es la cuota del navegador; con el server cerrado
-                (capacity) compartir no destraba nada, así que no se ofrece. */}
-            {paywallReason === "capacity" ? null : shareDone && sessionsLeft > 0 ? (
-              <div className="paywall-share paywall-share-done">
-                <div className="paywall-share-title">🦜 ¡Ganaste 1 sesión más!</div>
-                <button
-                  className="btn-action btn-primary"
-                  onClick={() => setShowPaywall(false)}
-                >
-                  Seguir gratis →
-                </button>
-              </div>
-            ) : bonusRef.current < MAX_BONUS ? (
-              <div className="paywall-share">
-                <div className="paywall-share-title">🦜 Regalale un Loro a un amigo</div>
-                <p className="paywall-text">Compartís y te ganás +1 sesión gratis al toque.</p>
-                <button className="btn-action btn-whatsapp" onClick={shareForBonus}>
-                  Lorealo por WhatsApp
-                </button>
-              </div>
-            ) : null}
-
-            <p className="paywall-text paywall-cta">
-              {paywallReason === "capacity"
-                ? "Dejá tu email y te avisamos apenas abra la próxima tanda."
-                : "O sumate a la lista de espera para acceso sin límites."}
-            </p>
-            {emailSent ? (
-              <div className="paywall-sent">Enviado ✔ Te avisamos cuando abramos cupos.</div>
-            ) : (
-              <div className="paywall-form">
-                <input
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (emailError) setEmailError("");
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && submitWaitlist()}
-                  placeholder="tu@email.com"
-                  className="form-input"
-                />
-                <button
-                  className="btn-action btn-primary"
-                  onClick={submitWaitlist}
-                  disabled={!email.trim() || sending}
-                >
-                  {sending ? "Enviando…" : "Entregá al Loro"}
-                </button>
-                {emailError && <div className="paywall-error">{emailError}</div>}
-              </div>
             )}
           </div>
         </div>

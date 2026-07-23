@@ -30,9 +30,11 @@ export default function Copiloto() {
         <div className="landing-btn-wrap">
           <div className="landing-glow" aria-hidden="true" />
           <Link href="/app" className="landing-btn">
-            Entrá
+            Usar en mi Entrevista
           </Link>
         </div>
+
+        <p className="landing-btn-sub">Indetectable. Funciona en Google Meet y Zoom.</p>
 
         <p className="landing-warn">
           ⚠️ Estamos experimentando una demanda excepcionalmente alta. Por favor, tené

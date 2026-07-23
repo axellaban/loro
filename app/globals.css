@@ -1086,6 +1086,17 @@ input {
   transform: scale(1.02);
 }
 
+.landing-btn-sub {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: clamp(11px, 2.8vw, 14px);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  margin: 0 auto;
+  text-align: center;
+}
+
 .landing-warn {
   color: #ef4444;
   font-size: clamp(10px, 2.6vw, 13px);
@@ -1489,6 +1500,25 @@ input {
   border-radius: 10px;
   padding: 14px;
   animation: answerIn 0.25s ease-out;
+}
+
+/* Oferta primaria (Pase VIP) dentro del paywall: bloque destacado. */
+.paywall-vip {
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  background: #f0fdf9;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.14);
+}
+.paywall-vip-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--loro-green-deep);
+  margin-bottom: 6px;
+}
+.paywall-vip .paywall-text {
+  margin-bottom: 12px;
 }
 
 /* Sección de compartir (loop viral) dentro del paywall. */

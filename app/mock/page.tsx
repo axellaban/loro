@@ -30,9 +30,11 @@ export default function MockLanding() {
         <div className="landing-btn-wrap">
           <div className="landing-glow" aria-hidden="true" />
           <Link href="/simulador" className="landing-btn">
-            Entrá
+            Iniciar Simulador Gratis
           </Link>
         </div>
+
+        <p className="landing-btn-sub">No requiere tarjeta ni registro.</p>
 
         <p className="landing-warn">
           ⚠️ Estamos experimentando una demanda excepcionalmente alta. Por favor, tené

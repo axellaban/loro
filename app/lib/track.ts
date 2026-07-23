@@ -25,6 +25,7 @@ export type FunnelEvent =
   | "capacity_closed_shown"
   | "waitlist_submit"
   | "share_whatsapp"
+  | "vip_pass_click"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"
@@ -37,6 +38,7 @@ export type FunnelEvent =
   | "sim_mic_toggled"
   | "sim_cross_sell_click"
   | "sim_share_whatsapp"
+  | "sim_email_submit"
   | "hub_practice_click"
   | "hub_copilot_click";
 

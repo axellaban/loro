@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { track } from "../lib/track";
+import { track, identify } from "../lib/track";
 import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 
@@ -460,6 +460,7 @@ function fmtElapsed(secs: number): string {
 
 const LS_KEY_CONTEXT = "simulador:context:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";
+const LS_KEY_EMAIL = "simulador:email:v1";
 
 // Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
 // turno por un carraspeo transcripto).
@@ -557,6 +558,13 @@ export default function SimuladorPage() {
   // Último informe guardado (sobrevive al refresh): acceso desde el setup.
   const [savedReport, setSavedReport] = useState<FeedbackReport | null>(null);
 
+  // Gate de email: pedimos el email para "desbloquear" el informe. Se persiste
+  // en localStorage; los que ya lo dejaron no vuelven a ver el modal.
+  const [emailGatePassed, setEmailGatePassed] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState("");
+
   // Social proof simulada del setup: número que deriva lentamente entre 35 y
   // 90 para que parezca actividad real. Decisión de producto explícita.
   const [practicing, setPracticing] = useState(0);
@@ -630,6 +638,9 @@ export default function SimuladorPage() {
   // Recuperar el último informe (sobrevive al refresh). No auto-saltamos al
   // feedback: se ofrece un acceso discreto en el setup.
   useEffect(() => {
+    try {
+      if (localStorage.getItem(LS_KEY_EMAIL)) setEmailGatePassed(true);
+    } catch {}
     try {
       const raw = localStorage.getItem(LS_KEY_REPORT);
       if (!raw) return;
@@ -1429,6 +1440,39 @@ export default function SimuladorPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
+  // Gate de email: valida, guarda y desbloquea el informe. Reusa /api/waitlist.
+  const submitEmail = useCallback(async () => {
+    const em = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setEmailError("Poné un email válido.");
+      return;
+    }
+    setEmailSending(true);
+    setEmailError("");
+    try {
+      const r = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: em }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) {
+        try {
+          localStorage.setItem(LS_KEY_EMAIL, em);
+        } catch {}
+        track("sim_email_submit");
+        identify(em, { email: em });
+        setEmailGatePassed(true);
+      } else {
+        setEmailError(j.error || "No se pudo enviar. Probá de nuevo.");
+      }
+    } catch {
+      setEmailError("Error de red. Probá de nuevo.");
+    } finally {
+      setEmailSending(false);
+    }
+  }, [email]);
+
   const inInterview = phase !== "setup" && phase !== "feedback";
   const connecting = phase === "connecting";
 
@@ -1824,6 +1868,40 @@ export default function SimuladorPage() {
             </div>
           ) : (
             <>
+              {!emailGatePassed && (
+                <div className="paywall-overlay">
+                  <div className="paywall">
+                    <div className="paywall-title">¡Simulación completada Loro! 🦜</div>
+                    <p className="paywall-text">
+                      La IA terminó de analizar tu entrevista completa. Ingresá tu email para
+                      desbloquear tu puntaje y ver tus correcciones exactas en este momento:
+                    </p>
+                    <div className="paywall-form">
+                      <input
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (emailError) setEmailError("");
+                        }}
+                        onKeyDown={(e) => e.key === "Enter" && submitEmail()}
+                        placeholder="tu@email.com"
+                        className="form-input"
+                      />
+                      <button
+                        className="btn-action btn-primary"
+                        onClick={submitEmail}
+                        disabled={!email.trim() || emailSending}
+                      >
+                        {emailSending ? "Enviando…" : "Ver mi Resultado Ahora"}
+                      </button>
+                      {emailError && <div className="paywall-error">{emailError}</div>}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="sim-score-circle-wrapper">
                 <ScoreGauge score={feedbackReport?.score ?? 0} />
                 {(feedbackReport?.level || feedbackReport?.verdict) && (
