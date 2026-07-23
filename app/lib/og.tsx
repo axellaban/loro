@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { ParrotSvg } from "./parrot";
+import { LORO_PHOTO } from "./ogLoro";
 
 // Tamaño estándar de Open Graph / Twitter card.
 export const ogSize = { width: 1200, height: 630 };
@@ -11,6 +12,145 @@ const LORO_GRADIENT =
   "linear-gradient(90deg,#10b981,#34d399,#a3e635,#fbbf24,#f59e0b,#fb7185,#22d3ee,#10b981)";
 const LORO_TEXT_GRADIENT =
   "linear-gradient(90deg,#34d399,#a3e635,#fbbf24,#f59e0b,#fb7185,#22d3ee)";
+
+// Card de compartir del HOME: foto real del loro (frame del video) a la derecha
+// y la frase a la izquierda sobre fondo oscuro. Horizontal 1200x630 (estándar de
+// preview de links) para que WhatsApp/Twitter/etc. la muestren completa.
+export function ogHomeImage() {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          background: LORO_GRADIENT,
+          padding: 14,
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            background: "#0a0a0f",
+            borderRadius: 24,
+            overflow: "hidden",
+            fontFamily: "sans-serif",
+          }}
+        >
+          {/* Foto del loro (frame del video) a la derecha */}
+          <img
+            src={LORO_PHOTO}
+            width={560}
+            height={602}
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              width: 560,
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+          {/* Scrim oscuro que difumina la foto hacia el texto (izq→der). */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              background:
+                "linear-gradient(90deg, #0a0a0f 44%, rgba(10,10,15,0.86) 56%, rgba(10,10,15,0) 74%)",
+            }}
+          />
+          {/* Glows sutiles de marca. */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              background:
+                "radial-gradient(circle at 6% 14%, rgba(163,230,53,0.22), transparent 40%)," +
+                "radial-gradient(circle at 4% 94%, rgba(34,211,238,0.16), transparent 45%)",
+            }}
+          />
+
+          {/* Columna de texto a la izquierda */}
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              padding: "52px 56px",
+              width: 720,
+              height: "100%",
+            }}
+          >
+            {/* Logo */}
+            <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+              <ParrotSvg size={50} />
+              <div style={{ display: "flex", fontSize: 38, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>
+                Loreado
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#ff4f12",
+                  color: "#fff",
+                  fontSize: 22,
+                  fontWeight: 800,
+                  padding: "3px 11px",
+                  borderRadius: 8,
+                  marginLeft: 2,
+                }}
+              >
+                IA
+              </div>
+            </div>
+
+            {/* Frase */}
+            <div style={{ display: "flex", flexDirection: "column", letterSpacing: -1 }}>
+              <div style={{ display: "flex", fontSize: 62, fontWeight: 800, lineHeight: 1.04, color: "#fff" }}>
+                METELE EL LORO
+              </div>
+              <div style={{ display: "flex", fontSize: 62, fontWeight: 800, lineHeight: 1.04, color: "#fff" }}>
+                A TU
+              </div>
+              <div style={{ display: "flex", fontSize: 62, fontWeight: 800, lineHeight: 1.04, color: "#a3e635" }}>
+                PRÓXIMA ENTREVISTA
+              </div>
+            </div>
+
+            {/* Pie: pill + claim */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+              <div
+                style={{
+                  display: "flex",
+                  background: LORO_GRADIENT,
+                  color: "#06231a",
+                  fontSize: 27,
+                  fontWeight: 800,
+                  padding: "11px 26px",
+                  borderRadius: 999,
+                }}
+              >
+                Simulador + Copiloto
+              </div>
+              <div style={{ display: "flex", color: "#c7ccd1", fontSize: 27, fontWeight: 600 }}>
+                Gratis · sin login
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    { ...ogSize }
+  );
+}
 
 // Card compartible (WhatsApp/Twitter/etc.), psicodélica: marco de degradado,
 // glows de color de fondo y tipografía con los colores del loro. Sin fetch
