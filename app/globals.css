@@ -1179,7 +1179,7 @@ input {
 /* Primera palabra: rota (swap) y usa el mismo gradiente "loro" del botón
    Responder del copiloto, animado para que los colores fluyan. */
 .hub-h1-swap {
-  display: block;
+  display: inline-block;
   background: linear-gradient(
     90deg,
     #10b981,
@@ -1199,7 +1199,7 @@ input {
   animation: loroGlow 5s linear infinite, hubWordIn 0.45s ease-out;
 }
 .hub-h1-rest {
-  display: block;
+  display: inline;
 }
 @keyframes hubWordIn {
   from {
