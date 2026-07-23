@@ -124,7 +124,7 @@ export default function Hub() {
     <div className="hub">
       <main className="hub-main">
         <div className="hub-brand" aria-hidden="true">
-          <ParrotSvg size={44} />
+          <ParrotSvg size={34} />
           <span className="hub-brand-text">Loreado</span>
           <IaFlag />
         </div>

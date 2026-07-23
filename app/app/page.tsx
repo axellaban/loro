@@ -671,9 +671,7 @@ export default function Page() {
   // Honesto con la fase actual: no verifica que el amigo entre (igual que la
   // cuota client-side), pero convierte a cada usuario en distribuidor.
   const shareForBonus = useCallback(() => {
-    const url =
-      typeof window !== "undefined" ? window.location.origin : "https://loreado.vercel.app";
-    const msg = `Mirá esto… me voló la cabeza 🦜\nUn Loro con IA que te sopla las respuestas en la entrevista, armadas con tu CV, la empresa y el puesto. Tocás un botón y listo. Sin login, sin vueltas.\n${url}`;
+    const msg = `Hey Loro mirá esto.\nUn Loro con IA que te sopla las respuestas en la entrevista, armadas con tu CV, la empresa y el puesto al que aplicás. Tocás un botón y es instantáneo. https://loreado.vercel.app`;
     try {
       window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
     } catch {}
@@ -692,7 +690,7 @@ export default function Page() {
   // Pase VIP: abre WhatsApp con un mensaje listo para enviar al creador.
   const requestVipPass = useCallback(() => {
     const msg =
-      "Hola Loro creador 🦜! Estuve probando Loreado y quiero solicitar un Pase VIP Early Member para mi próxima entrevista. ¿Cómo avanzo Loro?";
+      "Hola Loro creador! Estuve probando Loreado y quiero solicitar un Pase VIP Early Member para mi próxima entrevista. ¿Cómo avanzo Loro?";
     track("vip_pass_click");
     try {
       window.open(`https://wa.me/5491164090022?text=${encodeURIComponent(msg)}`, "_blank");
