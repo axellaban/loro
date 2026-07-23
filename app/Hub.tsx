@@ -148,7 +148,7 @@ export default function Hub() {
         annotation?.remove();
         annotation = annotate(el, {
           type: "highlight",
-          color: "rgba(255,79,18,0.42)",
+          color: "rgba(163,230,53,0.5)",
           multiline: true,
           padding: 2,
           animationDuration: animate ? 900 : 0,
