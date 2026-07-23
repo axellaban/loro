@@ -12,8 +12,8 @@ const HERO_WORDS = ["Loreá", "crackeá", "hackeá", "pasá"];
 function IaFlag() {
   return (
     <svg
-      width="35"
-      height="30"
+      width={29}
+      height={25}
       viewBox="0 0 35 30"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -136,7 +136,7 @@ export default function Hub() {
     <div className="hub">
       <main className="hub-main">
         <div className="hub-brand" aria-hidden="true">
-          <ParrotSvg size={34} />
+          <ParrotSvg size={28} />
           <span className="hub-brand-text">Loreado</span>
           <IaFlag />
         </div>

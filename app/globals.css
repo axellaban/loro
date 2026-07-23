@@ -1159,7 +1159,7 @@ input {
 }
 
 .hub-brand-text {
-  font-size: 2rem;
+  font-size: 1.62rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #fff;
@@ -1167,7 +1167,7 @@ input {
 }
 
 .hub-h1 {
-  font-size: clamp(2rem, 7vw, 4.25rem);
+  font-size: clamp(1.2rem, 5.2vw, 4.25rem);
   font-weight: 800;
   line-height: 1.05;
   letter-spacing: -0.02em;
