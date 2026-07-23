@@ -1543,7 +1543,7 @@ export default function SimuladorPage() {
         <>
           <p className="tagline">
             Destruí los nervios antes de tu entrevista. Simulá llamadas reales gratis, recibí
-            feedback al instante y descubrí en qué estás fallando.
+            feedback al instante y descubrí en qué estás fallando. 🦜
           </p>
 
           <div className="selectors-row" style={{ marginTop: 8 }}>
