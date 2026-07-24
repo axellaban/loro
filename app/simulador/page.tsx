@@ -548,8 +548,8 @@ export default function SimuladorPage() {
   const listeningStartedAtRef = useRef(0);
   // Conexión de audio perdida sin recuperación: ofrece finalizar y ver feedback.
   const [connLost, setConnLost] = useState(false);
-  // Pasos reales de conexión para el panel de chat: 0=media, 1=WS, 2=primera
-  // pregunta en camino, 3=todo listo.
+  // Pasos reales de conexión para el panel de chat: 0=nada, 1=media, 2=WS,
+  // 3=pedido de la primera pregunta enviado, 4=todo listo (primer chunk).
   const [connectStep, setConnectStep] = useState(0);
 
   // Feedback state
@@ -1002,6 +1002,10 @@ export default function SimuladorPage() {
       // En el cierre no se manda imagen ni señal de corte.
       const withVision = !closing && questionIndex <= 2;
       const image = withVision ? captureFrame() : null;
+      // Nuevo hito real de conexión: se dispara justo al pedir la primera
+      // pregunta (antes de esperar la respuesta), para separar "armando la
+      // pregunta con tu CV" de "generándola" (que llega con el primer chunk).
+      if (currentHistory.length === 0 && !closing) setConnectStep(3);
       const res = await fetch("/api/simulador", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1037,7 +1041,7 @@ export default function SimuladorPage() {
         if (done) break;
         if (firstChunk) {
           firstChunk = false;
-          setConnectStep(3);
+          setConnectStep(4);
         }
         const chunk = dec.decode(value, { stream: true });
         questionText += chunk;
@@ -1511,7 +1515,12 @@ export default function SimuladorPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [history, currentQuestion, spokenQuestion, currentAnswer, lines, phase, connectStep]);
 
-  const CONNECT_STEPS = ["Preparando tu sala de entrevista", "Cargando tu contexto y CV", "Generando la primera pregunta"];
+  const CONNECT_STEPS = [
+    "Preparando tu sala de entrevista",
+    "Conectando con el entrevistador",
+    "Armando tu pregunta con tu CV y la empresa",
+    "Generando la primera pregunta",
+  ];
   const showSteps = phase === "connecting" || (phase === "asking" && history.length === 0 && !currentQuestion);
 
   const interviewTypeLabel =
@@ -1777,19 +1786,22 @@ export default function SimuladorPage() {
 
               <div className="sim-chat-body" ref={chatBodyRef}>
                 {showSteps && (
-                  <ol className="sim-steps">
-                    {CONNECT_STEPS.map((label, i) => (
-                      <li
-                        key={i}
-                        className={i < connectStep ? "sim-step-done" : i === connectStep ? "sim-step-active" : ""}
-                      >
-                        <span className="sim-step-mark" aria-hidden="true">
-                          {i < connectStep ? "✓" : i === connectStep ? <span className="sim-step-spinner" /> : "·"}
-                        </span>
-                        {label}
-                      </li>
-                    ))}
-                  </ol>
+                  <>
+                    <div className="sim-steps-banner">Armando tu sala de entrevista</div>
+                    <ol className="sim-steps">
+                      {CONNECT_STEPS.map((label, i) => (
+                        <li
+                          key={i}
+                          className={i < connectStep ? "sim-step-done" : i === connectStep ? "sim-step-active" : ""}
+                        >
+                          <span className="sim-step-mark" aria-hidden="true">
+                            {i < connectStep ? "✓" : <span className="sim-step-spinner" />}
+                          </span>
+                          {label}
+                        </li>
+                      ))}
+                    </ol>
+                  </>
                 )}
 
                 {history.map((h, i) => (

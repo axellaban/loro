@@ -2122,6 +2122,16 @@ input {
 }
 
 /* --- Pasos de conexión --- */
+.sim-steps-banner {
+  background: rgba(163, 230, 53, 0.14);
+  border: 1px solid rgba(163, 230, 53, 0.35);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
 .sim-steps {
   list-style: none;
   display: flex;
@@ -2294,6 +2304,12 @@ input {
   .sim-steps li { color: rgba(255, 255, 255, 0.65); }
   .sim-steps li.sim-step-done { color: rgba(255, 255, 255, 0.85); }
   .sim-steps li.sim-step-active { color: #fff; }
+  .sim-steps-banner {
+    background: rgba(163, 230, 53, 0.28);
+    border-color: rgba(163, 230, 53, 0.65);
+    color: #fff;
+    backdrop-filter: blur(6px);
+  }
       }
 
 /* --- Tarjetas / feedback --- */
