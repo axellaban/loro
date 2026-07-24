@@ -6,9 +6,10 @@ import { capacityClosed, rateLimit, sameOriginStrict } from "../../../lib/rateli
 // (tono/acento); tts-1 no, por eso el retry lo omite.
 const TTS_MODEL = "gpt-4o-mini-tts";
 const TTS_MODEL_FALLBACK = "tts-1";
-// nova = voz femenina; el acento y el ritmo se piden por instructions (el
-// modelo nuevo no soporta `speed`, el fallback tts-1 sí).
-const TTS_VOICE = "nova";
+// coral = voz femenina más cálida/expresiva de OpenAI (antes: nova); el acento
+// y el ritmo se piden por instructions (el modelo nuevo no soporta `speed`,
+// el fallback tts-1 sí).
+const TTS_VOICE = "coral";
 const FALLBACK_SPEED = 1.25;
 
 // Experimento "voz de loro": textura vocal pedida por el usuario, sumada a la
