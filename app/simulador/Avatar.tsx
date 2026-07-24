@@ -16,8 +16,12 @@ export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 // Estado de espera (no hablando): en vez de un loop hacia adelante que corta al
 // reiniciar, hacemos un vaivén sutil (ping-pong) de una ventana corta del video,
 // oscilando currentTime con easing seno para que sea smooth y sin cortes.
-// Ventana muy chica = casi congelado, solo un micro-movimiento del loro.
-const IDLE_WINDOW = 0.3; // segundos de video que recorre el vaivén (sutil)
+// En espera, ancla el vaivén en una "pose de escucha": primer plano del loro
+// mirando fijo a cámara con el pico cerrado (t≈7.5–8.0s del video, identificado
+// frame a frame). Al terminar de hablar, salta ahí y se mueve muy poquito, para
+// acentuar el efecto "te miro y espero que respondas".
+const IDLE_ANCHOR = 7.5; // segundo del video donde arranca el vaivén de espera
+const IDLE_WINDOW = 0.3; // segundos que recorre el vaivén (movimiento sutil)
 const IDLE_PERIOD = 3000; // ms de un ciclo completo (ida y vuelta), lento y calmo
 
 export default function Avatar({
@@ -72,8 +76,11 @@ export default function Avatar({
     const begin = () => {
       if (stopped) return;
       const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
-      // Anclamos la ventana en el frame actual, sin pasarnos del final.
-      base = Math.min(Math.max(0, v.currentTime), Math.max(0, dur - IDLE_WINDOW));
+      // Saltamos a la pose de escucha y anclamos ahí, sin pasarnos del final.
+      base = Math.min(IDLE_ANCHOR, Math.max(0, dur - IDLE_WINDOW));
+      try {
+        v.currentTime = base;
+      } catch {}
       v.pause();
       raf = requestAnimationFrame(tick);
     };
