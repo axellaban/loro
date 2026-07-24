@@ -448,7 +448,10 @@ export default function Page() {
     const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
     const noTab = mobile || isSafari;
     setNoTabCapture(noTab);
-    if (noTab) setMode("mic");
+    // En desktop con soporte de captura de pestaña, "Pestaña" es el modo
+    // correcto (audio digital directo de Meet/Zoom); "Micrófono" queda como
+    // fallback manual (ej. celular apoyado cerca de los parlantes).
+    setMode(noTab ? "mic" : "tab");
   }, []);
 
   // iOS suspende el AudioContext al bloquear pantalla o cambiar de app.
@@ -1361,7 +1364,7 @@ export default function Page() {
         {!live && (
           <p className="mono btn-hint">
             {mode === "mic"
-              ? "Apoyá el celular cerca de los parlantes; sin auriculares el micrófono tiene que oír al entrevistador."
+              ? "Activá los parlantes (sin auriculares) para que el micrófono escuche al entrevistador."
               : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
           </p>
         )}
