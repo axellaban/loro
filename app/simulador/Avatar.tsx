@@ -77,6 +77,21 @@ export default function Avatar({
   return (
     <div className={`sim-avatar sim-avatar-${state}`}>
       <div className="sim-avatar-ring" aria-hidden="true" />
+      {!videoFailed && showVideo && (
+        // Fondo borroso (solo desktop): copia del mismo video escalada a "cover"
+        // y desenfocada para rellenar los costados anchos sin recortar al loro
+        // (que va en "contain" arriba). Técnica tipo Zoom/IG con video vertical.
+        <video
+          className="sim-avatar-bg"
+          src="/loro-interviewer.mp4"
+          muted
+          playsInline
+          loop
+          autoPlay
+          preload="auto"
+          aria-hidden="true"
+        />
+      )}
       {!videoFailed && (
         <video
           ref={videoRef}

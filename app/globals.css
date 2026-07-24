@@ -1865,6 +1865,11 @@ input {
 /* Oculto pero en el DOM para que precargue mientras se muestra el SVG. */
 .sim-avatar-video-hidden { opacity: 0; }
 
+/* Fondo borroso: oculto por defecto (mobile va a "cover" a pantalla completa y
+   no lo necesita). Solo se activa en desktop, donde la caja es ancha (16/9) y el
+   video del loro es vertical. */
+.sim-avatar-bg { display: none; }
+
 /* Anillo de "escuchando": marco interno pulsante sobre el stage. */
 .sim-avatar-ring {
   position: absolute;
@@ -2183,6 +2188,31 @@ input {
     overflow: hidden;
   }
   .sim-chat-body { max-height: none; }
+
+  /* Loro vertical en caja ancha (16/9): en vez de recortarlo con "cover", lo
+     mostramos entero ("contain") y rellenamos los costados con una copia borrosa
+     del mismo video (técnica Zoom/IG). Así no se corta nada ni quedan barras
+     negras. */
+  .sim-avatar-bg {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.15);
+    filter: blur(28px) brightness(0.55) saturate(1.15);
+    z-index: 0;
+  }
+  .sim-avatar-video,
+  .sim-avatar-video-paused {
+    object-fit: contain;
+    transform: none;
+    /* El "breathing" (simAvatarIdle) hace scale y volvería a recortar el video
+       contenido; en desktop lo desactivamos y el fondo borroso ya da vida. */
+    animation: none;
+    z-index: 1;
+  }
 }
 @media (max-width: 560px) {
   .sim-room-meta { display: none; }
