@@ -13,12 +13,21 @@ import { createLevelReader } from "./tts";
 
 export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 
+// Dos videos según el viewport:
+//  - mobile: loro vertical (9/16) a pantalla completa (loro-interviewer.mp4).
+//  - desktop: loro horizontal (16/9) que llena el stage ancho sin recorte
+//    (loro-interviewer-wide.mp4).
+const MOBILE_SRC = "/loro-interviewer.mp4";
+const DESKTOP_SRC = "/loro-interviewer-wide.mp4";
+
 // En espera (no hablando) congelamos el video en una "pose de escucha": primer
-// plano del loro mirando fijo a cámara con el pico cerrado (t≈7.5s, identificado
-// frame a frame). Un solo seek + pause; el micro-movimiento lo hace la animación
-// CSS `simAvatarIdle` (transform en GPU, fluida). Evitamos mover currentTime en
+// plano del loro mirando fijo a cámara con el pico cerrado. El segundo exacto
+// difiere por video (identificado frame a frame): vertical ≈7.5s, horizontal
+// ≈4.0s. Un solo seek + pause; el micro-movimiento lo hace la animación CSS
+// `simAvatarIdle` (transform en GPU, fluida). Evitamos mover currentTime en
 // bucle porque ese scrubbing traba/entrecorta en muchos dispositivos.
-const IDLE_ANCHOR = 7.5; // segundo del video en el que se congela la espera
+const MOBILE_ANCHOR = 7.5;
+const DESKTOP_ANCHOR = 4.0;
 
 export default function Avatar({
   state,
@@ -30,6 +39,20 @@ export default function Avatar({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Elegimos el video (horizontal/vertical) según el ancho, y lo recalculamos si
+  // el usuario cruza el breakpoint (resize / rotación).
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 880px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const videoSrc = isDesktop ? DESKTOP_SRC : MOBILE_SRC;
+  const idleAnchor = isDesktop ? DESKTOP_ANCHOR : MOBILE_ANCHOR;
 
   const failVideo = () => {
     setVideoFailed((prev) => {
@@ -58,7 +81,7 @@ export default function Avatar({
       if (stopped) return;
       const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
       try {
-        v.currentTime = Math.min(IDLE_ANCHOR, Math.max(0, dur - 0.05));
+        v.currentTime = Math.min(idleAnchor, Math.max(0, dur - 0.05));
       } catch {}
       v.pause();
     };
@@ -70,35 +93,21 @@ export default function Avatar({
       stopped = true;
       v.removeEventListener("loadedmetadata", freeze);
     };
-  }, [state, videoFailed]);
+  }, [state, videoFailed, idleAnchor]);
 
   const showVideo = !videoFailed && videoReady;
 
   return (
     <div className={`sim-avatar sim-avatar-${state}`}>
       <div className="sim-avatar-ring" aria-hidden="true" />
-      {!videoFailed && showVideo && (
-        // Fondo borroso (solo desktop): copia del mismo video escalada a "cover"
-        // y desenfocada para rellenar los costados anchos sin recortar al loro
-        // (que va en "contain" arriba). Técnica tipo Zoom/IG con video vertical.
-        <video
-          className="sim-avatar-bg"
-          src="/loro-interviewer.mp4"
-          muted
-          playsInline
-          loop
-          autoPlay
-          preload="auto"
-          aria-hidden="true"
-        />
-      )}
       {!videoFailed && (
         <video
           ref={videoRef}
+          key={videoSrc}
           className={`sim-avatar-video ${state === "speaking" ? "" : "sim-avatar-video-paused"} ${
             showVideo ? "" : "sim-avatar-video-hidden"
           }`}
-          src="/loro-interviewer.mp4"
+          src={videoSrc}
           muted
           playsInline
           loop
