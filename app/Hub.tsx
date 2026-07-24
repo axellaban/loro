@@ -203,7 +203,7 @@ export default function Hub() {
               <MatrixPill3D type="blue" />
             </div>
             <span className="hub-option-label hub-label-blue">Simulador</span>
-            <span className="hub-option-sub">Practicá con simulacros de entrevistas con IA</span>
+            <span className="hub-option-sub">Simulacro Sprint (5 preguntas) con IA y feedback al instante.</span>
           </Link>
 
           <Link
@@ -216,7 +216,7 @@ export default function Hub() {
               <MatrixPill3D type="red" />
             </div>
             <span className="hub-option-label hub-label-red">Copiloto</span>
-            <span className="hub-option-sub">Respuestas instantáneas e indetectables durante entrevistas en vivo</span>
+            <span className="hub-option-sub">Te sopla las respuestas exactas. 100% indetectable en vivo.</span>
           </Link>
         </div>
       </main>
