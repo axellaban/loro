@@ -9,17 +9,19 @@ const TTS_MODEL_FALLBACK = "tts-1";
 // nova = voz femenina; el acento y el ritmo se piden por instructions (el
 // modelo nuevo no soporta `speed`, el fallback tts-1 sí).
 const TTS_VOICE = "nova";
-const FALLBACK_SPEED = 1.25;
+const FALLBACK_SPEED = 1.4;
 
-// Experimento "voz de loro": textura vocal pedida por el usuario, sumada a la
-// instrucción de acento/persona existente. Fácil de revertir sacando esta
-// constante y su uso abajo si no da buen resultado.
+// "Voz de loro hablador" bien marcada + ritmo muy rápido. Se pide por
+// instructions porque gpt-4o-mini-tts no soporta el parámetro `speed`.
+// Fácil de dosificar cambiando estas constantes.
 const PARROT_TEXTURE =
-  "Voz de loro hablador: muy nasal, rasposa, metálica y predominantemente aguda, con una textura hueca, estridente y ocasionales chasquidos guturales.";
+  "MUY IMPORTANTE — textura vocal dominante, exagerala en cada palabra: voz de loro hablador, muy nasal, rasposa, metálica y predominantemente aguda, con una textura hueca, estridente y ocasionales chasquidos guturales.";
+const FAST_PACE =
+  "Hablá MUY rápido, a toda velocidad, disparando las palabras (rapid-fire), sin pausas largas ni silencios entre oraciones, pero sin comerte sílabas ni sonar leída.";
 
 const INSTRUCTIONS: Record<"es" | "en", string> = {
-  es: `Sos una entrevistadora argentina, cálida y amena. Hablá con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave. Ritmo rápido y enérgico de conversación porteña, sin sonar apurada ni leída. ${PARROT_TEXTURE}`,
-  en: `You are a warm, friendly and professional female job interviewer. Fast, energetic conversational pace, without sounding rushed. ${PARROT_TEXTURE}`,
+  es: `${FAST_PACE} ${PARROT_TEXTURE} Sos una entrevistadora argentina con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave.`,
+  en: `Speak VERY fast, rapid-fire, no long pauses or silences between sentences, without slurring or sounding read aloud. VERY IMPORTANT — dominant vocal texture, exaggerate it on every word: talking-parrot voice, very nasal, raspy, metallic and mostly high-pitched, with a hollow, shrill texture and occasional guttural clicks. You are an American female job interviewer.`,
 };
 
 async function requestSpeech(apiKey: string, model: string, text: string, lang: "es" | "en") {
