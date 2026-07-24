@@ -6,17 +6,16 @@ import { capacityClosed, rateLimit, sameOriginStrict } from "../../../lib/rateli
 // (tono/acento); tts-1 no, por eso el retry lo omite.
 const TTS_MODEL = "gpt-4o-mini-tts";
 const TTS_MODEL_FALLBACK = "tts-1";
-// coral = voz femenina más cálida/expresiva de OpenAI (antes: nova); el acento
-// y el ritmo se piden por instructions (el modelo nuevo no soporta `speed`,
-// el fallback tts-1 sí).
-const TTS_VOICE = "coral";
+// nova = voz femenina; el acento y el ritmo se piden por instructions (el
+// modelo nuevo no soporta `speed`, el fallback tts-1 sí).
+const TTS_VOICE = "nova";
 const FALLBACK_SPEED = 1.25;
 
 // Experimento "voz de loro": textura vocal pedida por el usuario, sumada a la
 // instrucción de acento/persona existente. Fácil de revertir sacando esta
 // constante y su uso abajo si no da buen resultado.
 const PARROT_TEXTURE =
-  "Voz muy nasal, rasposa, metálica y predominantemente aguda, con una textura hueca, estridente y ocasionales chasquidos guturales.";
+  "Voz de loro hablador: muy nasal, rasposa, metálica y predominantemente aguda, con una textura hueca, estridente y ocasionales chasquidos guturales.";
 
 const INSTRUCTIONS: Record<"es" | "en", string> = {
   es: `Sos una entrevistadora argentina, cálida y amena. Hablá con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave. Ritmo rápido y enérgico de conversación porteña, sin sonar apurada ni leída. ${PARROT_TEXTURE}`,
