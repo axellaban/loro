@@ -11,9 +11,15 @@ const TTS_MODEL_FALLBACK = "tts-1";
 const TTS_VOICE = "nova";
 const FALLBACK_SPEED = 1.25;
 
+// Experimento "voz de loro": textura vocal pedida por el usuario, sumada a la
+// instrucción de acento/persona existente. Fácil de revertir sacando esta
+// constante y su uso abajo si no da buen resultado.
+const PARROT_TEXTURE =
+  "Voz muy nasal, rasposa, metálica y predominantemente aguda, con una textura hueca, estridente y ocasionales chasquidos guturales.";
+
 const INSTRUCTIONS: Record<"es" | "en", string> = {
-  es: "Sos una entrevistadora argentina, cálida y amena. Hablá con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave. Ritmo rápido y enérgico de conversación porteña, sin sonar apurada ni leída.",
-  en: "You are a warm, friendly and professional female job interviewer. Fast, energetic conversational pace, without sounding rushed.",
+  es: `Sos una entrevistadora argentina, cálida y amena. Hablá con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave. Ritmo rápido y enérgico de conversación porteña, sin sonar apurada ni leída. ${PARROT_TEXTURE}`,
+  en: `You are a warm, friendly and professional female job interviewer. Fast, energetic conversational pace, without sounding rushed. ${PARROT_TEXTURE}`,
 };
 
 async function requestSpeech(apiKey: string, model: string, text: string, lang: "es" | "en") {
