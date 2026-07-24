@@ -13,16 +13,12 @@ import { createLevelReader } from "./tts";
 
 export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 
-// Estado de espera (no hablando): en vez de un loop hacia adelante que corta al
-// reiniciar, hacemos un vaivén sutil (ping-pong) de una ventana corta del video,
-// oscilando currentTime con easing seno para que sea smooth y sin cortes.
-// En espera, ancla el vaivén en una "pose de escucha": primer plano del loro
-// mirando fijo a cámara con el pico cerrado (t≈7.5–8.0s del video, identificado
-// frame a frame). Al terminar de hablar, salta ahí y se mueve muy poquito, para
-// acentuar el efecto "te miro y espero que respondas".
-const IDLE_ANCHOR = 7.5; // segundo del video donde arranca el vaivén de espera
-const IDLE_WINDOW = 0.3; // segundos que recorre el vaivén (movimiento sutil)
-const IDLE_PERIOD = 3000; // ms de un ciclo completo (ida y vuelta), lento y calmo
+// En espera (no hablando) congelamos el video en una "pose de escucha": primer
+// plano del loro mirando fijo a cámara con el pico cerrado (t≈7.5s, identificado
+// frame a frame). Un solo seek + pause; el micro-movimiento lo hace la animación
+// CSS `simAvatarIdle` (transform en GPU, fluida). Evitamos mover currentTime en
+// bucle porque ese scrubbing traba/entrecorta en muchos dispositivos.
+const IDLE_ANCHOR = 7.5; // segundo del video en el que se congela la espera
 
 export default function Avatar({
   state,
@@ -55,43 +51,24 @@ export default function Avatar({
       return;
     }
 
-    // Esperando: pausamos la reproducción nativa y movemos currentTime en un
-    // vaivén suave (0→1→0 con coseno) sobre una ventana corta, en loop.
-    let raf = 0;
-    let startTs = 0;
-    let base = 0;
+    // Esperando: congelamos el video en la pose de escucha (un solo seek) y
+    // pausamos. El movimiento sutil lo da la animación CSS, no el scrubbing.
     let stopped = false;
-
-    const tick = (now: number) => {
-      if (stopped) return;
-      if (!startTs) startTs = now;
-      const t = ((now - startTs) % IDLE_PERIOD) / IDLE_PERIOD; // 0..1
-      const phase = (1 - Math.cos(t * Math.PI * 2)) / 2; // 0→1→0 suave
-      try {
-        v.currentTime = base + phase * IDLE_WINDOW;
-      } catch {}
-      raf = requestAnimationFrame(tick);
-    };
-
-    const begin = () => {
+    const freeze = () => {
       if (stopped) return;
       const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
-      // Saltamos a la pose de escucha y anclamos ahí, sin pasarnos del final.
-      base = Math.min(IDLE_ANCHOR, Math.max(0, dur - IDLE_WINDOW));
       try {
-        v.currentTime = base;
+        v.currentTime = Math.min(IDLE_ANCHOR, Math.max(0, dur - 0.05));
       } catch {}
       v.pause();
-      raf = requestAnimationFrame(tick);
     };
 
-    if (v.readyState >= 1) begin();
-    else v.addEventListener("loadedmetadata", begin, { once: true });
+    if (v.readyState >= 1) freeze();
+    else v.addEventListener("loadedmetadata", freeze, { once: true });
 
     return () => {
       stopped = true;
-      cancelAnimationFrame(raf);
-      v.removeEventListener("loadedmetadata", begin);
+      v.removeEventListener("loadedmetadata", freeze);
     };
   }, [state, videoFailed]);
 

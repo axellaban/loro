@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ParrotSvg } from "./parrot";
 
 // Banderita tipo Final Round con el texto "IA" (misma que el hub del home).
@@ -45,13 +46,14 @@ export function BrandLogo({
   color?: string;
   flag?: { w: number; h: number };
 }) {
+  // El logo es un link al home (comportamiento estándar de logo de marca).
   return (
-    <div className="brand-logo" aria-hidden="true">
+    <Link href="/" aria-label="Ir al inicio" className="brand-logo" style={{ textDecoration: "none" }}>
       <ParrotSvg size={parrot} />
       <span className="brand-logo-text" style={{ fontSize, color }}>
         Loreado
       </span>
       <IaFlag w={flag.w} h={flag.h} />
-    </div>
+    </Link>
   );
 }

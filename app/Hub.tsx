@@ -171,11 +171,11 @@ export default function Hub() {
   return (
     <div className="hub">
       <main className="hub-main">
-        <div className="hub-brand" aria-hidden="true">
+        <Link href="/" aria-label="Ir al inicio" className="hub-brand" style={{ textDecoration: "none" }}>
           <ParrotSvg size={28} />
           <span className="hub-brand-text">Loreado</span>
           <IaFlag />
-        </div>
+        </Link>
 
         <h1 className="hub-h1">
           <span key={wordIdx} className="hub-h1-swap">
