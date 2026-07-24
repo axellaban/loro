@@ -16,8 +16,9 @@ export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 // Estado de espera (no hablando): en vez de un loop hacia adelante que corta al
 // reiniciar, hacemos un vaivén sutil (ping-pong) de una ventana corta del video,
 // oscilando currentTime con easing seno para que sea smooth y sin cortes.
-const IDLE_WINDOW = 1.2; // segundos de video que recorre el vaivén
-const IDLE_PERIOD = 2800; // ms de un ciclo completo (ida y vuelta)
+// Ventana muy chica = casi congelado, solo un micro-movimiento del loro.
+const IDLE_WINDOW = 0.3; // segundos de video que recorre el vaivén (sutil)
+const IDLE_PERIOD = 3000; // ms de un ciclo completo (ida y vuelta), lento y calmo
 
 export default function Avatar({
   state,
