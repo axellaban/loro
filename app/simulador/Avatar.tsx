@@ -1,11 +1,12 @@
 "use client";
 
 // Avatar del entrevistador: video real del loro (public/loro-interviewer.mp4).
-// El video reproduce SIEMPRE en loop: a ritmo normal cuando habla (`speaking`)
-// y ralentizado el resto del tiempo, para que el loro se vea vivo mientras
-// piensa/escucha en lugar de quedar congelado. El SVG animado queda como
-// fallback si el video no puede cargar o reproducirse (y como placeholder
-// mientras carga).
+// El video reproduce SIEMPRE en loop, sin pausas ni seeks: a ritmo normal
+// cuando habla (`speaking`) y ralentizado el resto del tiempo, para que el
+// loro se vea vivo mientras piensa/escucha en lugar de quedar congelado o
+// entrecortado (mover currentTime manualmente traba en muchos dispositivos).
+// El SVG animado queda como fallback si el video no puede cargar o
+// reproducirse (y como placeholder mientras carga).
 
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/track";
@@ -20,14 +21,8 @@ export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 const MOBILE_SRC = "/loro-interviewer.mp4";
 const DESKTOP_SRC = "/loro-interviewer-wide.mp4";
 
-// En espera (no hablando) congelamos el video en una "pose de escucha": primer
-// plano del loro mirando fijo a cámara con el pico cerrado. El segundo exacto
-// difiere por video (identificado frame a frame): vertical ≈7.5s, horizontal
-// ≈4.0s. Un solo seek + pause; el micro-movimiento lo hace la animación CSS
-// `simAvatarIdle` (transform en GPU, fluida). Evitamos mover currentTime en
-// bucle porque ese scrubbing traba/entrecorta en muchos dispositivos.
-const MOBILE_ANCHOR = 7.5;
-const DESKTOP_ANCHOR = 4.0;
+// Ritmo del loop según estado: normal al hablar, lento y calmo el resto.
+const IDLE_RATE = 0.6;
 
 export default function Avatar({
   state,
@@ -52,7 +47,6 @@ export default function Avatar({
   }, []);
 
   const videoSrc = isDesktop ? DESKTOP_SRC : MOBILE_SRC;
-  const idleAnchor = isDesktop ? DESKTOP_ANCHOR : MOBILE_ANCHOR;
 
   const failVideo = () => {
     setVideoFailed((prev) => {
@@ -61,39 +55,16 @@ export default function Avatar({
     });
   };
 
+  // Un solo loop continuo; solo cambia la velocidad. Ralentizar en idle da la
+  // sensación de "vivo pero calmo" sin cortes, pausas ni seeks.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || videoFailed) return;
-
-    // Hablando: reproducción normal hacia adelante.
-    if (state === "speaking") {
-      v.playbackRate = 1;
-      v.play().catch(() => {
-        if (v.currentTime === 0) failVideo();
-      });
-      return;
-    }
-
-    // Esperando: congelamos el video en la pose de escucha (un solo seek) y
-    // pausamos. El movimiento sutil lo da la animación CSS, no el scrubbing.
-    let stopped = false;
-    const freeze = () => {
-      if (stopped) return;
-      const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
-      try {
-        v.currentTime = Math.min(idleAnchor, Math.max(0, dur - 0.05));
-      } catch {}
-      v.pause();
-    };
-
-    if (v.readyState >= 1) freeze();
-    else v.addEventListener("loadedmetadata", freeze, { once: true });
-
-    return () => {
-      stopped = true;
-      v.removeEventListener("loadedmetadata", freeze);
-    };
-  }, [state, videoFailed, idleAnchor]);
+    v.playbackRate = state === "speaking" ? 1 : IDLE_RATE;
+    v.play().catch(() => {
+      if (v.currentTime === 0) failVideo();
+    });
+  }, [state, videoFailed]);
 
   const showVideo = !videoFailed && videoReady;
 
