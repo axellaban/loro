@@ -14,14 +14,14 @@ const FALLBACK_SPEED = 1.4;
 // "Voz de loro hablador" bien marcada + ritmo muy rápido. Se pide por
 // instructions porque gpt-4o-mini-tts no soporta el parámetro `speed`.
 // Fácil de dosificar cambiando estas constantes.
+// Nota: la VELOCIDAD real se acelera en el cliente (playbackRate en tts.ts),
+// no acá, porque el modelo casi no respeta el ritmo pedido por instructions.
 const PARROT_TEXTURE =
   "MUY IMPORTANTE — textura vocal dominante, exagerala en cada palabra: voz de loro hablador, muy nasal, rasposa, metálica y predominantemente aguda, con una textura hueca, estridente y ocasionales chasquidos guturales.";
-const FAST_PACE =
-  "Hablá MUY rápido, a toda velocidad, disparando las palabras (rapid-fire), sin pausas largas ni silencios entre oraciones, pero sin comerte sílabas ni sonar leída.";
 
 const INSTRUCTIONS: Record<"es" | "en", string> = {
-  es: `${FAST_PACE} ${PARROT_TEXTURE} Sos una entrevistadora argentina con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave.`,
-  en: `Speak VERY fast, rapid-fire, no long pauses or silences between sentences, without slurring or sounding read aloud. VERY IMPORTANT — dominant vocal texture, exaggerate it on every word: talking-parrot voice, very nasal, raspy, metallic and mostly high-pitched, with a hollow, shrill texture and occasional guttural clicks. You are an American female job interviewer.`,
+  es: `${PARROT_TEXTURE} Sos una entrevistadora argentina con acento rioplatense (Buenos Aires): voseo, entonación porteña, la 'll' e 'y' como 'sh' suave. Ritmo conversacional natural, sin pausas largas.`,
+  en: `VERY IMPORTANT — dominant vocal texture, exaggerate it on every word: talking-parrot voice, very nasal, raspy, metallic and mostly high-pitched, with a hollow, shrill texture and occasional guttural clicks. You are an American female job interviewer. Natural conversational pace, no long pauses.`,
 };
 
 async function requestSpeech(apiKey: string, model: string, text: string, lang: "es" | "en") {

@@ -24,6 +24,11 @@ type QueueItem = {
   abort: AbortController;
 };
 
+// Velocidad de reproducción del TTS. gpt-4o-mini-tts casi no respeta el ritmo
+// pedido por `instructions`, así que aceleramos acá: playbackRate > 1 la hace
+// más rápida y —al subir también el pitch— más aguda/nasal, o sea más "loro".
+const TTS_PLAYBACK_RATE = 1.18;
+
 export class TtsQueue {
   readonly analyser: AnalyserNode;
   private gain: GainNode;
@@ -128,10 +133,13 @@ export class TtsQueue {
         this.started = true;
         this.onStart?.();
       }
-      this.onChunkStart?.(item.text, buffer.duration);
+      // Duración real ajustada por la velocidad, para que el reveal del texto
+      // en pantalla siga sincronizado con la voz acelerada.
+      this.onChunkStart?.(item.text, buffer.duration / TTS_PLAYBACK_RATE);
       await new Promise<void>((resolve) => {
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
+        source.playbackRate.value = TTS_PLAYBACK_RATE;
         source.connect(this.analyser);
         source.onended = () => resolve();
         this.currentSource = source;

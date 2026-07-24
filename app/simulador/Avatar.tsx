@@ -13,8 +13,11 @@ import { createLevelReader } from "./tts";
 
 export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 
-// Ritmo del loop según estado: normal al hablar, lento y calmo el resto.
-const IDLE_RATE = 0.6;
+// Estado de espera (no hablando): en vez de un loop hacia adelante que corta al
+// reiniciar, hacemos un vaivén sutil (ping-pong) de una ventana corta del video,
+// oscilando currentTime con easing seno para que sea smooth y sin cortes.
+const IDLE_WINDOW = 1.2; // segundos de video que recorre el vaivén
+const IDLE_PERIOD = 2800; // ms de un ciclo completo (ida y vuelta)
 
 export default function Avatar({
   state,
@@ -34,16 +37,54 @@ export default function Avatar({
     });
   };
 
-  // Un solo loop continuo; solo cambia la velocidad. Ralentizar en idle da la
-  // sensación de "vivo pero calmo" sin cortes ni pausas.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || videoFailed) return;
-    v.playbackRate = state === "speaking" ? 1 : IDLE_RATE;
-    v.play().catch(() => {
-      // Si nunca llegó a reproducir (autoplay bloqueado o codec), caer al SVG.
-      if (v.currentTime === 0) failVideo();
-    });
+
+    // Hablando: reproducción normal hacia adelante.
+    if (state === "speaking") {
+      v.playbackRate = 1;
+      v.play().catch(() => {
+        if (v.currentTime === 0) failVideo();
+      });
+      return;
+    }
+
+    // Esperando: pausamos la reproducción nativa y movemos currentTime en un
+    // vaivén suave (0→1→0 con coseno) sobre una ventana corta, en loop.
+    let raf = 0;
+    let startTs = 0;
+    let base = 0;
+    let stopped = false;
+
+    const tick = (now: number) => {
+      if (stopped) return;
+      if (!startTs) startTs = now;
+      const t = ((now - startTs) % IDLE_PERIOD) / IDLE_PERIOD; // 0..1
+      const phase = (1 - Math.cos(t * Math.PI * 2)) / 2; // 0→1→0 suave
+      try {
+        v.currentTime = base + phase * IDLE_WINDOW;
+      } catch {}
+      raf = requestAnimationFrame(tick);
+    };
+
+    const begin = () => {
+      if (stopped) return;
+      const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
+      // Anclamos la ventana en el frame actual, sin pasarnos del final.
+      base = Math.min(Math.max(0, v.currentTime), Math.max(0, dur - IDLE_WINDOW));
+      v.pause();
+      raf = requestAnimationFrame(tick);
+    };
+
+    if (v.readyState >= 1) begin();
+    else v.addEventListener("loadedmetadata", begin, { once: true });
+
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      v.removeEventListener("loadedmetadata", begin);
+    };
   }, [state, videoFailed]);
 
   const showVideo = !videoFailed && videoReady;
