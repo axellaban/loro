@@ -34,19 +34,29 @@ export default function Avatar({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
+  // Se calcula sincrónicamente en el primer render (no en un efecto posterior)
+  // para no montar nunca el video vertical de arranque en desktop.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 880px)").matches
+  );
 
-  // Elegimos el video (horizontal/vertical) según el ancho, y lo recalculamos si
-  // el usuario cruza el breakpoint (resize / rotación).
+  // Recalculamos si el usuario cruza el breakpoint (resize / rotación).
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 880px)");
     const update = () => setIsDesktop(mq.matches);
-    update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
 
   const videoSrc = isDesktop ? DESKTOP_SRC : MOBILE_SRC;
+
+  // Al cambiar de fuente (cruce de breakpoint) el <video> se remonta por la
+  // key, pero el estado `videoReady` es del componente: sin este reset se
+  // mostraría el frame viejo (o un cuadro en blanco) hasta que el nuevo video
+  // dispare su propio onCanPlay.
+  useEffect(() => {
+    setVideoReady(false);
+  }, [videoSrc]);
 
   const failVideo = () => {
     setVideoFailed((prev) => {
