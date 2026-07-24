@@ -1850,10 +1850,11 @@ input {
   transition: filter 0.45s ease, transform 0.45s ease, opacity 0.3s ease;
 }
 .sim-avatar-video-paused {
-  /* El video sigue en loop lento mientras el loro no habla; el zoom tipo Ken
+  /* El video sigue en loop mientras el loro no habla; el zoom tipo Ken
      Burns le suma vida. Atenuación mínima para distinguir del estado hablando.
      Scale mínimo 1.02 mantiene overscan: el translate/rotate nunca revela el
-     fondo de la caja. */
+     fondo de la caja. Funciona igual en desktop (video horizontal) y mobile
+     (vertical): el breathing sutil hace el loro más vivo mientras espera. */
   filter: saturate(0.95) brightness(0.99);
   transform: scale(1.02);
   animation: simAvatarIdle 4.5s ease-in-out infinite;
