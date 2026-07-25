@@ -15,6 +15,7 @@
   --loro-green: #10b981;         /* Esmeralda: acento (fills) */
   --loro-green-bright: #059669;  /* Esmeralda para texto sobre blanco */
   --loro-green-deep: #047857;    /* Esmeralda oscuro (labels) */
+  --loro-lime: #a3e635;          /* Verde loro chillón: resaltador del home. Pide texto oscuro. */
   --loro-red: #ef4444;           /* Stop / error */
   --loro-red-deep: #dc2626;
 
@@ -1774,8 +1775,10 @@ input {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: var(--loro-green);
-  color: #fff;
+  /* Mismo verde loro del resaltador del home. Sobre este verde el texto blanco
+     queda ilegible (1.5:1), así que va en oscuro (12:1). */
+  background: var(--loro-lime);
+  color: #17181a;
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -1787,11 +1790,14 @@ input {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #fff;
+  background: #17181a;
   animation: simBlink 2s infinite;
   flex: none;
 }
-.sim-stage-badge-connecting { background: #64748b; }
+/* Conectando: sigue en gris (todavía no hay nadie del otro lado) y ahí sí el
+   texto va en blanco. */
+.sim-stage-badge-connecting { background: #64748b; color: #fff; }
+.sim-stage-badge-connecting .sim-stage-badge-dot { background: #fff; }
 
 .sim-pip {
   position: absolute;
