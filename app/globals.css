@@ -2037,8 +2037,10 @@ input {
   aspect-ratio: 4 / 3;
   border-radius: 12px;
   overflow: hidden;
-  border: 2px solid #fff;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  /* Sin marco: el recuadro se despega del fondo por la sombra, como en
+     Meet/Zoom. El borde blanco que había acá se comía el contraste contra el
+     video del entrevistador y se notaba pegado. */
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
   background: #17181a;
   z-index: 3;
 }
