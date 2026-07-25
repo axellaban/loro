@@ -26,6 +26,45 @@ function loadInterFonts() {
   ];
 }
 
+// Banderín "IA" para las cards de OG. Satori no renderiza <text> dentro de un
+// SVG, así que la forma va como <path> y las letras como un div superpuesto.
+// El path y las proporciones son los mismos que en BrandLogo (medidos contra la
+// referencia); acá solo cambia cómo se dibuja el texto.
+const FLAG_PATH =
+  "M7 0H75Q79 0 79 4L62 24.5Q58.2 27.5 62 30.5L78.6 51V53Q78.6 56 75 56H24.5Q12.5 63 6 70.4Q2.2 72.6 0 67V7Q0 0 7 0Z";
+
+function IaFlagOg({ h }: { h: number }) {
+  const w = (h * 79) / 71;
+  return (
+    <div style={{ display: "flex", position: "relative", width: w, height: h }}>
+      <svg width={w} height={h} viewBox="0 0 79 71">
+        <path d={FLAG_PATH} fill="#a3e635" />
+      </svg>
+      {/* La caja del texto cubre el cuerpo del banderín (sin la colita ni la
+          muesca), así centrarlo cae justo en el mismo punto que en el SVG. */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: (w * 65) / 79,
+          height: (h * 57) / 71,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          // 25/71 del alto es la altura de mayúscula medida; /0.72 pasa de
+          // altura de mayúscula a cuerpo de letra.
+          fontSize: (h * 25) / 71 / 0.72,
+          fontWeight: 800,
+          color: "#17181a",
+        }}
+      >
+        IA
+      </div>
+    </div>
+  );
+}
+
 // Card VERTICAL de compartir (WhatsApp/IG muestran verticales enteras): foto del
 // loro a pantalla completa con la frase abajo sobre un degradado oscuro.
 export async function ogHomeImageVertical() {
@@ -89,22 +128,7 @@ export async function ogHomeImageVertical() {
               <div style={{ display: "flex", fontSize: 42, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>
                 Loreado
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#a3e635",
-                  color: "#17181a",
-                  fontSize: 24,
-                  fontWeight: 800,
-                  padding: "4px 12px",
-                  borderRadius: 9,
-                  marginLeft: 2,
-                }}
-              >
-                IA
-              </div>
+              <IaFlagOg h={41} />
             </div>
 
             {/* Frase + pill */}
@@ -232,22 +256,7 @@ export async function ogHomeImage() {
               <div style={{ display: "flex", fontSize: 38, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>
                 Loreado
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#a3e635",
-                  color: "#17181a",
-                  fontSize: 22,
-                  fontWeight: 800,
-                  padding: "3px 11px",
-                  borderRadius: 8,
-                  marginLeft: 2,
-                }}
-              >
-                IA
-              </div>
+              <IaFlagOg h={38} />
             </div>
 
             {/* Frase */}

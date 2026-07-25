@@ -143,7 +143,7 @@ export default function Hub() {
         <Link href="/" aria-label="Ir al inicio" className="hub-brand" style={{ textDecoration: "none" }}>
           <ParrotSvg size={28} />
           <span className="hub-brand-text">Loreado</span>
-          <IaFlag w={29} h={24} />
+          <IaFlag w={29} />
         </Link>
 
         <h1 className="hub-h1">
