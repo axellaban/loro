@@ -23,6 +23,7 @@ export type FunnelEvent =
   | "answer_size_changed"
   | "auto_answer_toggled"
   | "session_saved"
+  | "app_email_submit"
   | "session_card_opened"
   | "session_notes_generated"
   | "session_chat_message"

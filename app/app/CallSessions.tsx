@@ -256,11 +256,14 @@ function SessionCard({
 function SessionModal({
   session,
   initialTab,
+  autoNotes,
   onClose,
   onPatch,
 }: {
   session: CallSession;
   initialTab: Tab;
+  /** Genera las notas al abrir, sin esperar el clic (ver `autoOpenId`). */
+  autoNotes?: boolean;
   onClose: () => void;
   onPatch: (patch: Partial<CallSession>) => void;
 }) {
@@ -344,6 +347,15 @@ function SessionModal({
       abortRef.current = null;
     }
   }, [post, onPatch]);
+
+  // Solo una vez por apertura: `generateNotes` cambia de identidad al patchear
+  // la sesión, y sin este guard se relanzaría en loop.
+  const autoNotesDone = useRef(false);
+  useEffect(() => {
+    if (!autoNotes || autoNotesDone.current || session.notes || busy) return;
+    autoNotesDone.current = true;
+    void generateNotes();
+  }, [autoNotes, session.notes, busy, generateNotes]);
 
   const send = useCallback(
     async (text: string) => {
@@ -509,6 +521,11 @@ function SessionModal({
             {tab === "notes" &&
               (notes || notesDraft ? (
                 <Markdown text={notes || notesDraft} className="cs-notes" />
+              ) : busy ? (
+                <div className="cs-empty">
+                  <h4>Analizando tu entrevista…</h4>
+                  <p>El Loro está leyendo la transcripción completa.</p>
+                </div>
               ) : (
                 <div className="cs-empty">
                   <h4>Todavía no generaste las notas</h4>
@@ -598,7 +615,18 @@ function SessionModal({
 }
 
 // ---------- Pantalla ----------
-export default function CallSessions({ onNew }: { onNew: () => void }) {
+export default function CallSessions({
+  onNew,
+  autoOpenId,
+}: {
+  onNew: () => void;
+  /**
+   * Sesión que se abre sola al entrar, en Notas IA y generándolas. Es lo que
+   * se prometió a cambio del email: llegar y tener el informe, no una pantalla
+   * con un botón para pedirlo.
+   */
+  autoOpenId?: string | null;
+}) {
   const [sessions, setSessions] = useState<CallSession[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openTab, setOpenTab] = useState<Tab>("transcript");
@@ -606,6 +634,12 @@ export default function CallSessions({ onNew }: { onNew: () => void }) {
   useEffect(() => {
     setSessions(loadSessions());
   }, []);
+
+  useEffect(() => {
+    if (!autoOpenId) return;
+    setOpenTab("notes");
+    setOpenId(autoOpenId);
+  }, [autoOpenId]);
 
   // Se resuelve por id contra la lista, no se guarda el objeto: así el modal
   // siempre lee el estado recién persistido (notas, chat) y no una copia vieja.
@@ -657,6 +691,7 @@ export default function CallSessions({ onNew }: { onNew: () => void }) {
         <SessionModal
           session={open}
           initialTab={openTab}
+          autoNotes={open.id === autoOpenId}
           onClose={() => setOpenId(null)}
           onPatch={(p) => patch(open.id, p)}
         />

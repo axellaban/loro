@@ -9,6 +9,7 @@ import { ProviderIcon } from "../lib/ProviderIcon";
 import { looksLikeQuestion } from "../lib/question";
 import CallSessions from "./CallSessions";
 import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
+import { rememberEmail, savedEmail } from "../lib/email";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -572,7 +573,9 @@ export default function Page() {
   const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
   // Al terminar una sesión el copiloto cae en la lista de sesiones (como
   // Parakeet), no de vuelta en el formulario.
-  const [view, setView] = useState<"setup" | "sessions">("setup");
+  const [view, setView] = useState<"setup" | "gate" | "sessions">("setup");
+  // Sesión recién terminada: se abre sola en Notas IA al pasar el gate.
+  const [justEndedId, setJustEndedId] = useState<string | null>(null);
   // Cuántas sesiones hay guardadas: si hay, el setup ofrece el acceso al
   // historial. Sin esto solo se llegaba terminando una sesión nueva.
   const [savedCount, setSavedCount] = useState(0);
@@ -895,6 +898,38 @@ export default function Page() {
         setEmailSent(true);
         track("waitlist_submit");
         identify(em, { email: em });
+      } else {
+        setEmailError(j.error || "No se pudo enviar. Probá de nuevo.");
+      }
+    } catch {
+      setEmailError("Error de red. Probá de nuevo.");
+    } finally {
+      setSending(false);
+    }
+  }, [email]);
+
+  // Gate del informe post-entrevista: mismo endpoint que la lista de espera,
+  // pero acá el email desbloquea el reporte de la sesión que acaba de terminar.
+  const submitGateEmail = useCallback(async () => {
+    const em = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setEmailError("Poné un email válido.");
+      return;
+    }
+    setSending(true);
+    setEmailError("");
+    try {
+      const r = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: em }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) {
+        rememberEmail(em);
+        track("app_email_submit");
+        identify(em, { email: em });
+        setView("sessions");
       } else {
         setEmailError(j.error || "No se pudo enviar. Probá de nuevo.");
       }
@@ -1288,8 +1323,15 @@ export default function Page() {
       };
       saveSession(session);
       track("session_saved", { questions: qa.length });
+      sessionStartRef.current = 0;
+      setJustEndedId(session.id);
+      // Con material y sin email todavía, primero el gate; si ya lo dejó, va
+      // derecho al informe de la sesión que acaba de terminar.
+      setView(savedEmail() ? "sessions" : "gate");
+      return;
     }
     sessionStartRef.current = 0;
+    setJustEndedId(null);
     setView("sessions");
   }, [cleanup]);
 
@@ -1342,6 +1384,9 @@ export default function Page() {
   // El formulario solo se muestra en la vista de setup: cuando termina una
   // sesión, el mismo lugar lo ocupa la lista de sesiones.
   const showSetup = !live && view === "setup";
+  // Fuera del setup y de la sesión en vivo no va nada del armazón del
+  // formulario: ni el área de contenido ni el footer con su CTA.
+  const hideChrome = !live && view !== "setup";
 
   return (
     <main
@@ -1542,7 +1587,7 @@ export default function Page() {
       )}
 
       {/* Contenido */}
-      {!(view === "sessions" && !live) && (
+      {!hideChrome && (
       <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
         {live && (
           <div className="panel" style={{ flex: 1, minHeight: 0 }}>
@@ -1615,9 +1660,55 @@ export default function Page() {
       </section>
       )}
 
+      {view === "gate" && !live && (
+        <div className="paywall-overlay">
+          <div className="paywall postmortem">
+            <div className="paywall-title">¿Querés saber cómo te fue realmente? 🦜</div>
+            <p className="paywall-text">
+              La entrevista terminó. Ahora veamos qué detectó la IA. Ingresá tu email para
+              desbloquear tu reporte “Post-Mortem”:
+            </p>
+            <ul className="postmortem-list">
+              <li><span aria-hidden="true">📝</span> Transcripción completa de la llamada.</li>
+              <li><span aria-hidden="true">🎯</span> Key Takeaways &amp; Red Flags (puntos fuertes y en qué la pifiaste).</li>
+              <li>
+                <span aria-hidden="true">💬</span> Chat interactivo: preguntale a la IA cómo podrías
+                haber respondido mejor esa pregunta difícil.
+              </li>
+            </ul>
+            <div className="paywall-form">
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && submitGateEmail()}
+                placeholder="tu@email.com"
+                className="form-input"
+                aria-label="Tu email"
+              />
+              <button
+                className="btn-action btn-primary"
+                onClick={submitGateEmail}
+                disabled={!email.trim() || sending}
+              >
+                {sending ? "Desbloqueando…" : "Desbloquear mi feedback al instante →"}
+              </button>
+              {emailError && <div className="paywall-error">{emailError}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {view === "sessions" && !live && (
         <CallSessions
+          autoOpenId={justEndedId}
           onNew={() => {
+            setJustEndedId(null);
             setView("setup");
             setAnswers([]);
             setLines([]);
@@ -1628,7 +1719,7 @@ export default function Page() {
       )}
 
       {/* Footer */}
-      {!(view === "sessions" && !live) && (
+      {!hideChrome && (
       <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
         {showSetup ? (
           <button onClick={start} disabled={connecting} className="btn-action btn-primary">

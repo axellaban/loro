@@ -5,6 +5,7 @@ import { track, identify } from "../lib/track";
 import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 import { BrandLogo } from "../lib/BrandLogo";
+import { rememberEmail, savedEmail } from "../lib/email";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
 
 type Line = { id: number; text: string; final: boolean };
@@ -465,7 +466,7 @@ function fmtElapsed(secs: number): string {
 
 const LS_KEY_CONTEXT = "simulador:context:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";
-const LS_KEY_EMAIL = "simulador:email:v1";
+
 
 // Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
 // turno por un carraspeo transcripto).
@@ -646,7 +647,7 @@ export default function SimuladorPage() {
   // feedback: se ofrece un acceso discreto en el setup.
   useEffect(() => {
     try {
-      if (localStorage.getItem(LS_KEY_EMAIL)) setEmailGatePassed(true);
+      if (savedEmail()) setEmailGatePassed(true);
     } catch {}
     try {
       const raw = localStorage.getItem(LS_KEY_REPORT);
@@ -1477,9 +1478,7 @@ export default function SimuladorPage() {
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.ok) {
-        try {
-          localStorage.setItem(LS_KEY_EMAIL, em);
-        } catch {}
+        rememberEmail(em);
         track("sim_email_submit");
         identify(em, { email: em });
         setEmailGatePassed(true);
