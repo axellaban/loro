@@ -253,17 +253,17 @@ function SessionCard({
 }
 
 // ---------- Modal ----------
+// Las notas NO se generan solas al abrir: cuestan tokens y no toda sesión que
+// se abre se quiere resumir. La pestaña arranca vacía con su botón, y el gasto
+// lo decide quien mira.
 function SessionModal({
   session,
   initialTab,
-  autoNotes,
   onClose,
   onPatch,
 }: {
   session: CallSession;
   initialTab: Tab;
-  /** Genera las notas al abrir, sin esperar el clic (ver `autoOpenId`). */
-  autoNotes?: boolean;
   onClose: () => void;
   onPatch: (patch: Partial<CallSession>) => void;
 }) {
@@ -358,15 +358,6 @@ function SessionModal({
       abortRef.current = null;
     }
   }, [post, onPatch]);
-
-  // Solo una vez por apertura: `generateNotes` cambia de identidad al patchear
-  // la sesión, y sin este guard se relanzaría en loop.
-  const autoNotesDone = useRef(false);
-  useEffect(() => {
-    if (!autoNotes || autoNotesDone.current || session.notes || busy) return;
-    autoNotesDone.current = true;
-    void generateNotes();
-  }, [autoNotes, session.notes, busy, generateNotes]);
 
   const send = useCallback(
     async (text: string) => {
@@ -534,7 +525,10 @@ function SessionModal({
                 <Markdown text={notes || notesDraft} className="cs-notes" />
               ) : busy ? (
                 <div className="cs-empty">
-                  <h4>Analizando tu entrevista…</h4>
+                  {/* No repite "Analizando tu entrevista…", que es lo que dice
+                      la pantalla al cerrar la sesión: son dos momentos
+                      distintos y con el mismo texto parecen el mismo. */}
+                  <h4>Escribiendo tus notas…</h4>
                   <p>El Loro está leyendo la transcripción completa.</p>
                 </div>
               ) : (
@@ -702,7 +696,6 @@ export default function CallSessions({
         <SessionModal
           session={open}
           initialTab={openTab}
-          autoNotes={open.id === autoOpenId}
           onClose={() => setOpenId(null)}
           onPatch={(p) => patch(open.id, p)}
         />

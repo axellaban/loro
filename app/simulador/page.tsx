@@ -569,6 +569,12 @@ export default function SimuladorPage() {
   // Gate de email: pedimos el email para "desbloquear" el informe. Se persiste
   // en localStorage; los que ya lo dejaron no vuelven a ver el modal.
   const [emailGatePassed, setEmailGatePassed] = useState(false);
+  // Informe viejo abierto desde "Ver tu último informe": no se vuelve a pedir
+  // el email. Ya se pidió cuando ese informe se generó, y el informe está en
+  // el dispositivo — volver a preguntar no protege nada y cobra dos veces lo
+  // mismo. Además cubre el caso en que el alta de la lista falló (Google Forms
+  // caído, rate limit) y el email nunca se llegó a guardar acá.
+  const [viewingSavedReport, setViewingSavedReport] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -1295,6 +1301,9 @@ export default function SimuladorPage() {
     setStuck(false);
     stuckRef.current = false;
     setConnLost(false);
+    // Arranca una entrevista nueva: el informe que salga de acá es nuevo, así
+    // que vuelve a regir el gate (esto solo se saltea al reabrir uno guardado).
+    setViewingSavedReport(false);
     sessionLangRef.current = lang;
     intentionalCloseRef.current = false;
     reconnectAttemptsRef.current = 0;
@@ -1672,6 +1681,7 @@ export default function SimuladorPage() {
                 onClick={() => {
                   setError("");
                   setFeedbackReport(savedReport);
+                  setViewingSavedReport(true);
                   setPhaseBoth("feedback");
                 }}
               >
@@ -1897,7 +1907,7 @@ export default function SimuladorPage() {
             </div>
           ) : (
             <>
-              {!emailGatePassed && (
+              {!emailGatePassed && !viewingSavedReport && (
                 <div className="paywall-overlay">
                   <div className="paywall">
                     <div className="paywall-title">¡Simulación completada Loro! 🦜</div>
