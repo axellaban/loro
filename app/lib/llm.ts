@@ -6,6 +6,12 @@
 import type { ModelSpec } from "./models";
 
 /**
+ * Turnos previos de una conversación, para los usos multi-turno (el chat sobre
+ * una sesión guardada). Van ANTES del mensaje `user` final.
+ */
+export type Turn = { role: "user" | "assistant"; text: string };
+
+/**
  * Nivel de thinking para Gemini 3.x. Se deja como constante única porque es el
  * valor que puede necesitar ajuste según lo que acepte cada modelo ("low" vs
  * "minimal"); el endpoint /api/models/health lo confirma en un request.
@@ -41,6 +47,7 @@ export function geminiBody(opts: {
   maxOutputTokens: number;
   temperature: number;
   json?: boolean;
+  history?: Turn[];
   /** Frame de la cámara del candidato, para que el entrevistador "lo vea". */
   image?: { mimeType: string; data: string } | null;
 }) {
@@ -57,8 +64,16 @@ export function geminiBody(opts: {
   if (opts.image) {
     parts.push({ inlineData: { mimeType: opts.image.mimeType, data: opts.image.data } });
   }
+  // Gemini llama "model" al turno del asistente.
+  const contents = [
+    ...(opts.history || []).map((t) => ({
+      role: t.role === "assistant" ? "model" : "user",
+      parts: [{ text: t.text }],
+    })),
+    { role: "user", parts },
+  ];
   return {
-    contents: [{ role: "user", parts }],
+    contents,
     systemInstruction: { parts: [{ text: opts.system }] },
     generationConfig,
   };
@@ -72,11 +87,13 @@ export function openaiBody(opts: {
   temperature: number;
   stream?: boolean;
   json?: boolean;
+  history?: Turn[];
 }) {
   const body: Record<string, unknown> = {
     model: opts.spec.model,
     messages: [
       { role: "system", content: opts.system },
+      ...(opts.history || []).map((t) => ({ role: t.role, content: t.text })),
       { role: "user", content: opts.user },
     ],
   };
@@ -101,13 +118,17 @@ export function anthropicBody(opts: {
   maxTokens: number;
   temperature: number;
   stream?: boolean;
+  history?: Turn[];
 }) {
   const body: Record<string, unknown> = {
     model: opts.spec.model,
     max_tokens: opts.maxTokens,
     temperature: opts.temperature,
     system: opts.system,
-    messages: [{ role: "user", content: opts.user }],
+    messages: [
+      ...(opts.history || []).map((t) => ({ role: t.role, content: t.text })),
+      { role: "user", content: opts.user },
+    ],
   };
   if (opts.stream) body.stream = true;
   return body;

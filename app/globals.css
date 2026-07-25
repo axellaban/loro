@@ -3037,3 +3037,511 @@ input {
   font-variant-numeric: tabular-nums;
   background: #fff;
 }
+
+/* ==========================================================================
+   Sesiones de llamada (/app, al terminar una sesión)
+   Ficha por sesión + modal con transcripción, notas y chat.
+   ========================================================================== */
+
+.app-sessions {
+  /* La pantalla de sesiones respira más que el formulario, que está pensado
+     para entrar entero sin scroll. */
+  max-width: 1080px;
+}
+
+.cs-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 4px;
+}
+
+.cs-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cs-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+.cs-sub {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-dim);
+}
+
+/* --- Botones compartidos --- */
+.cs-dark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--btn-dark);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.cs-dark-btn:hover:not(:disabled) { background: var(--btn-dark-hover); }
+.cs-dark-btn:disabled { opacity: 0.45; cursor: default; }
+
+.cs-outline-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cs-outline-btn:hover { background: #f7f8fa; border-color: #b9bfc8; }
+
+.cs-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #f2f3f5;
+  color: var(--ink-dim);
+  border: none;
+  border-radius: 999px;
+  padding: 9px 15px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cs-ghost-btn:hover { background: #e8eaed; color: var(--ink); }
+
+.cs-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--ink-dim);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.cs-icon-btn:hover { background: #f2f3f5; color: var(--ink); }
+
+/* --- Ficha --- */
+.cs-grid {
+  display: grid;
+  /* Dos columnas como máximo: con tres las fichas quedaban tan angostas
+     que el pie y los chips se partían en dos líneas. */
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.cs-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.cs-card-body {
+  background: #fafbfc;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 16px 16px 14px;
+}
+.cs-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cs-card-date {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.cs-card-title {
+  margin: 10px 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.cs-card-role {
+  margin: 3px 0 0;
+  font-size: 0.95rem;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+.cs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 16px;
+}
+.cs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 8px 15px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--panel);
+}
+.cs-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 10px 8px;
+}
+.cs-card-foot-left { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cs-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cs-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  flex: none;
+}
+.cs-card-meta { font-size: 0.88rem; color: var(--ink-faint); }
+.cs-dot-sep { margin: 0 3px; }
+
+.cs-kebab-wrap { position: relative; flex: none; }
+.cs-kebab {
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+  display: inline-flex;
+}
+.cs-kebab:hover { color: var(--ink); background: #eef0f3; }
+.cs-kebab-menu {
+  position: absolute;
+  top: 26px;
+  right: 0;
+  z-index: 5;
+  min-width: 178px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+}
+.cs-kebab-menu button {
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.cs-kebab-menu button:hover { background: #f2f3f5; }
+.cs-kebab-danger { color: var(--loro-red-deep) !important; }
+
+/* --- Modal --- */
+.cs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(20, 22, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+}
+.cs-modal {
+  width: min(1180px, 100%);
+  height: min(760px, 92vh);
+  background: var(--panel);
+  border-radius: 22px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+  display: flex;
+  overflow: hidden;
+}
+
+.cs-side {
+  flex: none;
+  width: 262px;
+  margin: 14px 0 14px 14px;
+  padding: 18px 14px;
+  background: #fafbfc;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+.cs-side-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.cs-side-role { margin: 3px 0 0; font-size: 0.95rem; color: var(--ink-faint); overflow-wrap: anywhere; }
+.cs-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 22px; }
+.cs-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  background: transparent;
+  padding: 11px 12px;
+  border-radius: 11px;
+  font-size: 0.98rem;
+  color: var(--ink-dim);
+  cursor: pointer;
+  text-align: left;
+}
+.cs-nav-item:hover { background: #eef0f3; color: var(--ink); }
+.cs-nav-item-on { background: #eceef1; color: var(--ink); font-weight: 600; }
+
+.cs-pane { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.cs-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 22px 14px;
+}
+.cs-pane-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.cs-pane-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.cs-pane-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 22px 22px; }
+
+.cs-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  margin: 0 0 14px;
+}
+
+.cs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  min-height: 320px;
+  padding: 20px;
+}
+.cs-empty h4 { margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.cs-empty p { margin: 0; font-size: 1rem; color: var(--ink-dim); max-width: 46ch; line-height: 1.5; }
+.cs-empty-screen {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.cs-suggestions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 6px; }
+
+/* --- Transcripción --- */
+.cs-timeline { display: flex; flex-direction: column; gap: 16px; }
+.cs-bubble-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.cs-bubble {
+  background: #e8eefc;
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 11px 16px;
+  font-size: 1rem;
+  line-height: 1.45;
+  max-width: min(78%, 720px);
+  overflow-wrap: anywhere;
+}
+.cs-bubble-meta { font-size: 0.82rem; color: var(--ink-faint); padding-left: 4px; }
+
+.cs-qa {
+  position: relative;
+  background: #fffdf5;
+  border: 1px solid #f2e6bd;
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.cs-qa-copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 0.72rem;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+.cs-qa-copy:hover { color: var(--ink); background: #f5efdb; }
+.cs-qa-q { margin: 0 34px 0 0; font-size: 1rem; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.cs-qa-sep { border: none; border-top: 1px solid #f0e4bb; margin: 13px 0; }
+.cs-qa-a-label { margin: 0 0 6px; font-size: 1rem; color: var(--ink); }
+
+/* --- Chat --- */
+.cs-chat { min-height: 100%; display: flex; flex-direction: column; }
+.cs-chat-log { display: flex; flex-direction: column; gap: 16px; }
+.cs-chat-user {
+  align-self: flex-end;
+  background: #e8eefc;
+  border-radius: 16px;
+  padding: 11px 16px;
+  font-size: 1rem;
+  line-height: 1.45;
+  max-width: min(78%, 640px);
+  overflow-wrap: anywhere;
+}
+.cs-chat-ai { align-self: flex-start; max-width: min(88%, 760px); }
+.cs-chat-thinking { color: var(--ink-faint); font-size: 0.85rem; }
+
+.cs-composer {
+  flex: none;
+  display: flex;
+  gap: 12px;
+  padding: 14px 22px 20px;
+  border-top: 1px solid var(--line);
+}
+.cs-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 13px 16px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--panel);
+}
+.cs-composer-input:focus { outline: none; border-color: var(--ink-faint); }
+.cs-send { border-radius: 14px; padding: 13px 26px; }
+
+/* --- Detalles --- */
+.cs-details { margin: 0; }
+.cs-details-h {
+  margin: 6px 0 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.cs-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 1fr;
+  gap: 12px;
+  padding: 9px 0;
+}
+.cs-row dt { font-size: 1rem; font-weight: 600; color: var(--ink); }
+.cs-row dd { margin: 0; font-size: 1rem; color: var(--ink-dim); overflow-wrap: anywhere; }
+.cs-details-sep { border: none; border-top: 1px solid var(--line); margin: 22px 0; }
+.cs-model-cell { display: inline-flex; align-items: center; gap: 8px; }
+
+/* --- Markdown --- */
+.md { font-size: 1rem; line-height: 1.6; color: var(--ink); }
+.md > *:first-child { margin-top: 0; }
+.md > *:last-child { margin-bottom: 0; }
+.md-p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.md-h2 { margin: 22px 0 10px; font-size: 1.08rem; font-weight: 700; letter-spacing: -0.01em; }
+.md-h3 { margin: 18px 0 8px; font-size: 1rem; font-weight: 700; }
+.md-ul, .md-ol { margin: 0 0 12px; padding-left: 22px; }
+.md-ul li, .md-ol li { margin-bottom: 6px; overflow-wrap: anywhere; }
+.md code {
+  background: #f0f1f4;
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (max-width: 720px) {
+  .cs-modal-backdrop { padding: 0; }
+  .cs-modal {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    flex-direction: column;
+  }
+  /* En mobile el sidebar se vuelve encabezado + pestañas horizontales: una
+     columna fija de 262px dejaría el contenido sin lugar. */
+  .cs-side {
+    width: auto;
+    margin: 10px 10px 0;
+    padding: 14px;
+  }
+  .cs-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    margin-top: 14px;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  .cs-nav::-webkit-scrollbar { display: none; }
+  .cs-nav-item { flex: none; padding: 9px 12px; font-size: 0.9rem; }
+  .cs-nav-item span { white-space: nowrap; }
+  .cs-pane-head { padding: 16px 16px 10px; }
+  .cs-pane-body { padding: 4px 16px 16px; }
+  .cs-composer { padding: 12px 16px 16px; }
+  .cs-bubble, .cs-chat-user { max-width: 92%; }
+  .cs-row { grid-template-columns: 1fr; gap: 2px; }
+  .cs-grid { grid-template-columns: 1fr; }
+  .cs-title { font-size: 1.35rem; }
+  .cs-sub { font-size: 0.88rem; }
+  /* En mobile el CTA baja a una barra de ancho completo bajo el encabezado,
+     que es donde el pulgar llega. */
+  .cs-header { flex-direction: column; align-items: stretch; gap: 14px; }
+  .cs-create { width: 100%; padding: 15px 20px; border-radius: 14px; }
+}
+
+/* Acceso al historial desde el setup del copiloto. */
+.cs-link-btn {
+  align-self: center;
+  border: none;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cs-link-btn:hover { color: var(--ink); }

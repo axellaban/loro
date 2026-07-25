@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { track, identify } from "../lib/track";
 import { BrandLogo } from "../lib/BrandLogo";
 import { extractSentences } from "../simulador/tts";
-import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
+import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable } from "../lib/models";
+import { ProviderIcon } from "../lib/ProviderIcon";
 import { looksLikeQuestion } from "../lib/question";
+import CallSessions from "./CallSessions";
+import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -29,6 +32,13 @@ type Line = { id: number; text: string; final: boolean };
 type Feedback = "up" | "down" | null;
 type Answer = { id: number; question: string; text: string; done: boolean; ts: number; feedback: Feedback };
 
+// Cuenta regresiva de la sesión, mm:ss. Con solo los minutos ("5 mins") la
+// píldora se quedaba quieta un minuto entero y parecía trabada.
+function fmtCountdown(secs: number): string {
+  const s = Math.max(0, secs);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 function fmtTime(ts: number): string {
   try {
     return new Date(ts).toLocaleTimeString("es-AR", { hour: "numeric", minute: "2-digit" });
@@ -44,42 +54,6 @@ function SparkleIcon() {
       <path d="M12 2.5l1.9 4.9 4.9 1.9-4.9 1.9L12 16l-1.9-4.8L5.2 9.3l4.9-1.9L12 2.5z" />
       <path d="M18.5 14.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
     </svg>
-  );
-}
-
-// Logos de proveedor para el selector de modelo (como Parakeet).
-function OpenAIMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="#000" aria-hidden="true">
-      <path d="M22.28 9.82a5.98 5.98 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.07 6.07 0 0 0 4.98 4.18a5.98 5.98 0 0 0-3.99 2.9 6.05 6.05 0 0 0 .74 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.52 2.9A5.98 5.98 0 0 0 13.26 22a6.05 6.05 0 0 0 5.77-4.21 5.99 5.99 0 0 0 3.99-2.9 6.05 6.05 0 0 0-.75-7.07zm-9.02 12.6a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.79.79 0 0 0 .39-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.58a4.5 4.5 0 0 1-4.49 4.5zM3.6 18.3a4.47 4.47 0 0 1-.54-3.01l.14.09 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 21a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9a4.48 4.48 0 0 1 2.34-1.97V11.6a.77.77 0 0 0 .39.68l5.82 3.36-2.02 1.17a.08.08 0 0 1-.07 0l-4.83-2.79A4.5 4.5 0 0 1 2.34 7.9zm16.6 3.86-5.84-3.39L15.11 7.2a.08.08 0 0 1 .07 0l4.83 2.78a4.49 4.49 0 0 1-.68 8.1v-5.68a.79.79 0 0 0-.39-.68zm2.01-3.02-.14-.09-4.77-2.78a.78.78 0 0 0-.79 0L9.42 7.24V4.91a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.32 12.9 6.3 11.73a.08.08 0 0 1-.04-.06V6.1a4.5 4.5 0 0 1 7.38-3.45l-.14.08L8.72 5.49a.79.79 0 0 0-.39.68zm1.1-2.36L12 9.06l2.6 1.5v3l-2.6 1.5-2.6-1.5z" />
-    </svg>
-  );
-}
-function AnthropicMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" stroke="#CC785C" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-      <line x1="12" y1="3" x2="12" y2="21" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
-      <line x1="18.4" y1="5.6" x2="5.6" y2="18.4" />
-    </svg>
-  );
-}
-function GeminiMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
-      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
-      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
-      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
-    </svg>
-  );
-}
-function ProviderIcon({ provider }: { provider: Provider }) {
-  return (
-    <span className="dd-icon">
-      {provider === "openai" ? <OpenAIMark /> : provider === "anthropic" ? <AnthropicMark /> : <GeminiMark />}
-    </span>
   );
 }
 
@@ -596,6 +570,12 @@ export default function Page() {
   const sessionsLeft = Math.max(0, freeSessions - sessionsUsed);
   // Countdown de la sesión (10 min gratis), estilo Parakeet.
   const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
+  // Al terminar una sesión el copiloto cae en la lista de sesiones (como
+  // Parakeet), no de vuelta en el formulario.
+  const [view, setView] = useState<"setup" | "sessions">("setup");
+  // Cuántas sesiones hay guardadas: si hay, el setup ofrece el acceso al
+  // historial. Sin esto solo se llegaba terminando una sesión nueva.
+  const [savedCount, setSavedCount] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -618,6 +598,13 @@ export default function Page() {
   // mientras la app estaba en background (Deepgram corta a los ~10s sin audio).
   const resumeRef = useRef<(() => void) | null>(null);
 
+  // Material de la sesión en curso, para guardarla al terminar. Va en refs
+  // porque lo lee `stop()`, que se crea una sola vez y no puede cerrar sobre
+  // el estado sin quedar viejo.
+  const sessionStartRef = useRef(0);
+  const sessionLinesRef = useRef<{ text: string; ts: number }[]>([]);
+  const answersRef = useRef<Answer[]>([]);
+  const sessionCtxRef = useRef({ company: "", role: "", modelId: "", lang: "es" as Lang, mode: "mic" as Mode });
   const transcriptRef = useRef(""); // todo lo transcripto (contexto para el LLM)
   const questionBufRef = useRef(""); // último tramo dicho, para "Responder ahora"
   const lineId = useRef(0);
@@ -631,6 +618,12 @@ export default function Page() {
   const selectedModel = MODELS.find((m) => m.id === modelId) || MODELS[0];
   const modelRef = useRef(selectedModel);
   modelRef.current = selectedModel;
+  answersRef.current = answers;
+  sessionCtxRef.current = { company, role, modelId, lang, mode };
+
+  useEffect(() => {
+    if (view === "setup") setSavedCount(loadSessions().length);
+  }, [view]);
 
   // ---------- Detección de mobile / Safari ----------
   // "Pestaña" (captura de audio vía getDisplayMedia) no tiene sentido en dos
@@ -1001,6 +994,9 @@ export default function Page() {
       // generación ocurre EXCLUSIVAMENTE al tocar el botón, así la conversación
       // no avanza sola con respuestas nuevas mientras la persona habla.
       if (isFinal) {
+        // Se guarda con hora para poder reconstruir después la conversación en
+        // el orden en que pasó, intercalada con las respuestas generadas.
+        sessionLinesRef.current.push({ text, ts: Date.now() });
         transcriptRef.current = (transcriptRef.current + " " + text).slice(-8000);
         questionBufRef.current = (questionBufRef.current + " " + text).slice(-1500);
       }
@@ -1185,8 +1181,10 @@ export default function Page() {
       } catch {}
       if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
       sessionTimerRef.current = setTimeout(() => stop(), SESSION_MAX_MS);
-      // Countdown visible (pill "X min (Free)"), tick cada segundo.
+      // Countdown visible (pill "mm:ss"), tick cada segundo.
       const startedAt = Date.now();
+      sessionStartRef.current = startedAt;
+      sessionLinesRef.current = [];
       setRemainingSec(Math.round(SESSION_MAX_MS / 1000));
       if (countdownRef.current) clearInterval(countdownRef.current);
       countdownRef.current = setInterval(() => {
@@ -1268,6 +1266,31 @@ export default function Page() {
     track("session_stopped");
     cleanup();
     setStatus("idle");
+    // La sesión se archiva al terminar y la vista pasa al historial. Solo se
+    // guarda si hubo material: una sesión que se cortó antes de transcribir
+    // nada dejaría una ficha vacía.
+    const startedAt = sessionStartRef.current;
+    const lines = sessionLinesRef.current;
+    const qa = answersRef.current.filter((a) => a.text.trim()).map((a) => ({ q: a.question, a: a.text, ts: a.ts }));
+    if (startedAt && (lines.length || qa.length)) {
+      const ctx = sessionCtxRef.current;
+      const session: CallSession = {
+        id: `${startedAt}-${Math.random().toString(36).slice(2, 8)}`,
+        createdAt: startedAt,
+        company: ctx.company,
+        role: ctx.role,
+        durationMs: Date.now() - startedAt,
+        modelId: ctx.modelId,
+        lang: ctx.lang,
+        mode: ctx.mode,
+        lines,
+        qa,
+      };
+      saveSession(session);
+      track("session_saved", { questions: qa.length });
+    }
+    sessionStartRef.current = 0;
+    setView("sessions");
   }, [cleanup]);
 
   useEffect(() => () => cleanup(), [cleanup]);
@@ -1316,9 +1339,13 @@ export default function Page() {
   const live = status === "live";
   const connecting = status === "connecting";
 
+  // El formulario solo se muestra en la vista de setup: cuando termina una
+  // sesión, el mismo lugar lo ocupa la lista de sesiones.
+  const showSetup = !live && view === "setup";
+
   return (
     <main
-      className={`app-container ${live ? "app-live" : ""}`}
+      className={`app-container ${live ? "app-live" : ""} ${view === "sessions" && !live ? "app-sessions" : ""}`}
       style={{ ["--answer-size" as string]: `${answerSizePx(answerSize)}px` }}
     >
       <header className="brand-header">
@@ -1332,7 +1359,7 @@ export default function Page() {
                   vista para que la primera línea quede como la de Parakeet. */}
               <span className="timer-pill" title="Tiempo restante de la sesión">
                 <ClockIcon />
-                {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
+                {fmtCountdown(remainingSec)} <span className="timer-free">(Free)</span>
               </span>
             </div>
           )}
@@ -1365,7 +1392,7 @@ export default function Page() {
         </div>
       </header>
 
-      {!live && (
+      {showSetup && (
         <p className="tagline">
           El Loro escucha tu entrevista en tiempo real y te sopla las respuestas exactas. 100%
           indetectable en Google Meet, Teams y Zoom. 🦜
@@ -1373,7 +1400,7 @@ export default function Page() {
       )}
 
       {/* Selectores de idioma + modelo, en una misma línea (estilo Parakeet) */}
-      {!live && (
+      {showSetup && (
         <div>
           <div className="selectors-row">
             <div className="field">
@@ -1415,7 +1442,7 @@ export default function Page() {
       {/* Selector de modo: se oculta en mobile (iOS/Android) y en Safari
           —incluso de escritorio—, donde "Pestaña" no tiene sentido o no
           funciona; en esos casos se usa directamente el micrófono. */}
-      {!live && !noTabCapture && (
+      {showSetup && !noTabCapture && (
         <div className={`grid-responsive`}>
           <button
             className={`btn-select ${mode === "mic" ? "btn-select-active" : ""}`}
@@ -1450,7 +1477,7 @@ export default function Page() {
       )}
 
       {/* Contexto de la entrevista (solo antes de arrancar) */}
-      {!live && (
+      {showSetup && (
         <div className="panel">
           <label className="mono form-label">
             Contexto de la entrevista
@@ -1515,6 +1542,7 @@ export default function Page() {
       )}
 
       {/* Contenido */}
+      {!(view === "sessions" && !live) && (
       <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
         {live && (
           <div className="panel" style={{ flex: 1, minHeight: 0 }}>
@@ -1585,12 +1613,26 @@ export default function Page() {
         )}
 
       </section>
+      )}
+
+      {view === "sessions" && !live && (
+        <CallSessions
+          onNew={() => {
+            setView("setup");
+            setAnswers([]);
+            setLines([]);
+            transcriptRef.current = "";
+            questionBufRef.current = "";
+          }}
+        />
+      )}
 
       {/* Footer */}
+      {!(view === "sessions" && !live) && (
       <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
-        {!live ? (
+        {showSetup ? (
           <button onClick={start} disabled={connecting} className="btn-action btn-primary">
-            {connecting ? "Conectando… 🦜" : mode === "mic" ? "▶ Soltar el Loro (activar micrófono)" : "▶ Soltar el Loro (compartir pestaña)"}
+            {connecting ? "Conectando… 🦜" : "▶ Soltar el Loro (Crear Sesión)"}
           </button>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1607,7 +1649,12 @@ export default function Page() {
             </button>
           </div>
         )}
-        {!live && (
+        {showSetup && savedCount > 0 && (
+          <button type="button" className="cs-link-btn" onClick={() => setView("sessions")}>
+            Ver mis sesiones ({savedCount}) →
+          </button>
+        )}
+        {showSetup && (
           <p className="mono btn-hint">
             {mode === "mic"
               ? "Activá los parlantes (sin auriculares) para que el micrófono escuche al entrevistador."
@@ -1615,6 +1662,7 @@ export default function Page() {
           </p>
         )}
       </footer>
+      )}
 
       {showPaywall && (
         <div className="paywall-overlay" onClick={() => setShowPaywall(false)}>

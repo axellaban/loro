@@ -1,22 +1,8 @@
 export const runtime = "edge";
 
 import { capacityClosed, rateLimit, sameOriginStrict } from "../../lib/ratelimit";
-import { specForRequest, type ModelSpec, type Provider } from "../../lib/models";
-import {
-  ANTHROPIC_HEADERS,
-  anthropicBody,
-  geminiBody,
-  geminiChunk,
-  geminiUrl,
-  logUpstream,
-  openaiBody,
-  upstreamMessage,
-} from "../../lib/llm";
-
-// ---------- Modelos disponibles ----------
-// El cliente manda { provider, model }; el spec del registro decide la FORMA
-// del request (ver app/lib/models.ts). No hay overrides por env var: pisaban en
-// silencio el modelo elegido en el selector.
+import { specForRequest, type Provider } from "../../lib/models";
+import { fallbackChain, streamLLM } from "../../lib/stream";
 
 const SYSTEM_PROMPT = `Sos EL ENTREVISTADO. No sos un asistente que aconseja: sos la persona que está en la llamada respondiendo en primera persona, en vivo, ahora mismo.
 
@@ -64,17 +50,6 @@ Usá la TRANSCRIPCIÓN para sonar como una conversación real: no repitas algo q
 
 ## Regla de oro sobre [PREGUNTA]
 Si ese campo tiene CUALQUIER texto —por corto, informal, mal transcrito o inesperado que sea, incluso si el PERFIL o la EMPRESA están vacíos— RESPONDÉLO IGUAL con lo que tengas. Nunca evalúes si "es lo bastante clara". El ÚNICO caso en que devolvés "(esperando pregunta)" es cuando [PREGUNTA] dice literalmente "(ninguna aún)" porque no llegó nada. Nunca lo uses por dudar del contenido.`;
-
-// Envuelve un stream de texto y deja registrado qué modelo respondió de verdad
-// (útil cuando entra un fallback).
-function textStreamResponse(stream: ReadableStream, model: string) {
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "x-loro-model": model,
-    },
-  });
-}
 
 export async function POST(req: Request) {
   if (capacityClosed()) {
@@ -146,218 +121,15 @@ ${transcript || "(vacío)"}
 
   // Fallback dentro del MISMO proveedor: si el modelo elegido falla (ID
   // inválido, no habilitado en la cuenta), se reintenta con uno estable para no
-  // quedar sin respuesta en plena entrevista. Se loguea cuando se usa, porque
-  // antes tapaba el fallo en silencio.
-  const candidates = fallbackChain(spec);
-
-  try {
-    if (provider === "anthropic") return await streamAnthropic(candidates, userContent);
-    if (provider === "openai") return await streamOpenAI(candidates, userContent);
-    return await streamGemini(candidates, userContent);
-  } catch (err: any) {
-    console.error(`[answer] excepción con ${provider}/${spec.model}:`, err?.message || err);
-    return new Response(`Error del modelo ${spec.model}: ${err?.message || "desconocido"}`, {
-      status: 502,
-    });
-  }
-}
-
-// Cadena de intentos: el modelo pedido y después el estable del mismo provider.
-function fallbackChain(spec: ModelSpec): ModelSpec[] {
-  const STABLE: Record<Provider, string> = {
-    gemini: "gemini-2.5-flash",
-    openai: "gpt-4.1-mini",
-    anthropic: "claude-haiku-4-5",
-  };
-  const stableId = STABLE[spec.provider];
-  if (spec.model === stableId) return [spec];
-  return [spec, specForRequest(spec.provider, stableId)];
-}
-
-// Parser SSE genérico: lee el body upstream, parte por líneas "data:", y por
-// cada JSON extrae el texto con `extract`. Reenvía solo texto plano al cliente.
-function sseTextStream(
-  upstream: ReadableStream<Uint8Array>,
-  extract: (json: string) => string | null
-): ReadableStream {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  const reader = upstream.getReader();
-  let buffer = "";
-  return new ReadableStream({
-    // El pull loopea hasta encolar datos reales: si resuelve sin encolar,
-    // Vercel Edge puede pausar el stream (fix redescubierto del historial viejo).
-    async pull(controller) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        let enqueuedAny = false;
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const json = trimmed.slice(5).trim();
-          if (!json || json === "[DONE]") continue;
-          try {
-            const text = extract(json);
-            if (text) {
-              controller.enqueue(encoder.encode(text));
-              enqueuedAny = true;
-            }
-          } catch {
-            // ignora fragmentos incompletos
-          }
-        }
-        if (enqueuedAny) return;
-      }
-    },
-    cancel() {
-      reader.cancel();
-    },
+  // quedar sin respuesta en plena entrevista. El streaming y el manejo de error
+  // viven en app/lib/stream.ts, compartidos con /api/session.
+  return streamLLM({
+    specs: fallbackChain(spec),
+    system: SYSTEM_PROMPT,
+    user: userContent,
+    maxTokens: 512,
+    reasoningMaxTokens: 900,
+    temperature: 0.4,
+    tag: "answer",
   });
-}
-
-// ---------- Gemini ----------
-async function streamGemini(specs: ModelSpec[], userContent: string): Promise<Response> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return new Response("Falta GEMINI_API_KEY en las variables de entorno.", { status: 500 });
-  }
-  let detail = "";
-  let status = 502;
-  let lastModel = "";
-  for (const spec of specs) {
-    lastModel = spec.model;
-    // El thinking se arma según la generación del modelo: 2.5 usa
-    // thinkingBudget, 3.x usa thinkingLevel, y cada uno rechaza el del otro.
-    const upstream = await fetch(geminiUrl(spec.model, "streamGenerateContent", apiKey), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        geminiBody({
-          spec,
-          system: SYSTEM_PROMPT,
-          user: userContent,
-          maxOutputTokens: 512,
-          temperature: 0.4,
-        })
-      ),
-    });
-    if (upstream.ok && upstream.body) {
-      if (spec !== specs[0]) console.warn(`[answer] fallback a ${spec.model}`);
-      return textStreamResponse(
-        sseTextStream(upstream.body, (json) => geminiChunk(JSON.parse(json), spec.model)),
-        spec.model
-      );
-    }
-    status = upstream.status;
-    detail = await upstream.text().catch(() => "");
-    logUpstream("gemini", spec.model, status, detail);
-  }
-  return new Response(upstreamMessage("gemini", lastModel, status, detail), { status: 502 });
-}
-
-// ---------- Anthropic (Claude) ----------
-async function streamAnthropic(specs: ModelSpec[], userContent: string): Promise<Response> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return new Response(
-      "Falta ANTHROPIC_API_KEY en Vercel para usar Claude. Cargá el token o elegí otro modelo.",
-      { status: 500 }
-    );
-  }
-  let detail = "";
-  let status = 502;
-  let lastModel = "";
-  for (const spec of specs) {
-    lastModel = spec.model;
-    const upstream = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: ANTHROPIC_HEADERS(apiKey),
-      body: JSON.stringify(
-        anthropicBody({
-          spec,
-          system: SYSTEM_PROMPT,
-          user: userContent,
-          maxTokens: 512,
-          temperature: 0.4,
-          stream: true,
-        })
-      ),
-    });
-    if (upstream.ok && upstream.body) {
-      if (spec !== specs[0]) console.warn(`[answer] fallback a ${spec.model}`);
-      return textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          // Solo nos interesan los deltas de texto del bloque de contenido.
-          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-            return evt.delta.text ?? null;
-          }
-          return null;
-        }),
-        spec.model
-      );
-    }
-    status = upstream.status;
-    detail = await upstream.text().catch(() => "");
-    logUpstream("anthropic", spec.model, status, detail);
-  }
-  return new Response(upstreamMessage("anthropic", lastModel, status, detail), { status: 502 });
-}
-
-// ---------- OpenAI (GPT) ----------
-async function streamOpenAI(specs: ModelSpec[], userContent: string): Promise<Response> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return new Response(
-      "Falta OPENAI_API_KEY en Vercel para usar GPT. Cargá el token o elegí otro modelo.",
-      { status: 500 }
-    );
-  }
-  let detail = "";
-  let status = 502;
-  let lastModel = "";
-  for (const spec of specs) {
-    lastModel = spec.model;
-    // Los modelos de razonamiento usan max_completion_tokens y rechazan
-    // temperature; los clásicos usan max_tokens. Lo decide el spec, no un
-    // prefijo adivinado.
-    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(
-        openaiBody({
-          spec,
-          system: SYSTEM_PROMPT,
-          user: userContent,
-          maxTokens: spec.reasoning ? 900 : 512,
-          temperature: 0.4,
-          stream: true,
-        })
-      ),
-    });
-    if (upstream.ok && upstream.body) {
-      if (spec !== specs[0]) console.warn(`[answer] fallback a ${spec.model}`);
-      return textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          return evt.choices?.[0]?.delta?.content ?? null;
-        }),
-        spec.model
-      );
-    }
-    status = upstream.status;
-    detail = await upstream.text().catch(() => "");
-    logUpstream("openai", spec.model, status, detail);
-  }
-  return new Response(upstreamMessage("openai", lastModel, status, detail), { status: 502 });
 }

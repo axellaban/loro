@@ -452,6 +452,11 @@ function buildDgUrl(sttLang: string): string {
   return `wss://api.deepgram.com/v1/listen?${params}`;
 }
 
+// Duración objetivo del simulacro Sprint. El reloj del header muestra cuánto
+// queda de ese presupuesto, no cuánto pasó: un contador que sube no le dice
+// nada a nadie, y este arranca en 05:00 y baja.
+const SIM_TARGET_SEC = 5 * 60;
+
 function fmtElapsed(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
@@ -1660,7 +1665,7 @@ export default function SimuladorPage() {
 
           <footer className="sim-setup-footer">
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
-              ▶ Soltar el Loro (generar sala)
+              ▶ Soltar el Loro (Crear Sesión)
             </button>
             {savedReport && (
               <button
@@ -1688,7 +1693,7 @@ export default function SimuladorPage() {
               </button>
               <h1 className="sim-room-title">Sala de Entrevista</h1>
               <span className="sim-room-meta mono">
-                {fmtElapsed(elapsed)} · Pregunta {Math.min(history.length + 1, questionsCount)} de {questionsCount}
+                {fmtElapsed(Math.max(0, SIM_TARGET_SEC - elapsed))} · Pregunta {Math.min(history.length + 1, questionsCount)} de {questionsCount}
               </span>
             </div>
             <div className="sim-room-header-right">
