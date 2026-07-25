@@ -5,14 +5,10 @@ import { track, identify } from "../lib/track";
 import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 import { BrandLogo } from "../lib/BrandLogo";
+import { MODELS, DEFAULT_MODEL_ID, type Provider } from "../lib/models";
 
 type Line = { id: number; text: string; final: boolean };
 type Lang = "es" | "en";
-type Provider = "gemini" | "anthropic" | "openai";
-// `short` es lo que se ve en la píldora cerrada: en mobile los selectores van a
-// media columna y el nombre completo no entra. La lista desplegada siempre
-// muestra `label`, así que el nombre real del modelo nunca se pierde.
-type ModelOption = { id: string; label: string; short: string; provider: Provider; model: string; tag: string };
 
 type InterviewType = "general" | "technical" | "behavioral" | "hr";
 
@@ -159,11 +155,9 @@ function TrafficLight({ score }: { score: number }) {
 
 const STT_LANG: Record<Lang, string> = { es: "es", en: "en" };
 
-const MODELS: ModelOption[] = [
-  { id: "gemini-flash", label: "Gemini 2.5 Flash", short: "Gemini Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
-  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", short: "Gemini Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
-];
-const DEFAULT_MODEL_ID = "gemini-flash";
+// MODELS y DEFAULT_MODEL_ID viven en app/lib/models.ts: los comparten esta
+// página, /app y los dos routes, porque el spec de cada modelo también define
+// la forma del request que hay que mandarle.
 
 // Destello del botón "mágico" (mismo que el "Responder" de /app).
 function SparkleIcon() {

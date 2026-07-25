@@ -1,12 +1,20 @@
 export const runtime = "edge";
 
 import { capacityClosed, rateLimit, sameOriginStrict } from "../../lib/ratelimit";
+import { specForRequest, type ModelSpec, type Provider } from "../../lib/models";
+import {
+  ANTHROPIC_HEADERS,
+  anthropicBody,
+  anthropicText,
+  geminiBody,
+  geminiUrl,
+  logUpstream,
+  openaiBody,
+  upstreamMessage,
+} from "../../lib/llm";
 
-type Provider = "gemini" | "anthropic" | "openai";
-
-const GEMINI_MODEL_OVERRIDE = process.env.GEMINI_MODEL || "";
-const ANTHROPIC_MODEL_OVERRIDE = process.env.ANTHROPIC_MODEL || "";
-const OPENAI_MODEL_OVERRIDE = process.env.OPENAI_MODEL || "";
+// El spec del registro decide la forma del request (ver app/lib/models.ts).
+// Sin overrides por env var: pisaban en silencio el modelo del selector.
 
 const SYSTEM_PROMPT_INTERVIEWER = `Sos el ENTREVISTADOR. No sos un asistente que aconseja: estás en la llamada haciendo la entrevista en vivo al candidato, ahora mismo.
 
@@ -101,10 +109,16 @@ Reglas críticas:
 - IDIOMA: escribí absolutamente TODO el reporte —cada campo de texto, sin excepción (summary, verdict, level, topPriority, nextStep, strengths, improvements, y el analysis/suggestion de cada pregunta)— en el idioma indicado en "## IDIOMA DEL REPORTE". Ni una palabra en otro idioma, aunque el historial de la entrevista esté en otro idioma.
 - Devuelve ÚNICAMENTE el objeto JSON válido. No uses bloques de código Markdown como \`\`\`json ni texto explicativo antes o después. Devuelve solo las llaves del JSON.`;
 
-function resolveModel(provider: Provider, requested: string): string {
-  if (provider === "anthropic") return ANTHROPIC_MODEL_OVERRIDE || requested || "claude-haiku-4-5";
-  if (provider === "openai") return OPENAI_MODEL_OVERRIDE || requested || "gpt-4o-mini";
-  return GEMINI_MODEL_OVERRIDE || requested || "gemini-2.5-flash";
+// Cadena de intentos: el modelo pedido y después el estable del mismo provider.
+function fallbackChain(spec: ModelSpec): ModelSpec[] {
+  const STABLE: Record<Provider, string> = {
+    gemini: "gemini-2.5-flash",
+    openai: "gpt-4.1-mini",
+    anthropic: "claude-haiku-4-5",
+  };
+  const stableId = STABLE[spec.provider];
+  if (spec.model === stableId) return [spec];
+  return [spec, specForRequest(spec.provider, stableId)];
 }
 
 export async function POST(req: Request) {
@@ -150,7 +164,7 @@ export async function POST(req: Request) {
   const action = body.action || "next-question";
   const provider: Provider =
     body.provider === "anthropic" || body.provider === "openai" ? body.provider : "gemini";
-  const model = resolveModel(provider, (body.model || "").slice(0, 100));
+  const spec = specForRequest(provider, (body.model || "").slice(0, 100));
 
   const profile = (body.profile || "").slice(0, 8000);
   const company = (body.company || "").slice(0, 200);
@@ -221,12 +235,7 @@ ${historyText}`;
     if (m) image = { mimeType: m[1], data: m[2] };
   }
 
-  const FALLBACK: Record<Provider, string[]> = {
-    openai: ["gpt-4.1-mini", "gpt-4o-mini"],
-    anthropic: ["claude-haiku-4-5"],
-    gemini: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
-  };
-  const candidates = [model, ...FALLBACK[provider].filter((m) => m !== model)];
+  const candidates = fallbackChain(spec);
 
   try {
     if (isFeedback) {
@@ -237,13 +246,21 @@ ${historyText}`;
       return await streamGemini(candidates, systemPrompt, userContent, image);
     }
   } catch (err: any) {
-    return new Response(`Error del modelo: ${err?.message || "desconocido"}`, { status: 502 });
+    console.error(`[simulador] excepción con ${provider}/${spec.model}:`, err?.message || err);
+    return new Response(`Error del modelo ${spec.model}: ${err?.message || "desconocido"}`, {
+      status: 502,
+    });
   }
 }
 
-function textStreamResponse(stream: ReadableStream) {
+// `x-loro-model` deja registrado qué modelo respondió de verdad (para saber si
+// entró un fallback).
+function textStreamResponse(stream: ReadableStream, model: string) {
   return new Response(stream, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "x-loro-model": model,
+    },
   });
 }
 
@@ -294,7 +311,7 @@ function sseTextStream(
 }
 
 async function streamGemini(
-  models: string[],
+  specs: ModelSpec[],
   systemPrompt: string,
   userContent: string,
   image?: { mimeType: string; data: string } | null
@@ -303,42 +320,43 @@ async function streamGemini(
   if (!apiKey) {
     return new Response("Falta GEMINI_API_KEY en las variables de entorno.", { status: 500 });
   }
-  const parts: Array<Record<string, unknown>> = [{ text: userContent }];
-  if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
-  const payload = {
-    contents: [{ role: "user", parts }],
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: {
-      temperature: 0.5,
-      maxOutputTokens: 512,
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-  };
   let detail = "";
-  for (const model of models) {
-    if (!model) continue;
-    const upstream = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
+  let status = 502;
+  let lastModel = "";
+  for (const spec of specs) {
+    lastModel = spec.model;
+    const upstream = await fetch(geminiUrl(spec.model, "streamGenerateContent", apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        geminiBody({
+          spec,
+          system: systemPrompt,
+          user: userContent,
+          maxOutputTokens: 512,
+          temperature: 0.5,
+          image,
+        })
+      ),
+    });
     if (upstream.ok && upstream.body) {
+      if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
       return textStreamResponse(
         sseTextStream(upstream.body, (json) => {
           const evt = JSON.parse(json);
           return evt.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-        })
+        }),
+        spec.model
       );
     }
+    status = upstream.status;
     detail = await upstream.text().catch(() => "");
+    logUpstream("gemini", spec.model, status, detail);
   }
-  return new Response(`Gemini error: ${detail}`, { status: 502 });
+  return new Response(upstreamMessage("gemini", lastModel, status, detail), { status: 502 });
 }
 
-async function streamAnthropic(models: string[], systemPrompt: string, userContent: string): Promise<Response> {
+async function streamAnthropic(specs: ModelSpec[], systemPrompt: string, userContent: string): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response(
@@ -347,25 +365,26 @@ async function streamAnthropic(models: string[], systemPrompt: string, userConte
     );
   }
   let detail = "";
-  for (const model of models) {
-    if (!model) continue;
+  let status = 502;
+  let lastModel = "";
+  for (const spec of specs) {
+    lastModel = spec.model;
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 512,
-        temperature: 0.5,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userContent }],
-        stream: true,
-      }),
+      headers: ANTHROPIC_HEADERS(apiKey),
+      body: JSON.stringify(
+        anthropicBody({
+          spec,
+          system: systemPrompt,
+          user: userContent,
+          maxTokens: 512,
+          temperature: 0.5,
+          stream: true,
+        })
+      ),
     });
     if (upstream.ok && upstream.body) {
+      if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
       return textStreamResponse(
         sseTextStream(upstream.body, (json) => {
           const evt = JSON.parse(json);
@@ -373,15 +392,18 @@ async function streamAnthropic(models: string[], systemPrompt: string, userConte
             return evt.delta.text ?? null;
           }
           return null;
-        })
+        }),
+        spec.model
       );
     }
+    status = upstream.status;
     detail = await upstream.text().catch(() => "");
+    logUpstream("anthropic", spec.model, status, detail);
   }
-  return new Response(`Claude error: ${detail}`, { status: 502 });
+  return new Response(upstreamMessage("anthropic", lastModel, status, detail), { status: 502 });
 }
 
-async function streamOpenAI(models: string[], systemPrompt: string, userContent: string): Promise<Response> {
+async function streamOpenAI(specs: ModelSpec[], systemPrompt: string, userContent: string): Promise<Response> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(
@@ -390,43 +412,42 @@ async function streamOpenAI(models: string[], systemPrompt: string, userContent:
     );
   }
   let detail = "";
-  for (const model of models) {
-    if (!model) continue;
-    const isReasoning = /^(gpt-5|o[0-9])/.test(model);
-    const reqBody: Record<string, unknown> = {
-      model,
-      stream: true,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-    };
-    if (isReasoning) {
-      reqBody.max_completion_tokens = 900;
-      reqBody.reasoning_effort = "low";
-    } else {
-      reqBody.max_tokens = 512;
-      reqBody.temperature = 0.5;
-    }
+  let status = 502;
+  let lastModel = "";
+  for (const spec of specs) {
+    lastModel = spec.model;
     const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(reqBody),
+      body: JSON.stringify(
+        openaiBody({
+          spec,
+          system: systemPrompt,
+          user: userContent,
+          maxTokens: spec.reasoning ? 900 : 512,
+          temperature: 0.5,
+          stream: true,
+        })
+      ),
     });
     if (upstream.ok && upstream.body) {
+      if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
       return textStreamResponse(
         sseTextStream(upstream.body, (json) => {
           const evt = JSON.parse(json);
           return evt.choices?.[0]?.delta?.content ?? null;
-        })
+        }),
+        spec.model
       );
     }
+    status = upstream.status;
     detail = await upstream.text().catch(() => "");
+    logUpstream("openai", spec.model, status, detail);
   }
-  return new Response(`GPT error: ${detail}`, { status: 502 });
+  return new Response(upstreamMessage("openai", lastModel, status, detail), { status: 502 });
 }
 
 // Los modelos a veces desobedecen y envuelven el JSON en fences ```json ...```
@@ -443,9 +464,13 @@ function parseModelJson(text: string): unknown {
   }
 }
 
+// El reporte necesita margen de tokens: con 5 preguntas, 2048 truncaba el JSON
+// y el parseo fallaba. Vale para los tres proveedores, no solo para Gemini.
+const FEEDBACK_MAX_TOKENS = 4096;
+
 async function getFeedback(
   provider: Provider,
-  models: string[],
+  specs: ModelSpec[],
   systemPrompt: string,
   userContent: string
 ): Promise<Response> {
@@ -453,21 +478,29 @@ async function getFeedback(
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return new Response("Falta OPENAI_API_KEY.", { status: 500 });
     let detail = "";
-    for (const model of models) {
+    let status = 502;
+    let lastModel = "";
+    for (const spec of specs) {
+      lastModel = spec.model;
+      // Igual que en streaming: los modelos de razonamiento necesitan
+      // max_completion_tokens y esfuerzo bajo, o se comen el límite de 25s
+      // de Edge razonando.
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
-          ],
-        }),
+        body: JSON.stringify(
+          openaiBody({
+            spec,
+            system: systemPrompt,
+            user: userContent,
+            maxTokens: FEEDBACK_MAX_TOKENS,
+            temperature: 0.2,
+            json: true,
+          })
+        ),
       });
       if (res.ok) {
         const j = await res.json();
@@ -475,81 +508,91 @@ async function getFeedback(
           return Response.json(parseModelJson(j.choices?.[0]?.message?.content || "{}"));
         } catch {
           detail = "JSON inválido del modelo";
+          console.error(`[simulador] feedback openai/${spec.model}: JSON inválido`);
           continue;
         }
       }
+      status = res.status;
       detail = await res.text().catch(() => "");
+      logUpstream("openai", spec.model, status, detail);
     }
-    return new Response(`OpenAI feedback error: ${detail}`, { status: 502 });
+    return new Response(upstreamMessage("openai", lastModel, status, detail), { status: 502 });
   }
 
   if (provider === "anthropic") {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return new Response("Falta ANTHROPIC_API_KEY.", { status: 500 });
     let detail = "";
-    for (const model of models) {
+    let status = 502;
+    let lastModel = "";
+    for (const spec of specs) {
+      lastModel = spec.model;
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userContent }],
-        }),
+        headers: ANTHROPIC_HEADERS(apiKey),
+        body: JSON.stringify(
+          anthropicBody({
+            spec,
+            system: systemPrompt,
+            user: userContent,
+            maxTokens: FEEDBACK_MAX_TOKENS,
+            temperature: 0.2,
+          })
+        ),
       });
       if (res.ok) {
         const j = await res.json();
         try {
-          return Response.json(parseModelJson(j.content?.[0]?.text || "{}"));
+          // anthropicText busca el primer bloque de texto: leer content[0]
+          // devolvía vacío si el modelo emitía otro bloque antes.
+          return Response.json(parseModelJson(anthropicText(j) || "{}"));
         } catch {
           detail = "JSON inválido del modelo";
+          console.error(`[simulador] feedback anthropic/${spec.model}: JSON inválido`);
           continue;
         }
       }
+      status = res.status;
       detail = await res.text().catch(() => "");
+      logUpstream("anthropic", spec.model, status, detail);
     }
-    return new Response(`Anthropic feedback error: ${detail}`, { status: 502 });
+    return new Response(upstreamMessage("anthropic", lastModel, status, detail), { status: 502 });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return new Response("Falta GEMINI_API_KEY.", { status: 500 });
   let detail = "";
-  for (const model of models) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: userContent }] }],
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: {
-            temperature: 0.2,
-            // Sin thinking y con margen de tokens: el reporte tiene que
-            // empezar a responder antes del límite de 25s de Vercel Edge, y
-            // 2048 se quedaba corto con 5 preguntas (JSON truncado = parse roto).
-            maxOutputTokens: 4096,
-            responseMimeType: "application/json",
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      }
-    );
+  let status = 502;
+  let lastModel = "";
+  for (const spec of specs) {
+    lastModel = spec.model;
+    const res = await fetch(geminiUrl(spec.model, "generateContent", apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        geminiBody({
+          spec,
+          system: systemPrompt,
+          user: userContent,
+          maxOutputTokens: FEEDBACK_MAX_TOKENS,
+          temperature: 0.2,
+          json: true,
+        })
+      ),
+    });
     if (res.ok) {
       const j = await res.json();
       try {
         return Response.json(parseModelJson(j.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
       } catch {
         detail = "JSON inválido del modelo";
+        console.error(`[simulador] feedback gemini/${spec.model}: JSON inválido`);
         continue;
       }
     }
+    status = res.status;
     detail = await res.text().catch(() => "");
+    logUpstream("gemini", spec.model, status, detail);
   }
-  return new Response(`Gemini feedback error: ${detail}`, { status: 502 });
+  return new Response(upstreamMessage("gemini", lastModel, status, detail), { status: 502 });
 }

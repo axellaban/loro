@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { track, identify } from "../lib/track";
 import { BrandLogo } from "../lib/BrandLogo";
 import { extractSentences } from "../simulador/tts";
+import { MODELS, DEFAULT_MODEL_ID, type Provider } from "../lib/models";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -309,31 +310,11 @@ const STT_LANG: Record<Lang, string> = { es: "es", en: "en" };
 const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en" };
 
 // ---------- Modelos de LLM ----------
-// El usuario elige el modelo (como el idioma). El default es Gemini 2.5 Flash
-// (rápido y ya probado). Claude y GPT se activan cuando el token está cargado
-// en Vercel; si falta, el backend devuelve un error claro. Los IDs de modelo se
-// pueden pisar por env var en el backend (ANTHROPIC_MODEL / OPENAI_MODEL).
-type Provider = "gemini" | "anthropic" | "openai";
-// `short` es lo que se ve en la píldora cerrada: en mobile los selectores van a
-// media columna y el nombre completo no entra. La lista desplegada siempre
-// muestra `label`, así que el nombre real del modelo nunca se pierde.
-type ModelOption = { id: string; label: string; short: string; provider: Provider; model: string; tag: string };
-// Misma lista que Parakeet (mismo orden y tags). Los `model` son los IDs reales
-// de API: para Claude va el ID canónico (claude-haiku-4-5) y para Gemini los IDs
-// que funcionan con la key actual; el resto usa el ID que matchea el nombre.
-// Cualquiera se puede pisar por env en el backend (OPENAI_MODEL/ANTHROPIC_MODEL/GEMINI_MODEL).
-// IDs reales de la API de Gemini (los que responden con la key actual). El
-// backend igual cae a un modelo estable si alguno fallara, así nunca queda sin
-// respuesta. Por ahora solo Gemini (OpenAI/Claude ocultos); el backend soporta
-// los tres proveedores: para reactivarlos, descomentar sus líneas y cargar la key.
-const MODELS: ModelOption[] = [
-  // { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
-  // { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
-  // { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
-  { id: "gemini-flash", label: "Gemini 2.5 Flash", short: "Gemini Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
-  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", short: "Gemini Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
-];
-const DEFAULT_MODEL_ID = "gemini-flash";
+// La lista vive en app/lib/models.ts, compartida con /simulador y con los dos
+// routes: además del label, cada modelo declara la FORMA de su request (Gemini
+// 2.5 vs 3.x usan parámetros de thinking distintos y mutuamente excluyentes),
+// así que el registro tiene que ser único. Si falta la key de un proveedor, el
+// backend devuelve un error claro y /api/models/health lo lista.
 
 function buildDgUrl(sttLang: string): string {
   const params = new URLSearchParams({
