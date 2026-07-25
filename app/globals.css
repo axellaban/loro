@@ -1840,6 +1840,9 @@ input {
   align-items: center;
   justify-content: center;
 }
+/* Los dos clips (habla y espera) van apilados con el MISMO encuadre: solo se
+   cruzan por opacidad, así que cualquier diferencia de transform se vería como
+   un salto en el cross-fade. */
 .sim-avatar-video {
   position: absolute;
   inset: 0;
@@ -1847,22 +1850,12 @@ input {
   height: 100%;
   object-fit: cover;
   transform: scale(1.04);
-  transition: filter 0.45s ease, transform 0.45s ease, opacity 0.3s ease;
+  opacity: 1;
+  transition: opacity 0.45s ease;
 }
-.sim-avatar-video-paused {
-  /* El video sigue en loop mientras el loro no habla; el zoom tipo Ken
-     Burns le suma vida. Atenuación mínima para distinguir del estado hablando.
-     Scale mínimo 1.02 mantiene overscan: el translate/rotate nunca revela el
-     fondo de la caja. Funciona igual en desktop (video horizontal) y mobile
-     (vertical): el breathing sutil hace el loro más vivo mientras espera. */
-  filter: saturate(0.95) brightness(0.99);
-  transform: scale(1.02);
-  animation: simAvatarIdle 4.5s ease-in-out infinite;
-}
-@keyframes simAvatarIdle {
-  0%, 100% { transform: scale(1.02) translateY(0) rotate(0deg); }
-  50% { transform: scale(1.05) translateY(-1%) rotate(0.5deg); }
-}
+/* Capa de abajo en el cross-fade. El clip de espera ya trae su propio
+   micro-movimiento (boomerang), por eso no hay animación CSS encima. */
+.sim-avatar-video-off { opacity: 0; }
 /* Oculto pero en el DOM para que precargue mientras se muestra el SVG. */
 .sim-avatar-video-hidden { opacity: 0; }
 
@@ -1881,6 +1874,15 @@ input {
   0% { opacity: 0.7; }
   70% { opacity: 0; }
   100% { opacity: 0; }
+}
+/* Con micrófono disponible el anillo deja de latir con un timer fijo y responde
+   al volumen real de la voz (--mic, 0–1, lo escribe el rAF del Avatar): queda
+   tenue en silencio y se enciende al hablar. */
+.sim-avatar-mic.sim-avatar-listening .sim-avatar-ring {
+  animation: none;
+  opacity: calc(0.18 + var(--mic, 0) * 0.72);
+  transform: scale(calc(1 + var(--mic, 0) * 0.012));
+  transition: opacity 0.08s linear, transform 0.08s linear;
 }
 
 /* Puntitos de "pensando". */
@@ -2532,6 +2534,12 @@ input {
   .sim-loading-spinner,
   .sim-step-spinner { animation: none !important; }
   .sim-avatar-video { transition: none; transform: none; animation: none; }
+  /* El anillo deja de seguir la voz: queda fijo y legible. */
+  .sim-avatar-mic.sim-avatar-listening .sim-avatar-ring {
+    opacity: 0.5;
+    transform: none;
+    transition: none;
+  }
   .sim-gauge-needle { transition: none !important; }
   .sim-ind-bar-fill { transition: none !important; }
 }

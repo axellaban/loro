@@ -524,6 +524,8 @@ export default function SimuladorPage() {
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const mutedRef = useRef(false);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  // Nivel del micrófono del usuario: hace latir el anillo del avatar mientras responde.
+  const [micAnalyser, setMicAnalyser] = useState<AnalyserNode | null>(null);
 
   // Interview state
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -1151,6 +1153,7 @@ export default function SimuladorPage() {
     ttsRef.current?.stop();
     ttsRef.current = null;
     setAnalyser(null);
+    setMicAnalyser(null);
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "CloseStream" }));
@@ -1320,6 +1323,14 @@ export default function SimuladorPage() {
       await audioCtx.audioWorklet.addModule("/pcm-worklet.js");
 
       const source = audioCtx.createMediaStreamSource(stream);
+
+      // Rama paralela solo para visualización: el avatar lee de acá el volumen
+      // de la voz del usuario. No toca el pipeline de PCM que va al STT.
+      const mic = audioCtx.createAnalyser();
+      mic.fftSize = 1024;
+      source.connect(mic);
+      setMicAnalyser(mic);
+
       const worklet = new AudioWorkletNode(audioCtx, "pcm-worklet");
       workletRef.current = worklet;
 
@@ -1725,7 +1736,7 @@ export default function SimuladorPage() {
           <div className="sim-room-grid">
             <section className="sim-room-left">
               <div className="sim-stage">
-                <Avatar state={avatarState} analyser={analyser} />
+                <Avatar state={avatarState} analyser={analyser} micAnalyser={micAnalyser} />
 
                 <span className={`sim-stage-badge ${connecting ? "sim-stage-badge-connecting" : ""}`}>
                   <span className="sim-stage-badge-dot" aria-hidden="true" />

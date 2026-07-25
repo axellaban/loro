@@ -1,12 +1,19 @@
 "use client";
 
-// Avatar del entrevistador: video real del loro (public/loro-interviewer.mp4).
-// El video reproduce SIEMPRE en loop, sin pausas ni seeks: a ritmo normal
-// cuando habla (`speaking`) y ralentizado el resto del tiempo, para que el
-// loro se vea vivo mientras piensa/escucha en lugar de quedar congelado o
-// entrecortado (mover currentTime manualmente traba en muchos dispositivos).
-// El SVG animado queda como fallback si el video no puede cargar o
-// reproducirse (y como placeholder mientras carga).
+// Avatar del entrevistador: dos videos reales del loro superpuestos, uno
+// hablando y otro escuchando, que se cruzan por opacidad.
+//
+// El clip de habla es el loro parloteando; el de espera se recortó de una
+// ventana del mismo video donde el loro mira a cámara con el PICO CERRADO, en
+// boomerang (directo + reverso) para que el loop no tenga costura. Así, mientras
+// el usuario responde, el entrevistador no parece hablarle encima.
+//
+// Los dos clips corren siempre a velocidad normal y solo cambia la opacidad:
+// nada de seeks, cambios de src ni playbackRate, que son las tres cosas que
+// entrecortaban el video en intentos anteriores.
+//
+// El SVG animado queda como fallback si el video no puede cargar o reproducirse
+// (y como placeholder mientras carga).
 
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/track";
@@ -14,28 +21,34 @@ import { createLevelReader } from "./tts";
 
 export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 
-// Dos videos según el viewport:
-//  - mobile: loro vertical (9/16) a pantalla completa (loro-interviewer.mp4).
-//  - desktop: loro horizontal (16/9) que llena el stage ancho sin recorte
-//    (loro-interviewer-wide.mp4).
-const MOBILE_SRC = "/loro-interviewer.mp4";
-const DESKTOP_SRC = "/loro-interviewer-wide.mp4";
+// Un par de clips por viewport:
+//  - mobile: loro vertical (9/16) a pantalla completa.
+//  - desktop: loro horizontal (16/9) que llena el stage ancho sin recorte.
+const SOURCES = {
+  mobile: { talk: "/loro-interviewer.mp4", idle: "/loro-idle.mp4" },
+  desktop: { talk: "/loro-interviewer-wide.mp4", idle: "/loro-idle-wide.mp4" },
+};
 
-// Ritmo del loop según estado: normal al hablar, lento y calmo el resto.
-const IDLE_RATE = 0.6;
+// Debe coincidir con la transición de `.sim-avatar-video` en globals.css.
+const FADE_MS = 450;
 
 export default function Avatar({
   state,
   analyser,
+  micAnalyser = null,
 }: {
   state: AvatarState;
   analyser: AnalyserNode | null;
+  /** Nivel del micrófono del usuario: hace latir el anillo mientras responde. */
+  micAnalyser?: AnalyserNode | null;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const talkRef = useRef<HTMLVideoElement | null>(null);
+  const idleRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   // Se calcula sincrónicamente en el primer render (no en un efecto posterior)
-  // para no montar nunca el video vertical de arranque en desktop.
+  // para no montar nunca los clips verticales de arranque en desktop.
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 880px)").matches
   );
@@ -48,15 +61,15 @@ export default function Avatar({
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const videoSrc = isDesktop ? DESKTOP_SRC : MOBILE_SRC;
+  const { talk: talkSrc, idle: idleSrc } = isDesktop ? SOURCES.desktop : SOURCES.mobile;
+  const speaking = state === "speaking";
 
-  // Al cambiar de fuente (cruce de breakpoint) el <video> se remonta por la
-  // key, pero el estado `videoReady` es del componente: sin este reset se
-  // mostraría el frame viejo (o un cuadro en blanco) hasta que el nuevo video
-  // dispare su propio onCanPlay.
+  // Al cambiar de fuente (cruce de breakpoint) los <video> se remontan por la
+  // key, pero `videoReady` es del componente: sin este reset se mostraría el
+  // frame viejo hasta que el clip nuevo dispare su propio onCanPlay.
   useEffect(() => {
     setVideoReady(false);
-  }, [videoSrc]);
+  }, [idleSrc]);
 
   const failVideo = () => {
     setVideoFailed((prev) => {
@@ -65,38 +78,89 @@ export default function Avatar({
     });
   };
 
-  // Un solo loop continuo; solo cambia la velocidad. Ralentizar en idle da la
-  // sensación de "vivo pero calmo" sin cortes, pausas ni seeks.
+  // El clip de espera corre siempre; el de habla solo mientras habla. Pausarlo
+  // recién después del cross-fade evita que se congele a la vista, y retomarlo
+  // no implica seek (sigue bufferizado), así que no reintroduce el tirón.
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v || videoFailed) return;
-    v.playbackRate = state === "speaking" ? 1 : IDLE_RATE;
-    v.play().catch(() => {
-      if (v.currentTime === 0) failVideo();
-    });
-  }, [state, videoFailed]);
+    if (videoFailed) return;
+    const talk = talkRef.current;
+    const idle = idleRef.current;
+    idle?.play().catch(() => {});
+    if (speaking) {
+      talk?.play().catch(() => {
+        if (talk.currentTime === 0) failVideo();
+      });
+      return;
+    }
+    const timer = setTimeout(() => talk?.pause(), FADE_MS + 150);
+    return () => clearTimeout(timer);
+  }, [speaking, videoFailed, talkSrc, idleSrc]);
+
+  // El anillo late con la voz real del usuario. Solo en `listening`: así no
+  // reacciona al TTS del propio loro filtrándose por el micrófono (eco).
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (state !== "listening" || !micAnalyser) {
+      el.style.setProperty("--mic", "0");
+      return;
+    }
+    const readLevel = createLevelReader(micAnalyser);
+    let raf = 0;
+    const tick = () => {
+      el.style.setProperty("--mic", readLevel().toFixed(3));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.style.setProperty("--mic", "0");
+    };
+  }, [state, micAnalyser]);
 
   const showVideo = !videoFailed && videoReady;
 
   return (
-    <div className={`sim-avatar sim-avatar-${state}`}>
+    <div
+      ref={rootRef}
+      className={`sim-avatar sim-avatar-${state} ${micAnalyser ? "sim-avatar-mic" : ""}`}
+    >
       <div className="sim-avatar-ring" aria-hidden="true" />
       {!videoFailed && (
-        <video
-          ref={videoRef}
-          key={videoSrc}
-          className={`sim-avatar-video ${state === "speaking" ? "" : "sim-avatar-video-paused"} ${
-            showVideo ? "" : "sim-avatar-video-hidden"
-          }`}
-          src={videoSrc}
-          muted
-          playsInline
-          loop
-          preload="auto"
-          onCanPlay={() => setVideoReady(true)}
-          onError={failVideo}
-          aria-hidden="true"
-        />
+        <>
+          {/* Espera: loop en boomerang, pico cerrado. Es el estado por defecto,
+              así que va abajo y el de habla se funde encima. */}
+          <video
+            ref={idleRef}
+            key={idleSrc}
+            className={`sim-avatar-video ${speaking ? "sim-avatar-video-off" : ""} ${
+              showVideo ? "" : "sim-avatar-video-hidden"
+            }`}
+            src={idleSrc}
+            muted
+            playsInline
+            loop
+            autoPlay
+            preload="auto"
+            onCanPlay={() => setVideoReady(true)}
+            onError={failVideo}
+            aria-hidden="true"
+          />
+          <video
+            ref={talkRef}
+            key={talkSrc}
+            className={`sim-avatar-video ${speaking ? "" : "sim-avatar-video-off"} ${
+              showVideo ? "" : "sim-avatar-video-hidden"
+            }`}
+            src={talkSrc}
+            muted
+            playsInline
+            loop
+            preload="auto"
+            onError={failVideo}
+            aria-hidden="true"
+          />
+        </>
       )}
       {!showVideo && (
         <div className="sim-avatar-circle">
