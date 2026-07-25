@@ -214,6 +214,10 @@ const ANSWER_SIZES = [
 ] as const;
 type AnswerSizeId = (typeof ANSWER_SIZES)[number]["id"];
 const DEFAULT_ANSWER_SIZE: AnswerSizeId = "m";
+
+// Pausa que tiene que sostener el entrevistador para que la respuesta
+// automática se dispare (las pausas cortas dentro de una pregunta no cuentan).
+const AUTO_ANSWER_DELAY_MS = 1400;
 function answerSizePx(id: string): number {
   return (ANSWER_SIZES.find((s) => s.id === id) || ANSWER_SIZES[2]).px;
 }
@@ -560,6 +564,12 @@ export default function Page() {
   useEffect(() => {
     autoAnswerRef.current = autoAnswer;
   }, [autoAnswer]);
+  // Espera antes de responder sola: una pregunta larga suele tener pausas en el
+  // medio, y cada pausa llega como "fin de intervención". Sin esta espera, cada
+  // una dispararía una respuesta que cancela la anterior. El timer se reinicia
+  // si el entrevistador sigue hablando, así que solo responde cuando la pausa
+  // se sostiene de verdad.
+  const autoAnswerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -943,7 +953,15 @@ export default function Page() {
       // fallback de la transcripción y respondería dos veces lo mismo.
       if (msg.type === "UtteranceEnd") {
         if (autoAnswerRef.current && questionBufRef.current.trim().length > 2) {
-          answerNowRef.current();
+          if (autoAnswerTimerRef.current) clearTimeout(autoAnswerTimerRef.current);
+          autoAnswerTimerRef.current = setTimeout(() => {
+            autoAnswerTimerRef.current = null;
+            // Se vuelve a chequear: en el ínterin pudo apagarse el toggle o
+            // haberse respondido a mano (que vacía el buffer).
+            if (autoAnswerRef.current && questionBufRef.current.trim().length > 2) {
+              answerNowRef.current();
+            }
+          }, AUTO_ANSWER_DELAY_MS);
         }
         return;
       }
@@ -953,6 +971,12 @@ export default function Page() {
       const text: string = alt?.transcript || "";
       if (!text) return;
       const isFinal = !!msg.is_final;
+
+      // Volvió a hablar: la pausa no era el final de la pregunta.
+      if (autoAnswerTimerRef.current) {
+        clearTimeout(autoAnswerTimerRef.current);
+        autoAnswerTimerRef.current = null;
+      }
 
       setLines((prev) => {
         const next = [...prev];
@@ -1201,6 +1225,8 @@ export default function Page() {
     stableTimerRef.current = null;
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     keepAliveRef.current = null;
+    if (autoAnswerTimerRef.current) clearTimeout(autoAnswerTimerRef.current);
+    autoAnswerTimerRef.current = null;
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     sessionTimerRef.current = null;
     if (countdownRef.current) clearInterval(countdownRef.current);
