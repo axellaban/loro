@@ -31,29 +31,25 @@ export type ModelSpec = {
   thinking?: "budget" | "level";
   /** OpenAI: familia de razonamiento (GPT-5.x / o-series). */
   reasoning?: boolean;
+  /** Muestra el badge "Recomendado" (puede convivir con el tag). */
+  recommended?: boolean;
+  /** Fuera del selector, pero sigue disponible como fallback y en el health check. */
+  hidden?: boolean;
 };
 
+// Orden, recomendado y tags replicando la lista de Parakeet.
 export const MODELS: ModelSpec[] = [
-  // Gemini 2.5: el que viene funcionando bien, se mantiene como default.
-  {
-    id: "gemini-flash",
-    label: "Gemini 2.5 Flash",
-    short: "Gemini Flash",
-    tag: "Recomendado",
-    provider: "gemini",
-    model: "gemini-2.5-flash",
-    thinking: "budget",
-  },
-  {
-    id: "gemini-flash-lite",
-    label: "Gemini 2.5 Flash Lite",
-    short: "Gemini Lite",
-    tag: "Rápido",
-    provider: "gemini",
-    model: "gemini-2.5-flash-lite",
-    thinking: "budget",
-  },
   // Gemini 3.x: thinkingLevel, NO thinkingBudget.
+  {
+    id: "gemini-3-1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    short: "Gemini 3.1",
+    tag: "Rápido",
+    recommended: true,
+    provider: "gemini",
+    model: "gemini-3.1-flash-lite",
+    thinking: "level",
+  },
   {
     id: "gemini-3-5-flash",
     label: "Gemini 3.5 Flash",
@@ -61,15 +57,6 @@ export const MODELS: ModelSpec[] = [
     tag: "Inteligente",
     provider: "gemini",
     model: "gemini-3.5-flash",
-    thinking: "level",
-  },
-  {
-    id: "gemini-3-1-flash-lite",
-    label: "Gemini 3.1 Flash Lite",
-    short: "Gemini 3.1",
-    tag: "Rápido",
-    provider: "gemini",
-    model: "gemini-3.1-flash-lite",
     thinking: "level",
   },
   // OpenAI clásicos: max_tokens + temperature.
@@ -90,20 +77,12 @@ export const MODELS: ModelSpec[] = [
     model: "gpt-4.1-mini",
   },
   // OpenAI razonamiento: max_completion_tokens + reasoning_effort, sin temperature.
-  {
-    id: "gpt-5.5",
-    label: "GPT-5.5",
-    short: "GPT-5.5",
-    tag: "Inteligente",
-    provider: "openai",
-    model: "gpt-5.5",
-    reasoning: true,
-  },
+  { id: "gpt-5.5", label: "GPT-5.5", short: "GPT-5.5", tag: "", provider: "openai", model: "gpt-5.5", reasoning: true },
   {
     id: "gpt-5.4-mini",
     label: "GPT-5.4 Mini",
     short: "GPT-5.4 Mini",
-    tag: "Rápido",
+    tag: "",
     provider: "openai",
     model: "gpt-5.4-mini",
     reasoning: true,
@@ -116,10 +95,42 @@ export const MODELS: ModelSpec[] = [
     provider: "anthropic",
     model: "claude-haiku-4-5",
   },
+  // Gemini 2.5: fuera del selector, pero siguen siendo la red de seguridad del
+  // backend (fallbackChain apunta a gemini-2.5-flash) y se chequean en /health.
+  {
+    id: "gemini-flash",
+    label: "Gemini 2.5 Flash",
+    short: "Gemini Flash",
+    tag: "",
+    provider: "gemini",
+    model: "gemini-2.5-flash",
+    thinking: "budget",
+    hidden: true,
+  },
+  {
+    id: "gemini-flash-lite",
+    label: "Gemini 2.5 Flash Lite",
+    short: "Gemini Lite",
+    tag: "",
+    provider: "gemini",
+    model: "gemini-2.5-flash-lite",
+    thinking: "budget",
+    hidden: true,
+  },
 ];
 
-/** El default es el modelo que hoy funciona bien en producción. */
-export const DEFAULT_MODEL_ID = "gemini-flash";
+/** Lo que ve el usuario en el selector. MODELS completo queda para el backend. */
+export const VISIBLE_MODELS = MODELS.filter((m) => !m.hidden);
+
+export const DEFAULT_MODEL_ID = "gemini-3-1-flash-lite";
+
+/**
+ * Un modelo guardado en localStorage puede haber quedado oculto: en ese caso el
+ * selector mostraría uno y el backend usaría otro, así que se vuelve al default.
+ */
+export function isSelectable(id: string): boolean {
+  return VISIBLE_MODELS.some((m) => m.id === id);
+}
 
 export function specById(id: string): ModelSpec {
   return MODELS.find((m) => m.id === id) || MODELS[0];

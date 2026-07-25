@@ -482,6 +482,12 @@ input {
   min-height: 220px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Relleno al final para que la última card SIEMPRE pueda scrollearse hasta
+     arriba de todo. Sin esto el scroll queda topeado en
+     scrollHeight - clientHeight y una card más baja que el contenedor nunca
+     llega al tope, dejando la Q&A anterior a la vista. Lo calcula el efecto de
+     app/app/page.tsx según lo que mida la card. */
+  padding-bottom: var(--answers-spacer, 0px);
 }
 
 .answer-card {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { track, identify } from "../lib/track";
 import { BrandLogo } from "../lib/BrandLogo";
 import { extractSentences } from "../simulador/tts";
-import { MODELS, DEFAULT_MODEL_ID, type Provider } from "../lib/models";
+import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -489,7 +489,7 @@ export default function Page() {
       if (saved.role) setRole(saved.role);
       if (saved.profile) setProfile(saved.profile);
       // El modelo sí se restaura (preferencia persistente del usuario).
-      if (saved.modelId && MODELS.some((m) => m.id === saved.modelId)) setModelId(saved.modelId);
+      if (saved.modelId && isSelectable(saved.modelId)) setModelId(saved.modelId);
       // Idioma: se restaura la última preferencia (es/en).
       if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
     } catch {}
@@ -1029,21 +1029,32 @@ export default function Page() {
   useEffect(() => {
     scrollT.current?.scrollTo({ top: scrollT.current.scrollHeight });
   }, [lines]);
-  // Al aparecer/llenarse una respuesta nueva, bajamos el scroll hasta que su
-  // parte de arriba quede al tope del área, dejando la Q&A anterior arriba
-  // (como Parakeet). Depende también del texto de la última: cuando la card
-  // arranca vacía el contenedor todavía no es scrolleable; al llenarse, se
-  // reintenta. NO depende de `feedback`, así tocar 👍/👎 no mueve el scroll.
+  // Al aparecer/llenarse una respuesta nueva, la subimos hasta el tope del área
+  // para que la Q&A anterior quede fuera de vista (como Parakeet).
+  //
+  // Scrollear solo no alcanza: el contenedor no puede pasar de
+  // scrollHeight - clientHeight, así que una card más baja que el contenedor
+  // nunca llegaba arriba. Por eso primero se le agrega abajo el espacio que
+  // falta (--answers-spacer) y recién después se scrollea.
+  //
+  // Depende del texto de la última card porque mientras llega en streaming la
+  // card crece y hay que recalcular. NO depende de `feedback`, así tocar 👍/👎
+  // no mueve el scroll.
   const lastAnswerText = answers.length ? answers[answers.length - 1].text : "";
   useEffect(() => {
     const container = scrollA.current;
     if (!container || answers.length === 0) return;
-    const last = container.lastElementChild as HTMLElement | null;
+    const last = container.querySelector<HTMLElement>(".answer-card-current");
     if (!last) return;
-    const cRect = container.getBoundingClientRect();
-    const lRect = last.getBoundingClientRect();
-    const delta = lRect.top - cRect.top;
-    if (delta > 1) container.scrollTo({ top: container.scrollTop + delta - 4, behavior: "smooth" });
+
+    // El relleno tiene que ser EXACTAMENTE lo que le falta al contenedor para
+    // que la card entre desde arriba: con menos, el scroll queda corto y la
+    // card no llega al tope.
+    const spacer = Math.max(0, container.clientHeight - last.offsetHeight);
+    container.style.setProperty("--answers-spacer", `${spacer}px`);
+
+    const delta = last.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    if (delta > 1) container.scrollTo({ top: container.scrollTop + delta, behavior: "smooth" });
   }, [answers.length, lastAnswerText]);
 
   const live = status === "live";
@@ -1105,13 +1116,14 @@ export default function Page() {
                 disabled={connecting}
                 ariaLabel="Modelo de IA"
                 alignRight
-                options={MODELS.map((m) => ({
+                options={VISIBLE_MODELS.map((m) => ({
                   id: m.id,
                   label: m.label,
                   short: m.short,
                   icon: <ProviderIcon provider={m.provider} />,
-                  tag: m.tag === "Recomendado" ? undefined : m.tag,
-                  badge: m.tag === "Recomendado" ? "Recomendado" : undefined,
+                  // Badge y tag pueden convivir (como en Parakeet: Recomendado + Rápido).
+                  tag: m.tag || undefined,
+                  badge: m.recommended ? "Recomendado" : undefined,
                 }))}
               />
             </div>

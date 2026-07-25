@@ -7,6 +7,7 @@ import {
   anthropicBody,
   anthropicText,
   geminiBody,
+  geminiChunk,
   geminiUrl,
   logUpstream,
   openaiBody,
@@ -342,10 +343,7 @@ async function streamGemini(
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
       return textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          return evt.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-        }),
+        sseTextStream(upstream.body, (json) => geminiChunk(JSON.parse(json), spec.model)),
         spec.model
       );
     }

@@ -5,7 +5,7 @@ import { track, identify } from "../lib/track";
 import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 import { BrandLogo } from "../lib/BrandLogo";
-import { MODELS, DEFAULT_MODEL_ID, type Provider } from "../lib/models";
+import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
 
 type Line = { id: number; text: string; final: boolean };
 type Lang = "es" | "en";
@@ -631,7 +631,7 @@ export default function SimuladorPage() {
       if (saved.company) setCompany(saved.company);
       if (saved.role) setRole(saved.role);
       if (saved.profile) setProfile(saved.profile);
-      if (saved.modelId && MODELS.some((m) => m.id === saved.modelId)) setModelId(saved.modelId);
+      if (saved.modelId && isSelectable(saved.modelId)) setModelId(saved.modelId);
       if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
       if (saved.interviewType) setInterviewType(saved.interviewType);
     } catch {}
@@ -1585,13 +1585,14 @@ export default function SimuladorPage() {
                 onChange={(id) => setModelId(id)}
                 ariaLabel="Modelo de IA"
                 alignRight
-                options={MODELS.map((m) => ({
+                options={VISIBLE_MODELS.map((m) => ({
                   id: m.id,
                   label: m.label,
                   short: m.short,
                   icon: <ProviderIcon provider={m.provider} />,
-                  tag: m.tag === "Recomendado" ? undefined : m.tag,
-                  badge: m.tag === "Recomendado" ? "Recomendado" : undefined,
+                  // Badge y tag pueden convivir (como en Parakeet: Recomendado + Rápido).
+                  tag: m.tag || undefined,
+                  badge: m.recommended ? "Recomendado" : undefined,
                 }))}
               />
             </div>

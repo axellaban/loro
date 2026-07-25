@@ -12,6 +12,15 @@ import type { ModelSpec } from "./models";
  */
 export const GEMINI_THINKING_LEVEL = "low";
 
+/**
+ * `maxOutputTokens` es un presupuesto COMPARTIDO entre los tokens de
+ * pensamiento y los de la respuesta visible. Los Gemini 3.x piensan, así que
+ * sin este margen se comen parte del presupuesto y el texto se corta a mitad de
+ * palabra. Es un tope, no un objetivo: se factura lo que se genera, y la
+ * profundidad del pensamiento la sigue fijando `thinkingLevel`.
+ */
+export const GEMINI_THINKING_HEADROOM = 2048;
+
 export function geminiUrl(model: string, method: "generateContent" | "streamGenerateContent", apiKey: string) {
   const qs = method === "streamGenerateContent" ? "?alt=sse&key=" : "?key=";
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}${qs}${apiKey}`;
@@ -35,9 +44,12 @@ export function geminiBody(opts: {
   /** Frame de la cámara del candidato, para que el entrevistador "lo vea". */
   image?: { mimeType: string; data: string } | null;
 }) {
+  // `maxOutputTokens` es el presupuesto de la respuesta VISIBLE; a los modelos
+  // que piensan se les suma el margen que va a consumir el pensamiento.
+  const thinks = opts.spec.thinking === "level";
   const generationConfig: Record<string, unknown> = {
     temperature: opts.temperature,
-    maxOutputTokens: opts.maxOutputTokens,
+    maxOutputTokens: opts.maxOutputTokens + (thinks ? GEMINI_THINKING_HEADROOM : 0),
     ...geminiThinking(opts.spec),
   };
   if (opts.json) generationConfig.responseMimeType = "application/json";
@@ -115,6 +127,19 @@ export function anthropicText(json: any): string {
   const blocks = Array.isArray(json?.content) ? json.content : [];
   const block = blocks.find((b: any) => b?.type === "text");
   return block?.text || "";
+}
+
+/**
+ * Extrae el texto de un evento SSE de Gemini y avisa si la respuesta se cortó
+ * por presupuesto de tokens. Sin esto, un corte se ve como texto truncado a
+ * mitad de palabra y no queda rastro de por qué.
+ */
+export function geminiChunk(evt: any, model: string): string | null {
+  const finish = evt?.candidates?.[0]?.finishReason;
+  if (finish && finish !== "STOP") {
+    console.warn(`[llm] gemini/${model} terminó por ${finish} (respuesta posiblemente cortada)`);
+  }
+  return evt?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
 /**
