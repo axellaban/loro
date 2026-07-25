@@ -292,6 +292,17 @@ function SessionModal({
   // escribiendo sobre una sesión que ya no está en pantalla.
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // Con el modal abierto, la página de atrás no scrollea. En mobile los dos
+  // scrolls compiten: el gesto sobre las notas terminaba moviendo el listado
+  // de fichas y parecía que el panel estaba trabado.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chat.length, chatDraft]);

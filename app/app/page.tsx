@@ -508,6 +508,66 @@ function buildDgUrl(sttLang: string): string {
   return `wss://api.deepgram.com/v1/listen?${params}`;
 }
 
+// Pantalla puente entre el fin de la entrevista y el pedido de email. Sin
+// esto, cortar la sesión hacía aparecer de golpe un formulario: primero se
+// muestra que hay algo procesándose y recién después se pide el email, que es
+// el orden en que la espera se entiende como trabajo y no como peaje.
+const ANALYZING_STEPS = [
+  "Cerrando la grabación",
+  "Ordenando la transcripción",
+  "Detectando las preguntas de la entrevista",
+  "Preparando tu reporte Post-Mortem",
+];
+const ANALYZING_STEP_MS = 700;
+
+function AnalyzingScreen({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState(0);
+  // onDone en un ref: si el padre lo recrea en cada render, el intervalo no
+  // tiene que reiniciarse por eso (volvería a empezar la cuenta de pasos).
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setStep((s) => {
+        const next = s + 1;
+        if (next >= ANALYZING_STEPS.length) {
+          clearInterval(t);
+          // Fuera del setState: llamarlo durante el render del padre es un
+          // update anidado que React rechaza.
+          setTimeout(() => doneRef.current(), ANALYZING_STEP_MS);
+        }
+        return next;
+      });
+    }, ANALYZING_STEP_MS);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="paywall-overlay">
+      <div className="paywall analyzing" role="status" aria-live="polite">
+        <div className="paywall-title">Analizando tu entrevista… 🦜</div>
+        <p className="paywall-text">
+          Estamos revisando lo que pasó en la llamada para armar tu reporte.
+        </p>
+        <ol className="analyzing-steps">
+          {ANALYZING_STEPS.map((label, i) => (
+            <li
+              key={i}
+              className={i < step ? "analyzing-step-done" : i === step ? "analyzing-step-active" : ""}
+            >
+              <span className="analyzing-mark" aria-hidden="true">
+                {i < step ? "✓" : <span className="analyzing-spinner" />}
+              </span>
+              {label}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 const LS_KEY = "copiloto:context:v1";
 
 // ---------- Cuota gratuita (100% client-side, sin backend) ----------
@@ -573,7 +633,7 @@ export default function Page() {
   const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
   // Al terminar una sesión el copiloto cae en la lista de sesiones (como
   // Parakeet), no de vuelta en el formulario.
-  const [view, setView] = useState<"setup" | "gate" | "sessions">("setup");
+  const [view, setView] = useState<"setup" | "analyzing" | "gate" | "sessions">("setup");
   // Sesión recién terminada: se abre sola en Notas IA al pasar el gate.
   const [justEndedId, setJustEndedId] = useState<string | null>(null);
   // Cuántas sesiones hay guardadas: si hay, el setup ofrece el acceso al
@@ -1325,9 +1385,9 @@ export default function Page() {
       track("session_saved", { questions: qa.length });
       sessionStartRef.current = 0;
       setJustEndedId(session.id);
-      // Con material y sin email todavía, primero el gate; si ya lo dejó, va
-      // derecho al informe de la sesión que acaba de terminar.
-      setView(savedEmail() ? "sessions" : "gate");
+      // Siempre pasa primero por el análisis: es lo que cierra la entrevista.
+      // Recién cuando termina se decide entre el gate y el informe.
+      setView("analyzing");
       return;
     }
     sessionStartRef.current = 0;
@@ -1658,6 +1718,14 @@ export default function Page() {
         )}
 
       </section>
+      )}
+
+      {view === "analyzing" && !live && (
+        <AnalyzingScreen
+          // Al terminar el análisis se pide el email; si ya lo dejó (acá o en
+          // el simulador), se salta directo al informe.
+          onDone={() => setView(savedEmail() ? "sessions" : "gate")}
+        />
       )}
 
       {view === "gate" && !live && (
