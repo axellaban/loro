@@ -1597,27 +1597,27 @@ export default function SimuladorPage() {
             </div>
           </div>
 
-          <div className="selectors-row" style={{ marginTop: 8 }}>
-            <div className="field">
-              <label className="mono form-label">Tipo de Entrevista</label>
-              <Dropdown
-                value={interviewType}
-                onChange={(id) => setInterviewType(id as InterviewType)}
-                ariaLabel="Tipo de Entrevista"
-                options={[
-                  { id: "general", label: "General / Fit Cultural" },
-                  { id: "technical", label: "Técnica / Hard Skills" },
-                  { id: "behavioral", label: "De Comportamiento (STAR)" },
-                  { id: "hr", label: "Inicial / Recursos Humanos" },
-                ]}
-              />
-            </div>
+          {/* A ancho completo: iba solo dentro de una grilla de 2 columnas, así que
+              dejaba la mitad derecha vacía y encima truncaba el valor. */}
+          <div className="field" style={{ marginTop: 8 }}>
+            <label className="mono form-label">Tipo de entrevista</label>
+            <Dropdown
+              value={interviewType}
+              onChange={(id) => setInterviewType(id as InterviewType)}
+              ariaLabel="Tipo de entrevista"
+              options={[
+                { id: "general", label: "General / Fit Cultural" },
+                { id: "technical", label: "Técnica / Hard Skills" },
+                { id: "behavioral", label: "De Comportamiento (STAR)" },
+                { id: "hr", label: "Inicial / Recursos Humanos" },
+              ]}
+            />
           </div>
 
           {error && <div className="mono sim-error-box" style={{ marginTop: 10 }}>⚠️ {error}</div>}
 
           <div className="panel" style={{ marginTop: 12 }}>
-            <label className="mono form-label">Contexto del Puesto</label>
+            <label className="mono form-label">Contexto de la entrevista</label>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label className="mono form-mini-label">
@@ -1659,7 +1659,7 @@ export default function SimuladorPage() {
 
           <footer className="sim-setup-footer">
             <button onClick={() => void startSimulation()} className="btn-action btn-primary">
-              ▶ Soltar Loro (generar sala)
+              ▶ Soltar el Loro (generar sala)
             </button>
             {savedReport && (
               <button

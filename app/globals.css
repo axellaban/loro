@@ -105,10 +105,18 @@ input {
 }
 
 /* Fila de selectores (idioma + modelo en una misma línea, como Parakeet). */
+/* En el teléfono van apilados: en media columna no entra ningún nombre de
+   modelo (ni "Gemini 2.5 Flash" en un Pro Max), y se cortaban con puntos
+   suspensivos. A ancho completo entran enteros hasta en pantallas de 320px. */
 .selectors-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
+}
+@media (min-width: 560px) {
+  .selectors-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .field {
