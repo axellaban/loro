@@ -214,6 +214,8 @@ function ListenText({ text }: { text: string }) {
 type DDOption = {
   id: string;
   label: string;
+  /** Versión abreviada para la píldora cerrada. Si falta, se usa `label`. */
+  short?: string;
   icon?: ReactNode;
   tag?: string;
   badge?: string;
@@ -264,7 +266,7 @@ function Dropdown({
       >
         <span className="dd-trigger-main">
           {current?.icon}
-          <span className="dd-trigger-label">{current?.label}</span>
+          <span className="dd-trigger-label">{current?.short ?? current?.label}</span>
         </span>
         <span className="dd-caret" aria-hidden="true">▾</span>
       </button>
@@ -312,7 +314,10 @@ const ANSWER_LANG: Record<Lang, "es" | "en"> = { es: "es", en: "en" };
 // en Vercel; si falta, el backend devuelve un error claro. Los IDs de modelo se
 // pueden pisar por env var en el backend (ANTHROPIC_MODEL / OPENAI_MODEL).
 type Provider = "gemini" | "anthropic" | "openai";
-type ModelOption = { id: string; label: string; provider: Provider; model: string; tag: string };
+// `short` es lo que se ve en la píldora cerrada: en mobile los selectores van a
+// media columna y el nombre completo no entra. La lista desplegada siempre
+// muestra `label`, así que el nombre real del modelo nunca se pierde.
+type ModelOption = { id: string; label: string; short: string; provider: Provider; model: string; tag: string };
 // Misma lista que Parakeet (mismo orden y tags). Los `model` son los IDs reales
 // de API: para Claude va el ID canónico (claude-haiku-4-5) y para Gemini los IDs
 // que funcionan con la key actual; el resto usa el ID que matchea el nombre.
@@ -325,8 +330,8 @@ const MODELS: ModelOption[] = [
   // { id: "gpt-4.1", label: "GPT-4.1", provider: "openai", model: "gpt-4.1", tag: "Smart" },
   // { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", model: "gpt-4.1-mini", tag: "Rápido" },
   // { id: "claude-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", model: "claude-haiku-4-5", tag: "Lento" },
-  { id: "gemini-flash", label: "Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
-  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash", label: "Gemini 2.5 Flash", short: "Gemini Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
+  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", short: "Gemini Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
 ];
 const DEFAULT_MODEL_ID = "gemini-flash";
 
@@ -1122,6 +1127,7 @@ export default function Page() {
                 options={MODELS.map((m) => ({
                   id: m.id,
                   label: m.label,
+                  short: m.short,
                   icon: <ProviderIcon provider={m.provider} />,
                   tag: m.tag === "Recomendado" ? undefined : m.tag,
                   badge: m.tag === "Recomendado" ? "Recomendado" : undefined,

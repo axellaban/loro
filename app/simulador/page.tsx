@@ -9,7 +9,10 @@ import { BrandLogo } from "../lib/BrandLogo";
 type Line = { id: number; text: string; final: boolean };
 type Lang = "es" | "en";
 type Provider = "gemini" | "anthropic" | "openai";
-type ModelOption = { id: string; label: string; provider: Provider; model: string; tag: string };
+// `short` es lo que se ve en la píldora cerrada: en mobile los selectores van a
+// media columna y el nombre completo no entra. La lista desplegada siempre
+// muestra `label`, así que el nombre real del modelo nunca se pierde.
+type ModelOption = { id: string; label: string; short: string; provider: Provider; model: string; tag: string };
 
 type InterviewType = "general" | "technical" | "behavioral" | "hr";
 
@@ -157,8 +160,8 @@ function TrafficLight({ score }: { score: number }) {
 const STT_LANG: Record<Lang, string> = { es: "es", en: "en" };
 
 const MODELS: ModelOption[] = [
-  { id: "gemini-flash", label: "Gemini 2.5 Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
-  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
+  { id: "gemini-flash", label: "Gemini 2.5 Flash", short: "Gemini Flash", provider: "gemini", model: "gemini-2.5-flash", tag: "Recomendado" },
+  { id: "gemini-flash-lite", label: "Gemini 2.5 Flash Lite", short: "Gemini Lite", provider: "gemini", model: "gemini-2.5-flash-lite", tag: "Rápido" },
 ];
 const DEFAULT_MODEL_ID = "gemini-flash";
 
@@ -352,6 +355,8 @@ function InfoTip({ text }: { text: string }) {
 type DDOption = {
   id: string;
   label: string;
+  /** Versión abreviada para la píldora cerrada. Si falta, se usa `label`. */
+  short?: string;
   icon?: ReactNode;
   tag?: string;
   badge?: string;
@@ -402,7 +407,7 @@ function Dropdown({
       >
         <span className="dd-trigger-main">
           {current?.icon}
-          <span className="dd-trigger-label">{current?.label}</span>
+          <span className="dd-trigger-label">{current?.short ?? current?.label}</span>
         </span>
         <span className="dd-caret" aria-hidden="true">▾</span>
       </button>
@@ -1589,6 +1594,7 @@ export default function SimuladorPage() {
                 options={MODELS.map((m) => ({
                   id: m.id,
                   label: m.label,
+                  short: m.short,
                   icon: <ProviderIcon provider={m.provider} />,
                   tag: m.tag === "Recomendado" ? undefined : m.tag,
                   badge: m.tag === "Recomendado" ? "Recomendado" : undefined,

@@ -105,18 +105,10 @@ input {
 }
 
 /* Fila de selectores (idioma + modelo en una misma línea, como Parakeet). */
-/* En el teléfono van apilados: en media columna no entra ningún nombre de
-   modelo (ni "Gemini 2.5 Flash" en un Pro Max), y se cortaban con puntos
-   suspensivos. A ancho completo entran enteros hasta en pantallas de 320px. */
 .selectors-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-}
-@media (min-width: 560px) {
-  .selectors-row {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 .field {
@@ -332,6 +324,19 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* En el teléfono los selectores van en dos columnas, así que cada píldora tiene
+   la mitad del ancho. Recortar un poco el padding y el gap libera los ~10px que
+   hacen falta para que el nombre del modelo entre entero. En desktop sobra
+   lugar, así que ahí queda el padding holgado. */
+@media (max-width: 559px) {
+  .dd-trigger {
+    padding: 0 10px 0 12px;
+  }
+  .dd-trigger-main {
+    gap: 6px;
+  }
 }
 
 .dd-caret {
