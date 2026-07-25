@@ -5,6 +5,7 @@ import { track, identify } from "../lib/track";
 import { BrandLogo } from "../lib/BrandLogo";
 import { extractSentences } from "../simulador/tts";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
+import { looksLikeQuestion } from "../lib/question";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -810,8 +811,8 @@ export default function Page() {
   // Disparo manual (ÚNICA forma de responder, como Parakeet): al tocar
   // "Responder ahora" se genera una respuesta sobre lo último dicho. La app
   // NO responde sola mientras la persona habla; solo transcribe.
-  const answerNow = useCallback(() => {
-    track("answer_requested");
+  const answerNow = useCallback((opts?: { auto?: boolean }) => {
+    track("answer_requested", { auto: !!opts?.auto });
     // Aborta una respuesta en curso para no encimar dos generaciones. Si esa
     // respuesta todavía estaba vacía (no llegó ni el primer token), sacamos su
     // tarjeta para que no quede colgada en pantalla al reintentar.
@@ -821,7 +822,12 @@ export default function Page() {
     if (prev) {
       setAnswers((list) => list.filter((a) => !(a.id === prev.id && !a.done && !a.text)));
     }
-    const q = questionBufRef.current.trim() || transcriptRef.current.trim().slice(-500);
+    // El botón manual, si el buffer está vacío, cae a lo último transcripto:
+    // la persona tocó el botón, algo hay que responder. La respuesta
+    // automática NO usa ese fallback — respondería de nuevo lo mismo que
+    // acaba de responder, porque generar vacía el buffer pero no el
+    // transcript.
+    const q = questionBufRef.current.trim() || (opts?.auto ? "" : transcriptRef.current.trim().slice(-500));
     questionBufRef.current = "";
     if (q.trim().length < 2) return;
     const id = ++ansId.current;
@@ -947,19 +953,22 @@ export default function Page() {
       }
 
       // Fin de intervención del entrevistador. En modo manual no hace nada; con
-      // la respuesta automática activada, es el disparador. Se exige que haya
-      // texto sin usar en el buffer: `answerNow` lo vacía al generar, así que
-      // sin esta guarda un silencio posterior volvería a disparar con el
-      // fallback de la transcripción y respondería dos veces lo mismo.
+      // la respuesta automática activada, es el disparador — pero un silencio
+      // NO es una pregunta: Deepgram manda UtteranceEnd en cada pausa, también
+      // después de un "ok, perfecto" o de la presentación del entrevistador.
+      // Por eso se exige que el buffer contenga efectivamente una pregunta o un
+      // pedido de información (ver app/lib/question.ts). El buffer además tiene
+      // que tener texto sin usar: `answerNow` lo vacía al generar, así que sin
+      // eso el mismo texto dispararía dos veces.
       if (msg.type === "UtteranceEnd") {
-        if (autoAnswerRef.current && questionBufRef.current.trim().length > 2) {
+        if (autoAnswerRef.current && looksLikeQuestion(questionBufRef.current)) {
           if (autoAnswerTimerRef.current) clearTimeout(autoAnswerTimerRef.current);
           autoAnswerTimerRef.current = setTimeout(() => {
             autoAnswerTimerRef.current = null;
             // Se vuelve a chequear: en el ínterin pudo apagarse el toggle o
             // haberse respondido a mano (que vacía el buffer).
-            if (autoAnswerRef.current && questionBufRef.current.trim().length > 2) {
-              answerNowRef.current();
+            if (autoAnswerRef.current && looksLikeQuestion(questionBufRef.current)) {
+              answerNowRef.current({ auto: true });
             }
           }, AUTO_ANSWER_DELAY_MS);
         }
@@ -1590,7 +1599,7 @@ export default function Page() {
                 ✕ Limpiar
               </button>
             </div>
-            <button onClick={answerNow} className="btn-action btn-primary btn-answer">
+            <button onClick={() => answerNow()} className="btn-action btn-primary btn-answer">
               <span className="btn-answer-inner">
                 <SparkleIcon />
                 Responder
