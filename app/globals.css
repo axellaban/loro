@@ -637,7 +637,8 @@ input {
 }
 
 .answer-card-text {
-  font-size: 16.5px;
+  /* Lo controla el menú de sesión (tres puntitos → Tamaño del texto). */
+  font-size: var(--answer-size, 16.5px);
   line-height: 1.72;
   white-space: pre-wrap;
   color: var(--ink);
@@ -891,6 +892,142 @@ input {
 .timer-free {
   color: var(--ink-faint);
   font-weight: 500;
+}
+
+/* ---- Menú de sesión (los tres puntitos del header, estilo Parakeet) ---- */
+.sess-menu {
+  position: relative;
+  flex: none;
+}
+
+/* Mismo cuadrado redondeado que el botón rojo de al lado, pero en blanco. */
+.sess-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sess-menu-btn:hover {
+  border-color: var(--ink-dim);
+}
+
+.sess-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 264px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.16);
+  padding: 6px;
+  /* En pantallas angostas el panel no debe desbordar el viewport. */
+  max-width: calc(100vw - 24px);
+}
+
+.sess-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 10px 12px 8px;
+}
+
+.sess-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  font-size: 15px;
+}
+.sess-row:hover,
+.sess-row-active {
+  background: var(--bg);
+}
+.sess-row-icon {
+  display: inline-flex;
+  color: var(--ink-dim);
+  flex: none;
+}
+.sess-row-label {
+  flex: 1;
+  min-width: 0;
+}
+.sess-row-value {
+  color: var(--ink-faint);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.sess-row-chevron {
+  display: inline-flex;
+  color: var(--ink-faint);
+  flex: none;
+}
+
+/* Submenú: tarjeta propia debajo de la fila elegida, como en Parakeet. */
+.sess-sub {
+  margin: 2px 0 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.1);
+  background: #fff;
+}
+
+.sess-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+}
+.sess-sub-row:hover,
+.sess-sub-row-sel {
+  background: var(--bg);
+}
+
+/* La muestra "Aa" se ve en el tamaño real que aplica esa opción. */
+.sess-sub-aa {
+  font-weight: 600;
+  line-height: 1;
+  width: 46px;
+  flex: none;
+  color: var(--ink);
+}
+.sess-sub-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+.sess-sub-label-lang {
+  font-size: 15px;
+  color: var(--ink);
+}
+.sess-sub-check {
+  display: inline-flex;
+  color: var(--ink);
+  flex: none;
 }
 
 /* Detener = botón rojo con "✕" arriba a la derecha (como Parakeet). */

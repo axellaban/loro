@@ -20,6 +20,7 @@ export type FunnelEvent =
   | "answer_copied"
   | "model_changed"
   | "lang_changed"
+  | "answer_size_changed"
   | "mode_changed"
   | "paywall_shown"
   | "capacity_closed_shown"

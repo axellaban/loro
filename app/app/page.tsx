@@ -159,6 +159,184 @@ function ClockIcon() {
   );
 }
 
+function DotsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="5" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="12" cy="19" r="1.8" />
+    </svg>
+  );
+}
+function AaIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 18 7.5 6l4.5 12" />
+      <path d="M4.6 14h5.8" />
+      <path d="M20 18v-5.2a2.8 2.8 0 0 0-5.2-1.4" />
+      <path d="M20 15.4c-3.6 0-5.2.7-5.2 2 0 .9.8 1.6 2 1.6 1.8 0 3.2-1.2 3.2-2.6Z" />
+    </svg>
+  );
+}
+function GlobeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z" />
+    </svg>
+  );
+}
+function ChevronRightIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+  );
+}
+function CheckMarkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12.5 9 17.5 20 6.5" />
+    </svg>
+  );
+}
+
+// Tamaños del texto de la respuesta (mismos seis escalones que Parakeet).
+// El valor se aplica como CSS var --answer-size sobre .answer-card-text.
+const ANSWER_SIZES = [
+  { id: "xs", label: "Extra chico", px: 13 },
+  { id: "s", label: "Chico", px: 15 },
+  { id: "m", label: "Normal", px: 16.5 },
+  { id: "l", label: "Grande", px: 19 },
+  { id: "xl", label: "Extra grande", px: 22 },
+  { id: "xxl", label: "Enorme", px: 26 },
+] as const;
+type AnswerSizeId = (typeof ANSWER_SIZES)[number]["id"];
+const DEFAULT_ANSWER_SIZE: AnswerSizeId = "m";
+function answerSizePx(id: string): number {
+  return (ANSWER_SIZES.find((s) => s.id === id) || ANSWER_SIZES[2]).px;
+}
+
+const MENU_LANGS: Array<{ id: Lang; label: string }> = [
+  { id: "es", label: "Español" },
+  { id: "en", label: "English" },
+];
+
+// Menú de sesión del header (los tres puntitos), con el mismo diseño de dos
+// niveles de Parakeet: las filas del menú quedan visibles y el submenú aparece
+// como una tarjeta debajo de la fila elegida.
+function SessionMenu({
+  lang,
+  onLang,
+  sizeId,
+  onSize,
+}: {
+  lang: Lang;
+  onLang: (l: Lang) => void;
+  sizeId: AnswerSizeId;
+  onSize: (id: AnswerSizeId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"root" | "size" | "lang">("root");
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  // Al cerrar, la próxima apertura arranca de nuevo en el menú principal.
+  useEffect(() => {
+    if (!open) setView("root");
+  }, [open]);
+
+  const langLabel = MENU_LANGS.find((l) => l.id === lang)?.label || "";
+
+  return (
+    <div className="sess-menu" ref={ref}>
+      <button
+        type="button"
+        className="sess-menu-btn"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Opciones de la sesión"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <DotsIcon />
+      </button>
+      {open && (
+        <div className="sess-panel" role="menu">
+          <div className="sess-panel-title">Sesión</div>
+
+          <button
+            type="button"
+            className={`sess-row ${view === "size" ? "sess-row-active" : ""}`}
+            onClick={() => setView(view === "size" ? "root" : "size")}
+          >
+            <span className="sess-row-icon"><AaIcon /></span>
+            <span className="sess-row-label">Tamaño del texto</span>
+            <span className="sess-row-chevron"><ChevronRightIcon /></span>
+          </button>
+          {view === "size" && (
+            <div className="sess-sub">
+              {ANSWER_SIZES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`sess-sub-row ${s.id === sizeId ? "sess-sub-row-sel" : ""}`}
+                  onClick={() => onSize(s.id)}
+                >
+                  <span className="sess-sub-aa" style={{ fontSize: s.px }}>Aa</span>
+                  <span className="sess-sub-label">{s.label}</span>
+                  {s.id === sizeId && <span className="sess-sub-check"><CheckMarkIcon /></span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className={`sess-row ${view === "lang" ? "sess-row-active" : ""}`}
+            onClick={() => setView(view === "lang" ? "root" : "lang")}
+          >
+            <span className="sess-row-icon"><GlobeIcon /></span>
+            <span className="sess-row-label">Idioma</span>
+            <span className="sess-row-value">{langLabel}</span>
+            <span className="sess-row-chevron"><ChevronRightIcon /></span>
+          </button>
+          {view === "lang" && (
+            <div className="sess-sub">
+              {MENU_LANGS.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  className={`sess-sub-row ${l.id === lang ? "sess-sub-row-sel" : ""}`}
+                  onClick={() => onLang(l.id)}
+                >
+                  <span className="sess-sub-label sess-sub-label-lang">{l.label}</span>
+                  {l.id === lang && <span className="sess-sub-check"><CheckMarkIcon /></span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Tooltip de ayuda (ⓘ) tap-to-toggle, apto mobile (el title nativo no aparece
 // al tocar en el celular).
 function InfoTip({ text }: { text: string }) {
@@ -356,6 +534,7 @@ export default function Page() {
   const [role, setRole] = useState("");
   const [profile, setProfile] = useState("");
   const [lang, setLang] = useState<Lang>("es");
+  const [answerSize, setAnswerSize] = useState<AnswerSizeId>(DEFAULT_ANSWER_SIZE);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -492,13 +671,19 @@ export default function Page() {
       if (saved.modelId && isSelectable(saved.modelId)) setModelId(saved.modelId);
       // Idioma: se restaura la última preferencia (es/en).
       if (saved.lang === "es" || saved.lang === "en") setLang(saved.lang);
+      if (saved.answerSize && ANSWER_SIZES.some((s) => s.id === saved.answerSize)) {
+        setAnswerSize(saved.answerSize);
+      }
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify({ company, role, profile, modelId, lang }));
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({ company, role, profile, modelId, lang, answerSize })
+      );
     } catch {}
-  }, [company, role, profile, modelId, lang]);
+  }, [company, role, profile, modelId, lang, answerSize]);
 
   // ---------- Generación ----------
   // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
@@ -1061,7 +1246,10 @@ export default function Page() {
   const connecting = status === "connecting";
 
   return (
-    <main className={`app-container ${live ? "app-live" : ""}`}>
+    <main
+      className={`app-container ${live ? "app-live" : ""}`}
+      style={{ ["--answer-size" as string]: `${answerSizePx(answerSize)}px` }}
+    >
       <header className="brand-header">
         <div className="brand">
           <BrandLogo />
@@ -1069,13 +1257,30 @@ export default function Page() {
         <div className="header-right">
           {live && (
             <div className="header-center">
-              <span className="timer-pill sessions-pill" title="Sesiones gratis restantes">
-                {sessionsLeft}/{freeSessions} Loros ~ {Math.ceil(remainingSec / 60)} mins (Free)
+              {/* Solo el tiempo restante: el contador de sesiones se sacó de la
+                  vista para que la primera línea quede como la de Parakeet. */}
+              <span className="timer-pill" title="Tiempo restante de la sesión">
+                <ClockIcon />
+                {Math.ceil(remainingSec / 60)} mins <span className="timer-free">(Free)</span>
               </span>
             </div>
           )}
           {!live && connecting && <span className="status-chip">conectando…</span>}
           {!live && status === "error" && <span className="status-chip">error</span>}
+          {live && (
+            <SessionMenu
+              lang={lang}
+              onLang={(l) => {
+                setLang(l);
+                track("lang_changed", { lang: l, from: "session_menu" });
+              }}
+              sizeId={answerSize}
+              onSize={(id) => {
+                setAnswerSize(id);
+                track("answer_size_changed", { size: id });
+              }}
+            />
+          )}
           {live && (
             <button className="stop-x" onClick={stop} aria-label="Detener" title="Detener">
               ✕
