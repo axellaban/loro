@@ -231,11 +231,15 @@ function SessionMenu({
   onLang,
   sizeId,
   onSize,
+  autoAnswer,
+  onAutoAnswer,
 }: {
   lang: Lang;
   onLang: (l: Lang) => void;
   sizeId: AnswerSizeId;
   onSize: (id: AnswerSizeId) => void;
+  autoAnswer: boolean;
+  onAutoAnswer: (v: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"root" | "size" | "lang">("root");
@@ -331,6 +335,20 @@ function SessionMenu({
               ))}
             </div>
           )}
+
+          <button
+            type="button"
+            className="sess-row sess-row-toggle"
+            role="switch"
+            aria-checked={autoAnswer}
+            onClick={() => onAutoAnswer(!autoAnswer)}
+          >
+            <span className="sess-row-icon"><SparkleIcon /></span>
+            <span className="sess-row-label">Respuesta automática</span>
+            <span className={`sess-switch ${autoAnswer ? "sess-switch-on" : ""}`} aria-hidden="true">
+              <span className="sess-switch-knob" />
+            </span>
+          </button>
         </div>
       )}
     </div>
@@ -535,6 +553,13 @@ export default function Page() {
   const [profile, setProfile] = useState("");
   const [lang, setLang] = useState<Lang>("es");
   const [answerSize, setAnswerSize] = useState<AnswerSizeId>(DEFAULT_ANSWER_SIZE);
+  // Respuesta automática: genera sola al detectar que el entrevistador terminó
+  // de hablar, sin tocar "Responder".
+  const [autoAnswer, setAutoAnswer] = useState(false);
+  const autoAnswerRef = useRef(false);
+  useEffect(() => {
+    autoAnswerRef.current = autoAnswer;
+  }, [autoAnswer]);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -672,16 +697,17 @@ export default function Page() {
       if (saved.answerSize && ANSWER_SIZES.some((s) => s.id === saved.answerSize)) {
         setAnswerSize(saved.answerSize);
       }
+      if (typeof saved.autoAnswer === "boolean") setAutoAnswer(saved.autoAnswer);
     } catch {}
   }, []);
   useEffect(() => {
     try {
       localStorage.setItem(
         LS_KEY,
-        JSON.stringify({ company, role, profile, modelId, lang, answerSize })
+        JSON.stringify({ company, role, profile, modelId, lang, answerSize, autoAnswer })
       );
     } catch {}
-  }, [company, role, profile, modelId, lang, answerSize]);
+  }, [company, role, profile, modelId, lang, answerSize, autoAnswer]);
 
   // ---------- Generación ----------
   // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
@@ -796,6 +822,13 @@ export default function Page() {
     runGenerate(id, q, controller);
   }, [runGenerate]);
 
+  // El handler del socket se crea una sola vez (deps []), así que no puede
+  // cerrar sobre `answerNow` sin quedar viejo: se lo pasa por ref.
+  const answerNowRef = useRef(answerNow);
+  useEffect(() => {
+    answerNowRef.current = answerNow;
+  }, [answerNow]);
+
   // Feedback 👍/👎 por respuesta. Togglea el estado visual y manda el evento a
   // analytics (única señal de calidad de respuestas que tenemos).
   const setFeedback = useCallback((id: number, fb: "up" | "down") => {
@@ -903,8 +936,17 @@ export default function Page() {
         return;
       }
 
-      // Modo manual: NO se dispara solo por fin de intervención.
-      if (msg.type === "UtteranceEnd") return;
+      // Fin de intervención del entrevistador. En modo manual no hace nada; con
+      // la respuesta automática activada, es el disparador. Se exige que haya
+      // texto sin usar en el buffer: `answerNow` lo vacía al generar, así que
+      // sin esta guarda un silencio posterior volvería a disparar con el
+      // fallback de la transcripción y respondería dos veces lo mismo.
+      if (msg.type === "UtteranceEnd") {
+        if (autoAnswerRef.current && questionBufRef.current.trim().length > 2) {
+          answerNowRef.current();
+        }
+        return;
+      }
       if (msg.type !== "Results") return;
 
       const alt = msg.channel?.alternatives?.[0];
@@ -1272,6 +1314,11 @@ export default function Page() {
               onSize={(id) => {
                 setAnswerSize(id);
                 track("answer_size_changed", { size: id });
+              }}
+              autoAnswer={autoAnswer}
+              onAutoAnswer={(v) => {
+                setAutoAnswer(v);
+                track("auto_answer_toggled", { on: v });
               }}
             />
           )}

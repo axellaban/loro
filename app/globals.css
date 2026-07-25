@@ -1018,6 +1018,39 @@ input {
   flex: none;
 }
 
+/* Fila con interruptor: el switch va pegado a la derecha. */
+.sess-row-toggle .sess-row-label {
+  flex: 1;
+}
+
+.sess-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 46px;
+  height: 27px;
+  border-radius: 999px;
+  background: #d7dae0;
+  flex: none;
+  transition: background 0.18s ease;
+}
+.sess-switch-knob {
+  position: absolute;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.28);
+  transition: transform 0.18s ease;
+}
+.sess-switch-on {
+  background: var(--loro-green);
+}
+.sess-switch-on .sess-switch-knob {
+  transform: translateX(19px);
+}
+
 /* Submenú: tarjeta propia debajo de la fila elegida, como en Parakeet. */
 .sess-sub {
   margin: 2px 0 4px;

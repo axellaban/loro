@@ -21,6 +21,7 @@ export type FunnelEvent =
   | "model_changed"
   | "lang_changed"
   | "answer_size_changed"
+  | "auto_answer_toggled"
   | "mode_changed"
   | "paywall_shown"
   | "capacity_closed_shown"
