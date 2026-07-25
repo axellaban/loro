@@ -364,12 +364,13 @@ input {
   top: calc(100% + 6px);
   left: 0;
   min-width: 250px;
-  max-width: 82vw;
+  /* Ancho generoso: la fila más larga lleva label + tag + badge "Recomendado". */
+  max-width: min(98vw, 420px);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 12px 32px -8px rgba(16, 24, 40, 0.22);
-  padding: 6px;
+  padding: 5px;
   z-index: 30;
   max-height: 340px;
   overflow-y: auto;
@@ -387,8 +388,8 @@ input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 10px;
+  gap: 8px;
+  padding: 10px 9px;
   border: none;
   background: transparent;
   border-radius: 8px;
@@ -404,11 +405,15 @@ input {
   background: #f0fdf9;
 }
 
+/* El lado izquierdo se encoge y el derecho (badge + tilde) nunca: si no, el
+   texto se desborda POR DEBAJO del badge "Recomendado" y queda tapado. */
 .dd-option-left {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .dd-option-label {
@@ -416,28 +421,35 @@ input {
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
+/* El tag es lo único que cede cuando no entra todo en la fila: el nombre del
+   modelo se muestra siempre entero. */
 .dd-option-tag {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--ink-faint);
   font-weight: 500;
   white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dd-option-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  flex: none;
 }
 
 .dd-badge {
   background: var(--btn-dark);
   color: #fff;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 3px 9px;
+  padding: 3px 8px;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -653,15 +665,21 @@ input {
 }
 
 /* Barra de escucha en vivo */
+/* Franja de escucha: banda de borde a borde, sin tarjeta (como Parakeet). El
+   margen negativo la saca del padding lateral del contenedor para que llegue a
+   los bordes de la pantalla. */
 .listen-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  min-height: 36px;
+  gap: 9px;
+  padding: 11px 16px;
+  margin: 0 -16px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  min-height: 44px;
 }
 
 .eq {
@@ -846,6 +864,28 @@ input {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+}
+
+/* En vivo el header se aprieta: entran logo + banderita + pastilla + dos
+   botones. Se le da el aire de Parakeet — la banderita "IA" se va (es
+   decorativa y come ancho), el logo baja un punto y todo respira más. */
+.app-live .brand-header {
+  gap: 12px;
+  min-height: 52px;
+}
+.app-live .flag-ia {
+  display: none;
+}
+.app-live .brand-logo-text {
+  font-size: 1.22rem;
+}
+.app-live .header-right {
+  gap: 9px;
+}
+.app-live .timer-pill {
+  padding: 8px 13px;
+  font-size: 13.5px;
 }
 
 .header-actions {

@@ -538,7 +538,6 @@ export default function Page() {
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const [tab, setTab] = useState<"answer" | "transcript">("answer");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   // Cuota gratuita
   const [sessionsUsed, setSessionsUsed] = useState(0);
@@ -590,7 +589,6 @@ export default function Page() {
   // Respuesta en curso: permite abortarla si se pide otra o se limpia.
   const turnRef = useRef<{ id: number; sentText: string; controller: AbortController | null } | null>(null);
 
-  const scrollT = useRef<HTMLDivElement | null>(null);
   const scrollA = useRef<HTMLDivElement | null>(null);
 
   // Modelo elegido, siempre fresco (evita closures viejas en runGenerate).
@@ -706,7 +704,6 @@ export default function Page() {
           ? prev.map((a) => (a.id === id ? card : a))
           : [...prev, card].slice(-20); // cronológico: nuevas abajo
       });
-      setTab("answer");
       const startedAt = Date.now();
       try {
         const res = await fetch("/api/answer", {
@@ -1211,9 +1208,6 @@ export default function Page() {
     return () => document.removeEventListener("visibilitychange", reacquire);
   }, [status]);
 
-  useEffect(() => {
-    scrollT.current?.scrollTo({ top: scrollT.current.scrollHeight });
-  }, [lines]);
   // Al aparecer/llenarse una respuesta nueva, la subimos hasta el tope del área
   // para que la Q&A anterior quede fuera de vista (como Parakeet).
   //
@@ -1422,38 +1416,25 @@ export default function Page() {
       {/* Tira de escucha en vivo: muestra lo último que se oye y da acceso
           secundario a la transcripción. La respuesta es la protagonista. */}
       {live && (
+        // Franja de escucha: una sola línea de borde a borde, sin tarjeta ni
+        // botones (como Parakeet). Lo único que importa acá es ver que el Loro
+        // está escuchando y qué viene oyendo.
         <div className="listen-bar mono">
-          {tab === "answer" ? (
-            <>
-              <span className="eq" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-                <span />
-              </span>
-              <span className="listen-text listen-text-live">
-                <ListenText text={lines.length ? lines[lines.length - 1].text : ""} />
-              </span>
-              <button className="listen-toggle" onClick={() => setTab("transcript")}>
-                Transcripción
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="listen-text" style={{ color: "var(--ink)", fontWeight: 600 }}>
-                Transcripción completa
-              </span>
-              <button className="listen-toggle" onClick={() => setTab("answer")}>
-                ← Respuestas
-              </button>
-            </>
-          )}
+          <span className="eq" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="listen-text listen-text-live">
+            <ListenText text={lines.length ? lines[lines.length - 1].text : ""} />
+          </span>
         </div>
       )}
 
       {/* Contenido */}
       <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
-        {live && tab === "answer" && (
+        {live && (
           <div className="panel" style={{ flex: 1, minHeight: 0 }}>
             <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
@@ -1521,27 +1502,6 @@ export default function Page() {
           </div>
         )}
 
-        {live && tab === "transcript" && (
-          <div className="panel" style={{ flex: 1, minHeight: 0 }}>
-            <div ref={scrollT} className="transcript-container">
-              {lines.length === 0 ? (
-                <p className="placeholder" style={{ fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", padding: "8px" }}>
-                  Escuchando… la transcripción aparece acá.
-                </p>
-              ) : (
-                lines.map((l) => (
-                  <p
-                    key={l.id}
-                    className="transcript-line"
-                    style={{ color: l.final ? "var(--ink)" : "var(--ink-dim)" }}
-                  >
-                    {l.text}
-                  </p>
-                ))
-              )}
-            </div>
-          </div>
-        )}
       </section>
 
       {/* Footer */}

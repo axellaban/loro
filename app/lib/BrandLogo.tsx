@@ -10,6 +10,7 @@ export function IaFlag({ w = 35, h = 30 }: { w?: number; h?: number }) {
       viewBox="0 0 35 30"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      className="flag-ia"
       style={{ flexShrink: 0 }}
       aria-hidden="true"
     >
