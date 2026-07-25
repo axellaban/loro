@@ -3,42 +3,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ParrotSvg } from "./lib/parrot";
+import { IaFlag } from "./lib/BrandLogo";
 import { track } from "./lib/track";
 
 // Palabras que rotan en la 1ra palabra del título (efecto swap).
 const HERO_WORDS = ["Loreá", "crackeá", "hackeá", "pasá"];
-
-// Banderita tipo Final Round con el texto "IA"
-function IaFlag() {
-  return (
-    <svg
-      width={29}
-      height={25}
-      viewBox="0 0 35 30"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ flexShrink: 0 }}
-      aria-hidden="true"
-    >
-      <path
-        d="M6 2h24a4 4 0 0 1 4 4v2a2 2 0 0 1-.4 1.2L29.5 14l4.1 4.8a2 2 0 0 1 .4 1.2v2a4 4 0 0 1-4 4H9.5L4.5 29.5c-.6.5-1.5.1-1.5-.7V26H4a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h2z"
-        fill="#ff4f12"
-      />
-      <text
-        x="16.5"
-        y="14"
-        fill="#ffffff"
-        fontSize="11"
-        fontWeight="bold"
-        fontFamily="system-ui, -apple-system, sans-serif"
-        textAnchor="middle"
-        dominantBaseline="central"
-      >
-        IA
-      </text>
-    </svg>
-  );
-}
 
 // Cápsula 3D realista idéntica a la imagen de referencia Matrix
 function MatrixPill3D({ type }: { type: "blue" | "red" }) {
@@ -174,7 +143,7 @@ export default function Hub() {
         <Link href="/" aria-label="Ir al inicio" className="hub-brand" style={{ textDecoration: "none" }}>
           <ParrotSvg size={28} />
           <span className="hub-brand-text">Loreado</span>
-          <IaFlag />
+          <IaFlag w={29} h={24} />
         </Link>
 
         <h1 className="hub-h1">

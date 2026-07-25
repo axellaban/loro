@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { ParrotSvg } from "./parrot";
 
-// Banderita tipo Final Round con el texto "IA" (misma que el hub del home).
-export function IaFlag({ w = 35, h = 30 }: { w?: number; h?: number }) {
+// Banderita "IA": globo de diálogo con la colita abajo a la derecha.
+//
+// Va en verde loro (--loro-lime) en vez del naranja anterior, para que el
+// lockup use el mismo verde que el resaltador del home. Ojo: sobre ese lima el
+// texto tiene que ser oscuro — en blanco el contraste queda en ~1.7:1 y a
+// tamaño de header es ilegible.
+export function IaFlag({ w = 28, h = 23 }: { w?: number; h?: number }) {
   return (
     <svg
       width={w}
       height={h}
-      viewBox="0 0 35 30"
+      viewBox="0 0 38 31"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="flag-ia"
@@ -15,15 +20,15 @@ export function IaFlag({ w = 35, h = 30 }: { w?: number; h?: number }) {
       aria-hidden="true"
     >
       <path
-        d="M6 2h24a4 4 0 0 1 4 4v2a2 2 0 0 1-.4 1.2L29.5 14l4.1 4.8a2 2 0 0 1 .4 1.2v2a4 4 0 0 1-4 4H9.5L4.5 29.5c-.6.5-1.5.1-1.5-.7V26H4a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h2z"
-        fill="#ff4f12"
+        d="M5 0h24a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5h-6.6l7 6.1c.9.8.3 2.3-.9 2.3H5a5 5 0 0 1-5-5V5a5 5 0 0 1 5-5z"
+        fill="#a3e635"
       />
       <text
-        x="16.5"
-        y="14"
-        fill="#ffffff"
-        fontSize="11"
-        fontWeight="bold"
+        x="17"
+        y="12.5"
+        fill="#17181a"
+        fontSize="13"
+        fontWeight="800"
         fontFamily="system-ui, -apple-system, sans-serif"
         textAnchor="middle"
         dominantBaseline="central"
