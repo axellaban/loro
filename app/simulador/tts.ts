@@ -29,9 +29,16 @@ type QueueItem = {
 // más rápida y —al subir también el pitch— más aguda/nasal, o sea más "loro".
 const TTS_PLAYBACK_RATE = 1.18;
 
+// Volumen. El audio que devuelve la API viene bastante por debajo del máximo,
+// así que se amplifica en vez de dejarlo en ganancia unitaria. Subir la
+// ganancia sola recortaría los picos (distorsión), por eso después va un
+// limitador: sube el volumen percibido y aplasta solo los picos que se pasan.
+const TTS_GAIN = 2.6;
+
 export class TtsQueue {
   readonly analyser: AnalyserNode;
   private gain: GainNode;
+  private limiter: DynamicsCompressorNode;
   private ctx: AudioContext;
   private lang: "es" | "en";
   private items: QueueItem[] = [];
@@ -55,14 +62,27 @@ export class TtsQueue {
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 256;
     this.gain = ctx.createGain();
+    this.gain.gain.value = TTS_GAIN;
+
+    // Limitador después de la ganancia: ataque rápido y ratio alto para frenar
+    // los picos que se pasarían de 0 dB. Sin esto, amplificar distorsiona.
+    this.limiter = ctx.createDynamicsCompressor();
+    this.limiter.threshold.value = -3;
+    this.limiter.knee.value = 0;
+    this.limiter.ratio.value = 20;
+    this.limiter.attack.value = 0.003;
+    this.limiter.release.value = 0.25;
+
+    // El analyser va primero para que el lip-sync mida la voz, no la ganancia.
     this.analyser.connect(this.gain);
-    this.gain.connect(ctx.destination);
+    this.gain.connect(this.limiter);
+    this.limiter.connect(ctx.destination);
   }
 
   setMuted(muted: boolean) {
     // Silencia sin frenar la reproducción: el timing (onended) sigue corriendo
     // para no romper la máquina de estados de la entrevista.
-    this.gain.gain.value = muted ? 0 : 1;
+    this.gain.gain.value = muted ? 0 : TTS_GAIN;
   }
 
   enqueue(sentence: string) {
