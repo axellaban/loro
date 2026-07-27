@@ -1909,16 +1909,16 @@ export default function Page() {
               />
               <button
                 type="submit"
-                className="btn-action btn-primary"
+                className="btn-action btn-primary btn-answer"
                 disabled={!passInput.trim() || passBusy}
               >
-                {passBusy ? "Validando…" : "Activar"}
+                <span className="btn-answer-inner">{passBusy ? "Validando…" : "Activar"}</span>
               </button>
               {passError && <p className="paywall-error">{passError}</p>}
             </form>
           ) : (
             <button type="button" className="cs-link-btn" onClick={() => setPassOpen(true)}>
-              ¿Tenés un pase? Activalo acá
+              ¿Ya sos Loro?
             </button>
           ))}
         {showSetup && (
