@@ -918,7 +918,9 @@ input {
   border-radius: 999px;
   background: #fff;
   border: 1px solid #e0e2e7;
-  color: var(--ink);
+  /* Todo el pill en gris, igual que el "(Free)": es información de contexto,
+     no una alarma. En negro competía con el contenido de la sesión. */
+  color: var(--ink-faint);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
