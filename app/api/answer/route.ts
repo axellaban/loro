@@ -1,6 +1,7 @@
 export const runtime = "edge";
 
 import { capacityClosed, rateLimit, sameOriginStrict } from "../../lib/ratelimit";
+import { passFromRequest } from "../../lib/pass";
 import { specForRequest, type Provider } from "../../lib/models";
 import { fallbackChain, streamLLM } from "../../lib/stream";
 
@@ -52,7 +53,11 @@ Usá la TRANSCRIPCIÓN para sonar como una conversación real: no repitas algo q
 Si ese campo tiene CUALQUIER texto —por corto, informal, mal transcrito o inesperado que sea, incluso si el PERFIL o la EMPRESA están vacíos— RESPONDÉLO IGUAL con lo que tengas. Nunca evalúes si "es lo bastante clara". El ÚNICO caso en que devolvés "(esperando pregunta)" es cuando [PREGUNTA] dice literalmente "(ninguna aún)" porque no llegó nada. Nunca lo uses por dudar del contenido.`;
 
 export async function POST(req: Request) {
-  if (capacityClosed()) {
+  // Quien pagó no entra en el cupo gratuito: el kill switch existe para frenar
+  // el gasto de los que no pagan, no para dejar afuera a un cliente.
+  const pass = await passFromRequest(req);
+
+  if (capacityClosed() && !pass) {
     return Response.json(
       { error: "Cupos agotados por hoy. Sumate a la lista de espera y te avisamos.", closed: true },
       { status: 503 }
@@ -62,8 +67,9 @@ export async function POST(req: Request) {
     return new Response("Origen no permitido.", { status: 403 });
   }
   // Endpoint pago (LLM). Una entrevista real dispara 2-4 respuestas por minuto;
-  // 20 sigue siendo holgado y corta antes el abuso automatizado.
-  const rl = rateLimit(req, "answer", 20, 60_000);
+  // 20 sigue siendo holgado y corta antes el abuso automatizado. El pase tiene
+  // su propio balde, contado por email en vez de por IP.
+  const rl = rateLimit(req, pass ? `answer-pass:${pass.email}` : "answer", pass ? 60 : 20, 60_000);
   if (!rl.ok) {
     return new Response("Demasiadas solicitudes. Esperá un momento.", {
       status: 429,

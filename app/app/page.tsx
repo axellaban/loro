@@ -10,6 +10,8 @@ import { looksLikeQuestion } from "../lib/question";
 import CallSessions from "./CallSessions";
 import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 import { rememberEmail, savedEmail } from "../lib/email";
+import { usePass, storedPassToken } from "../lib/passClient";
+import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -570,6 +572,16 @@ function AnalyzingScreen({ onDone }: { onDone: () => void }) {
 
 const LS_KEY = "copiloto:context:v1";
 
+/**
+ * El pase viaja en cada pedido caro. Se lee del storage en el momento (y no de
+ * un estado de React) para que el header sea correcto incluso en la primera
+ * llamada, antes de que termine la revalidación.
+ */
+function passHeader(): Record<string, string> {
+  const t = storedPassToken();
+  return t ? { [PASS_HEADER]: t } : {};
+}
+
 // ---------- Cuota gratuita (100% client-side, sin backend) ----------
 // Cada navegador arranca con FREE_SESSIONS sesiones de hasta SESSION_MAX_MS.
 // Se descuenta 1 al arrancar. Al agotarse, se muestra el paywall con los pases
@@ -627,6 +639,17 @@ export default function Page() {
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [sending, setSending] = useState(false);
+  // Pase ilimitado: sin corte de tiempo ni tope de sesiones mientras esté
+  // vigente. `checking` evita mostrarle el paywall a alguien que ya pagó
+  // durante el instante en que se revalida.
+  const { pass, checking: passChecking, error: passError, activate: activatePass } = usePass();
+  const passRef = useRef<typeof pass>(null);
+  useEffect(() => {
+    passRef.current = pass;
+  }, [pass]);
+  const [passInput, setPassInput] = useState("");
+  const [passOpen, setPassOpen] = useState(false);
+  const [passBusy, setPassBusy] = useState(false);
   const sessionsLeft = Math.max(0, FREE_SESSIONS - sessionsUsed);
   // Countdown de la sesión (10 min gratis), estilo Parakeet.
   const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
@@ -796,7 +819,7 @@ export default function Page() {
       try {
         const res = await fetch("/api/answer", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...passHeader() },
           body: JSON.stringify({
             profile,
             company,
@@ -1099,8 +1122,9 @@ export default function Page() {
   }, []);
 
   const start = useCallback(async () => {
-    // Cuota gratuita: si no quedan sesiones, se muestra el paywall.
-    if (sessionsUsedRef.current >= FREE_SESSIONS) {
+    // Cuota gratuita: si no quedan sesiones, se muestra el paywall. Con pase
+    // vigente no hay cuota que chequear.
+    if (!passRef.current && sessionsUsedRef.current >= FREE_SESSIONS) {
       setPaywallReason("quota");
       setShowPaywall(true);
       track("paywall_shown");
@@ -1139,7 +1163,10 @@ export default function Page() {
       // stream/worklet: en una reconexión NO se vuelve a pedir permiso de
       // micrófono ni de pestaña, solo se reconstruye el socket.
       const connectWs = async () => {
-        const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
+        const tokRes = await fetch("/api/deepgram-token", {
+          method: "POST",
+          headers: passHeader(),
+        });
         if (!tokRes.ok) {
           const e = await tokRes.json().catch(() => ({}));
           // Kill switch global del server: no es un error de conexión, es
@@ -1244,31 +1271,36 @@ export default function Page() {
 
       await connectWs();
 
-      // La sesión arrancó de verdad (audio + socket): descontamos 1 y armamos
-      // el corte automático a los 10 minutos.
-      const used = sessionsUsedRef.current + 1;
-      sessionsUsedRef.current = used;
-      setSessionsUsed(used);
-      track("session_start", { mode, model: modelRef.current.model });
-      try {
-        localStorage.setItem(SESSIONS_KEY, String(used));
-      } catch {}
-      if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
-      sessionTimerRef.current = setTimeout(() => stop(), SESSION_MAX_MS);
-      // Countdown visible (pill "mm:ss"), tick cada segundo.
+      // La sesión arrancó de verdad (audio + socket). Con pase no se descuenta
+      // cuota ni se arma el corte: es lo que se compró.
+      const conPase = !!passRef.current;
+      if (!conPase) {
+        const used = sessionsUsedRef.current + 1;
+        sessionsUsedRef.current = used;
+        setSessionsUsed(used);
+        try {
+          localStorage.setItem(SESSIONS_KEY, String(used));
+        } catch {}
+      }
+      track("session_start", { mode, model: modelRef.current.model, pass: conPase });
       const startedAt = Date.now();
       sessionStartRef.current = startedAt;
       sessionLinesRef.current = [];
-      setRemainingSec(Math.round(SESSION_MAX_MS / 1000));
+      if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
-      countdownRef.current = setInterval(() => {
-        const left = Math.max(0, Math.ceil((SESSION_MAX_MS - (Date.now() - startedAt)) / 1000));
-        setRemainingSec(left);
-        if (left <= 0 && countdownRef.current) {
-          clearInterval(countdownRef.current);
-          countdownRef.current = null;
-        }
-      }, 1000);
+      if (!conPase) {
+        sessionTimerRef.current = setTimeout(() => stop(), SESSION_MAX_MS);
+        // Countdown visible (pill "mm:ss"), tick cada segundo.
+        setRemainingSec(Math.round(SESSION_MAX_MS / 1000));
+        countdownRef.current = setInterval(() => {
+          const left = Math.max(0, Math.ceil((SESSION_MAX_MS - (Date.now() - startedAt)) / 1000));
+          setRemainingSec(left);
+          if (left <= 0 && countdownRef.current) {
+            clearInterval(countdownRef.current);
+            countdownRef.current = null;
+          }
+        }, 1000);
+      }
 
       stream.getAudioTracks()[0].onended = () => stop();
 
@@ -1441,10 +1473,17 @@ export default function Page() {
             <div className="header-center">
               {/* Solo el tiempo restante: el contador de sesiones se sacó de la
                   vista para que la primera línea quede como la de Parakeet. */}
-              <span className="timer-pill" title="Tiempo restante de la sesión">
-                <ClockIcon />
-                {fmtCountdown(remainingSec)} <span className="timer-free">(Free)</span>
-              </span>
+              {pass ? (
+                <span className="timer-pill timer-pill-pass" title={`Pase de ${pass.email}`}>
+                  👑 Rey Loro{" "}
+                  <span className="timer-free">vence {fmtPassExpiry(pass.expiresAt)}</span>
+                </span>
+              ) : (
+                <span className="timer-pill" title="Tiempo restante de la sesión">
+                  <ClockIcon />
+                  {fmtCountdown(remainingSec)} <span className="timer-free">(Free)</span>
+                </span>
+              )}
             </div>
           )}
           {!live && connecting && <span className="status-chip">conectando…</span>}
@@ -1771,16 +1810,17 @@ export default function Page() {
         {showSetup ? (
           <button
             onClick={() => {
-              // Antes de arrancar se elige el tipo de sesión. Si ya no quedan
-              // gratis, `start` corta y muestra el paywall directamente.
-              if (sessionsUsedRef.current >= FREE_SESSIONS) {
+              // Con pase se arranca derecho: no hay tipo de sesión que elegir.
+              // Sin pase, se elige; y si ya no quedan gratis, `start` corta y
+              // muestra el paywall.
+              if (pass || sessionsUsedRef.current >= FREE_SESSIONS) {
                 void start();
                 return;
               }
               setShowSessionType(true);
               track("session_type_shown");
             }}
-            disabled={connecting}
+            disabled={connecting || passChecking}
             className="btn-action btn-primary"
           >
             {connecting ? "Conectando… 🦜" : "▶ Soltar el Loro (Crear Sesión)"}
@@ -1805,6 +1845,50 @@ export default function Page() {
             Ver mis sesiones ({savedCount}) →
           </button>
         )}
+        {/* Canje manual del pase. Lo normal es entrar por el link, que lo canjea
+            solo; esto es la red por si alguien copió solo el código. */}
+        {showSetup &&
+          (pass ? (
+            <p className="pass-active">
+              👑 Pase Rey Loro activo — {pass.email} · vence {fmtPassExpiry(pass.expiresAt)}
+            </p>
+          ) : passOpen ? (
+            <form
+              className="pass-form"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setPassBusy(true);
+                const ok = await activatePass(passInput);
+                setPassBusy(false);
+                if (ok) {
+                  setPassInput("");
+                  setPassOpen(false);
+                  track("pass_activated");
+                }
+              }}
+            >
+              <input
+                className="form-input"
+                value={passInput}
+                onChange={(e) => setPassInput(e.target.value)}
+                placeholder="LORO.…"
+                aria-label="Código de tu pase"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn-action btn-primary"
+                disabled={!passInput.trim() || passBusy}
+              >
+                {passBusy ? "Validando…" : "Activar"}
+              </button>
+              {passError && <p className="paywall-error">{passError}</p>}
+            </form>
+          ) : (
+            <button type="button" className="cs-link-btn" onClick={() => setPassOpen(true)}>
+              ¿Tenés un pase? Activalo acá
+            </button>
+          ))}
         {showSetup && (
           <p className="mono btn-hint">
             {mode === "mic"

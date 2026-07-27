@@ -37,6 +37,7 @@ export type FunnelEvent =
   | "session_type_shown"
   | "pass_week_click"
   | "pass_year_click"
+  | "pass_activated"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"

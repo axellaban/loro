@@ -936,6 +936,32 @@ input {
   font-weight: 500;
 }
 
+/* Con pase el pill no cuenta hacia atrás: dice quién sos. */
+.timer-pill-pass {
+  color: var(--loro-green-deep);
+  border-color: rgba(16, 185, 129, 0.45);
+  background: #f0fdf9;
+}
+
+/* ---- Pase ilimitado en el setup ---- */
+.pass-active {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--loro-green-deep);
+  background: #f0fdf9;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.pass-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ---- Menú de sesión (los tres puntitos del header, estilo Parakeet) ---- */
 .sess-menu {
   position: relative;
