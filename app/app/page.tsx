@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { track, identify } from "../lib/track";
 import { BrandLogo } from "../lib/BrandLogo";
 import { extractSentences } from "../simulador/tts";
@@ -10,7 +10,7 @@ import { looksLikeQuestion } from "../lib/question";
 import CallSessions from "./CallSessions";
 import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 import { rememberEmail, savedEmail } from "../lib/email";
-import { usePass, storedPassToken } from "../lib/passClient";
+import { usePass, storedPassToken, type ActivePass } from "../lib/passClient";
 import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
@@ -602,6 +602,108 @@ function AnalyzingScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
+// ---------- Fiesta al activar el pase ----------
+// Alguien acaba de pagar y entrar: es EL momento del producto, así que la
+// pantalla entera se pone de fiesta unos segundos.
+const PARTY_MS = 6000;
+const PARTY_COLORS = ["#10b981", "#34d399", "#a3e635", "#fbbf24", "#f59e0b", "#fb7185", "#22d3ee"];
+const PARTY_EMOJIS = ["🦜", "👑", "🎉", "✨", "🎊", "🔥", "💚", "🌈", "🥳"];
+
+function PassParty({ pass, onDone }: { pass: ActivePass; onDone: () => void }) {
+  // Las partículas se sortean una sola vez: si se recalcularan en cada render
+  // saltarían de lugar en el medio de la animación.
+  const bits = useMemo(() => {
+    const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+    const papelitos = Array.from({ length: 110 }, (_, i) => ({
+      key: `c${i}`,
+      left: rnd(0, 100),
+      delay: rnd(0, 2.2),
+      dur: rnd(2.4, 4.6),
+      drift: rnd(-16, 16),
+      spin: rnd(360, 1200) * (Math.random() < 0.5 ? -1 : 1),
+      w: rnd(6, 12),
+      h: rnd(9, 18),
+      color: PARTY_COLORS[i % PARTY_COLORS.length],
+      redondo: Math.random() < 0.25,
+    }));
+    const emojis = Array.from({ length: 34 }, (_, i) => ({
+      key: `e${i}`,
+      left: rnd(0, 100),
+      delay: rnd(0, 2.8),
+      dur: rnd(3, 5.2),
+      drift: rnd(-14, 14),
+      spin: rnd(-70, 70),
+      size: rnd(22, 46),
+      char: PARTY_EMOJIS[i % PARTY_EMOJIS.length],
+    }));
+    return { papelitos, emojis };
+  }, []);
+
+  // Se cierra sola. Igual se puede tocar para saltearla: nadie debería quedar
+  // esperando a que termine una animación para usar lo que compró.
+  useEffect(() => {
+    const t = setTimeout(onDone, PARTY_MS);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div className="party" onClick={onDone} role="status" aria-live="polite">
+      <div className="party-wash" aria-hidden="true" />
+      <div className="party-bits" aria-hidden="true">
+        {bits.papelitos.map((p) => (
+          <span
+            key={p.key}
+            className={`party-confetti${p.redondo ? " party-confetti-round" : ""}`}
+            style={
+              {
+                left: `${p.left}%`,
+                background: p.color,
+                width: `${p.w}px`,
+                height: `${p.h}px`,
+                animationDelay: `${p.delay}s`,
+                animationDuration: `${p.dur}s`,
+                "--drift": `${p.drift}vw`,
+                "--spin": `${p.spin}deg`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+        {bits.emojis.map((e) => (
+          <span
+            key={e.key}
+            className="party-emoji"
+            style={
+              {
+                left: `${e.left}%`,
+                fontSize: `${e.size}px`,
+                animationDelay: `${e.delay}s`,
+                animationDuration: `${e.dur}s`,
+                "--drift": `${e.drift}vw`,
+                "--spin": `${e.spin}deg`,
+              } as React.CSSProperties
+            }
+          >
+            {e.char}
+          </span>
+        ))}
+      </div>
+
+      <div className="party-card">
+        <div className="party-parrot" aria-hidden="true">
+          🦜
+        </div>
+        <div className="party-title">¡YA SOS LORO! 🎉</div>
+        <p className="party-text">
+          Tu pase quedó activo. Sesiones sin límite de tiempo ni de cantidad hasta el{" "}
+          <strong>{fmtPassExpiry(pass.expiresAt)}</strong>.
+        </p>
+        <p className="party-text party-text-dim">Andá a romperla en esa entrevista 👑</p>
+        <span className="party-skip">tocá para seguir</span>
+      </div>
+    </div>
+  );
+}
+
 const LS_KEY = "copiloto:context:v1";
 
 /**
@@ -674,7 +776,14 @@ export default function Page() {
   // Pase ilimitado: sin corte de tiempo ni tope de sesiones mientras esté
   // vigente. `checking` evita mostrarle el paywall a alguien que ya pagó
   // durante el instante en que se revalida.
-  const { pass, checking: passChecking, error: passError, activate: activatePass } = usePass();
+  const {
+    pass,
+    checking: passChecking,
+    error: passError,
+    activate: activatePass,
+    celebrate,
+    endCelebration,
+  } = usePass();
   const passRef = useRef<typeof pass>(null);
   useEffect(() => {
     passRef.current = pass;
@@ -2011,6 +2120,8 @@ export default function Page() {
           </div>
         </div>
       )}
+
+      {celebrate && pass && <PassParty pass={pass} onDone={endCelebration} />}
 
       {/* Elección de tipo de sesión, antes de arrancar. A diferencia de
           Parakeet no hay créditos: lo que se vende es acceso ilimitado por

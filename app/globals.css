@@ -943,6 +943,178 @@ input {
   background: #f0fdf9;
 }
 
+/* ===== Fiesta al activar el pase =====
+   Se dispara una sola vez, cuando el pase se activa de verdad. Cubre toda la
+   pantalla y se cierra sola a los 6s (o al toque). */
+.party {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: pointer;
+  animation: partyIn 0.25s ease-out;
+}
+
+@keyframes partyIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* El baño de color: los mismos colores del halo de "Responder", barriendo la
+   pantalla entera. */
+.party-wash {
+  position: absolute;
+  inset: -25%;
+  background: conic-gradient(
+    from 0deg,
+    #10b981,
+    #34d399,
+    #a3e635,
+    #fbbf24,
+    #f59e0b,
+    #fb7185,
+    #22d3ee,
+    #10b981
+  );
+  /* Menos blur y más saturación que un fondo decorativo normal: acá el color
+     TIENE que gritar. El blur solo suaviza los bordes entre franjas. */
+  filter: blur(52px) saturate(1.5);
+  opacity: 0.85;
+  animation: partySpin 3s linear infinite, partyFade 6s ease-out forwards;
+}
+
+@keyframes partySpin {
+  from { transform: rotate(0deg) scale(1.2); }
+  to { transform: rotate(360deg) scale(1.2); }
+}
+
+/* Entra de golpe, se sostiene fuerte y recién al final se apaga para devolver
+   la app legible. */
+@keyframes partyFade {
+  0% { opacity: 0; }
+  6% { opacity: 0.92; }
+  75% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+.party-bits {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.party-confetti,
+.party-emoji {
+  position: absolute;
+  top: -8vh;
+  will-change: transform, opacity;
+  animation-name: partyFall;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+.party-confetti {
+  border-radius: 2px;
+}
+.party-confetti-round {
+  border-radius: 50%;
+}
+
+.party-emoji {
+  line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.18));
+}
+
+@keyframes partyFall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0), 118vh, 0) rotate(var(--spin, 360deg));
+    opacity: 0;
+  }
+}
+
+.party-card {
+  position: relative;
+  z-index: 2;
+  max-width: 24rem;
+  width: 100%;
+  background: #fff;
+  border-radius: 24px;
+  padding: 30px 26px 22px;
+  text-align: center;
+  box-shadow: 0 30px 70px -14px rgba(16, 24, 40, 0.55);
+  animation: partyPop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes partyPop {
+  0% { transform: scale(0.5) rotate(-6deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.party-parrot {
+  font-size: 60px;
+  line-height: 1;
+  margin-bottom: 10px;
+  animation: partyDance 0.9s ease-in-out infinite;
+}
+
+@keyframes partyDance {
+  0%, 100% { transform: rotate(-12deg) scale(1); }
+  50% { transform: rotate(12deg) scale(1.12); }
+}
+
+.party-title {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.party-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  margin: 0 0 8px;
+}
+.party-text strong {
+  color: var(--ink);
+}
+.party-text-dim {
+  color: var(--loro-green-deep);
+  font-weight: 600;
+}
+
+.party-skip {
+  display: block;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Con movimiento reducido: el mensaje sí, la tormenta no. */
+@media (prefers-reduced-motion: reduce) {
+  .party-bits { display: none; }
+  .party-wash { animation: partyFade 6s ease-out forwards; }
+  .party-parrot,
+  .party-card { animation: none; }
+}
+
 /* ---- Pase ilimitado en el setup ---- */
 .pass-active {
   font-size: 13px;

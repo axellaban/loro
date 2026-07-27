@@ -12,6 +12,17 @@ import { PASS_QUERY, type PassPlan } from "./pass";
 
 const PASS_KEY = "loreado:pass:v1";
 
+/**
+ * Qué pase llegó por link en ESTA carga de página.
+ *
+ * Vive fuera del componente porque el efecto puede correr dos veces (React lo
+ * hace en desarrollo) y para la segunda el `?pase=` ya no está en la URL: lo
+ * borramos en la primera. Sin esta memoria, el pase se activa pero la fiesta
+ * no se dispara. Se reinicia sola en la próxima carga, que es justo lo que
+ * queremos: entrar por el link se festeja, recargar no.
+ */
+let tokenDelLink: string | null = null;
+
 export type ActivePass = { email: string; expiresAt: number; plan: PassPlan };
 
 export function storedPassToken(): string {
@@ -53,20 +64,29 @@ export function usePass() {
   // paywall en la cara de alguien que ya pagó.
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  /**
+   * Se activó RECIÉN (abrió el link o pegó el código), no "ya lo tenía". Es lo
+   * que dispara la fiesta: se festeja el momento de entrar, no cada recarga.
+   */
+  const [celebrate, setCelebrate] = useState(false);
 
-  const apply = useCallback((token: string, res: { pass?: ActivePass; error?: string }) => {
-    if (res.pass) {
-      setPass(res.pass);
-      setError("");
-      try {
-        localStorage.setItem(PASS_KEY, token);
-      } catch {}
-      return true;
-    }
-    setPass(null);
-    setError(res.error || "");
-    return false;
-  }, []);
+  const apply = useCallback(
+    (token: string, res: { pass?: ActivePass; error?: string }, festejar = false) => {
+      if (res.pass) {
+        setPass(res.pass);
+        setError("");
+        if (festejar) setCelebrate(true);
+        try {
+          localStorage.setItem(PASS_KEY, token);
+        } catch {}
+        return true;
+      }
+      setPass(null);
+      setError(res.error || "");
+      return false;
+    },
+    []
+  );
 
   // Al cargar: primero el pase del link (?pase=…), si no el guardado.
   useEffect(() => {
@@ -78,6 +98,7 @@ export function usePass() {
       } catch {}
 
       if (fromUrl) {
+        tokenDelLink = fromUrl;
         // Se guarda ANTES de validar, a propósito. El código sale de la URL
         // enseguida (para que no quede en el historial ni se filtre por el
         // Referer), así que si no lo guardáramos primero y la validación se
@@ -108,7 +129,9 @@ export function usePass() {
           localStorage.removeItem(PASS_KEY);
         } catch {}
       }
-      apply(token, res);
+      // Se festeja solo si el pase vino del link en esta carga: entrar por
+      // primera vez es el momento, recargar la página no.
+      apply(token, res, token === tokenDelLink);
       setChecking(false);
     })();
     return () => {
@@ -116,16 +139,18 @@ export function usePass() {
     };
   }, [apply]);
 
-  /** Canje manual, desde el input "¿Tenés un pase?". */
+  /** Canje manual, desde el input "¿Ya sos Loro?". */
   const activate = useCallback(
     async (token: string) => {
       const clean = token.trim();
       if (!clean) return false;
       setError("");
-      return apply(clean, await redeem(clean));
+      return apply(clean, await redeem(clean), true);
     },
     [apply]
   );
 
-  return { pass, checking, error, activate };
+  const endCelebration = useCallback(() => setCelebrate(false), []);
+
+  return { pass, checking, error, activate, celebrate, endCelebration };
 }
