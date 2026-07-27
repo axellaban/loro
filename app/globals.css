@@ -1817,65 +1817,134 @@ input {
   line-height: 1.35;
 }
 
-/* ----- Elección de tipo de sesión ----- */
+/* ----- Elección de tipo de sesión -----
+   Sigue la referencia de Parakeet: caja grande y aireada, título tipográfico
+   grande alineado a la izquierda, y dos tarjetas NEUTRAS —sin color de marca—
+   donde la jerarquía la marca el botón (sólido arriba, outline abajo) y no el
+   fondo de la tarjeta. */
 .paywall-wide {
   max-width: 30rem;
   position: relative;
   text-align: left;
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  /* En un teléfono chico las dos tarjetas no entran en pantalla. Antes que
+     recortarlas, la caja scrollea dentro suyo. */
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-.paywall-wide .paywall-title,
+.paywall-wide .paywall-title {
+  text-align: left;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  /* Deja lugar a la X sin que el título le pase por debajo. */
+  padding-right: 36px;
+  margin-bottom: 10px;
+}
 .paywall-wide > .paywall-text {
   text-align: left;
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 20px;
 }
 .paywall-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 20px;
+  right: 20px;
   border: none;
   background: none;
-  font-size: 17px;
+  font-size: 20px;
   line-height: 1;
-  color: var(--ink-faint);
+  color: var(--ink-dim);
   cursor: pointer;
   padding: 4px;
 }
 .paywall-close:hover {
   color: var(--ink);
 }
+
 .stype-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-.stype-card-paid {
-  border-color: rgba(16, 185, 129, 0.5);
-  background: #f0fdf9;
-  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.14);
+  border: 1px solid #ebedf0;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 16px;
 }
 .stype-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+/* El nombre ocupa lo que sobra y envuelve dentro de sí mismo; el badge queda
+   arriba a la derecha, como en la referencia, en vez de bajar a otra línea.
+   min-width: 0 es lo que le permite achicarse debajo del ancho de su texto. */
+.stype-name {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .stype-name {
-  font-size: 15.5px;
-  font-weight: 800;
+  display: inline-flex;
+  /* El título puede cortar en dos líneas; el ícono se queda arriba con la
+     primera, no centrado contra el bloque entero. */
+  align-items: flex-start;
+  gap: 10px;
+  /* Los nombres en español son más largos que los de la referencia ("Pase Rey
+     Loro Ilimitado" vs "Full session"), así que el cuerpo es un poco menor
+     para que entren en una línea junto al badge. */
+  font-size: 17.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
   color: var(--ink);
+}
+.stype-name svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
 }
 .stype-badge {
   flex: none;
+  align-self: flex-start;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-dim);
-  background: #eef0f3;
-  border-radius: 999px;
-  padding: 4px 10px;
+  background: #f2f3f5;
+  border-radius: 9px;
+  padding: 5px 10px;
+  white-space: nowrap;
 }
 .stype-card .paywall-text {
-  margin-bottom: 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 18px;
+}
+/* Botones del selector: más altos y con más radio que los del resto de la app,
+   para que la tarjeta respire como en la referencia. */
+.paywall-wide .btn-action {
+  width: 100%;
+  padding: 17px 20px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+/* Botón secundario: blanco con borde, el par del sólido negro. */
+.btn-outline {
+  background: #fff;
+  border: 1px solid #e2e4e8;
+  color: var(--ink);
+  font-weight: 600;
+}
+.btn-outline:hover:not(:disabled) {
+  background: #f7f8fa;
+  border-color: #cfd3d9;
+}
+.btn-outline:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* Botón de WhatsApp (verde de marca de WhatsApp para reconocimiento). */

@@ -137,6 +137,38 @@ function ClockIcon() {
   );
 }
 
+// Iconos del selector de tipo de sesión: outline, al lado del título de cada
+// tarjeta, en el tamaño del texto (como la referencia de Parakeet).
+const stypeIconProps = {
+  width: 22,
+  height: 22,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function CardIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <path d="M2.5 10h19" />
+    </svg>
+  );
+}
+
+function ClockBigIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
 function DotsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -1999,23 +2031,27 @@ export default function Page() {
               Podés arrancar con un pase ilimitado o probar con una sesión gratis más corta.
             </p>
 
-            <div className="stype-card stype-card-paid">
+            <div className="stype-card">
               <div className="stype-head">
-                <span className="stype-name">👑 Pase Rey Loro Ilimitado</span>
+                <span className="stype-name">
+                  <CardIcon /> Pase Rey Loro Ilimitado
+                </span>
                 <span className="stype-badge">7 días</span>
               </div>
               <p className="paywall-text">
                 Sesiones sin límite de tiempo ni de cantidad durante 7 días, por {PASS_WEEK_PRICE}.
                 Si no te sirve en tu entrevista, te devuelvo la plata.
               </p>
-              <button className="btn-action btn-whatsapp" onClick={() => requestPass("week")}>
-                Entregá al Loro →
+              <button className="btn-action btn-primary" onClick={() => requestPass("week")}>
+                Entregá al Loro
               </button>
             </div>
 
             <div className="stype-card">
               <div className="stype-head">
-                <span className="stype-name">🦜 Sesión gratis</span>
+                <span className="stype-name">
+                  <ClockBigIcon /> Sesión gratis
+                </span>
                 <span className="stype-badge">
                   {sessionsLeft === 1 ? "queda 1" : `quedan ${sessionsLeft}`}
                 </span>
@@ -2025,7 +2061,7 @@ export default function Page() {
                 no se extiende.
               </p>
               <button
-                className="btn-action btn-primary"
+                className="btn-action btn-outline"
                 onClick={() => void start()}
                 disabled={connecting || sessionsLeft <= 0}
               >
@@ -2033,7 +2069,7 @@ export default function Page() {
               </button>
             </div>
 
-            <button className="btn-action btn-ghost" onClick={() => setShowSessionType(false)}>
+            <button className="btn-action btn-outline" onClick={() => setShowSessionType(false)}>
               ← Volver
             </button>
           </div>
