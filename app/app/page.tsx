@@ -1000,8 +1000,8 @@ export default function Page() {
   const requestPass = useCallback((plan: "week" | "year") => {
     const msg =
       plan === "week"
-        ? `Hola Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`
-        : `Hola Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}). ¿Cómo avanzo Loro?`;
+        ? `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`
+        : `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`;
     track(plan === "week" ? "pass_week_click" : "pass_year_click");
     try {
       window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
