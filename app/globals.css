@@ -1767,22 +1767,87 @@ input {
   margin-bottom: 12px;
 }
 
-/* Sección de compartir (loop viral) dentro del paywall. */
-.paywall-share {
-  border: 1px dashed rgba(16, 185, 129, 0.45);
-  background: #f0fdf9;
+/* Letra chica bajo cada botón de pase: la garantía y el "te respondo yo". */
+.paywall-fineprint {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-faint);
+  margin: 8px 0 0;
+}
+
+/* Oferta secundaria (pase anual): sin caja de color, para que no compita con
+   la principal. */
+.paywall-year {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+.paywall-year .btn-ghost {
+  /* El texto del botón es largo a propósito: tiene que poder cortar en dos
+     líneas sin desbordar en mobile. */
+  white-space: normal;
+  line-height: 1.35;
+}
+
+/* ----- Elección de tipo de sesión ----- */
+.paywall-wide {
+  max-width: 30rem;
+  position: relative;
+  text-align: left;
+}
+.paywall-wide .paywall-title,
+.paywall-wide > .paywall-text {
+  text-align: left;
+}
+.paywall-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  border: none;
+  background: none;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 4px;
+}
+.paywall-close:hover {
+  color: var(--ink);
+}
+.stype-card {
+  border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
 }
-.paywall-share-done {
-  border-style: solid;
+.stype-card-paid {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: #f0fdf9;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.14);
 }
-.paywall-share-title {
-  font-size: 15px;
+.stype-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.stype-name {
+  font-size: 15.5px;
   font-weight: 800;
   color: var(--ink);
-  margin-bottom: 6px;
+}
+.stype-badge {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  background: #eef0f3;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.stype-card .paywall-text {
+  margin-bottom: 12px;
 }
 
 /* Botón de WhatsApp (verde de marca de WhatsApp para reconocimiento). */

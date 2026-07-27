@@ -33,6 +33,10 @@ export type FunnelEvent =
   | "waitlist_submit"
   | "share_whatsapp"
   | "vip_pass_click"
+  // Elección de tipo de sesión y los dos pases ilimitados que la reemplazan.
+  | "session_type_shown"
+  | "pass_week_click"
+  | "pass_year_click"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"

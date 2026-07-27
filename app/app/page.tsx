@@ -572,16 +572,19 @@ const LS_KEY = "copiloto:context:v1";
 
 // ---------- Cuota gratuita (100% client-side, sin backend) ----------
 // Cada navegador arranca con FREE_SESSIONS sesiones de hasta SESSION_MAX_MS.
-// Se descuenta 1 al arrancar. Al agotarse, se muestra el modal de lista de
-// espera. Es escasez percibida, no protección de costos (se saltea borrando
+// Se descuenta 1 al arrancar. Al agotarse, se muestra el paywall con los pases
+// ilimitados. Es escasez percibida, no protección de costos (se saltea borrando
 // storage / incógnito — a propósito en esta fase de guerrilla).
 const SESSIONS_KEY = "loreado:sessions:v1";
-const BONUS_KEY = "loreado:bonus:v1";
-const FREE_SESSIONS = 3;
-// Sesiones extra que se ganan compartiendo (loop viral). Tope para que no sea
-// infinito.
-const MAX_BONUS = 3;
-const SESSION_MAX_MS = 5 * 60 * 1000;
+const FREE_SESSIONS = 10;
+const SESSION_MAX_MS = 10 * 60 * 1000;
+const SESSION_MAX_MIN = Math.round(SESSION_MAX_MS / 60000);
+
+// Pases pagos. No hay créditos: se vende acceso ilimitado por tiempo y el
+// cierre lo hago yo por WhatsApp, así que el "checkout" es un mensaje armado.
+const WA_NUMBER = "5491164090022";
+const PASS_WEEK_PRICE = "$19.99 USD";
+const PASS_YEAR_PRICE = "$89";
 
 // ---------- Endpointing semántico ----------
 export default function Page() {
@@ -613,22 +616,18 @@ export default function Page() {
   // Cuota gratuita
   const [sessionsUsed, setSessionsUsed] = useState(0);
   const sessionsUsedRef = useRef(0);
-  // Sesiones extra ganadas por compartir (loop viral).
-  const [bonus, setBonus] = useState(0);
-  const bonusRef = useRef(0);
   const [showPaywall, setShowPaywall] = useState(false);
   // Por qué se muestra el paywall: "quota" = se acabaron las sesiones gratis
   // del navegador; "capacity" = kill switch global del server (CAPACITY_CLOSED),
-  // donde compartir no destraba nada — solo queda la lista de espera.
+  // donde solo queda la lista de espera.
   const [paywallReason, setPaywallReason] = useState<"quota" | "capacity">("quota");
-  const [shareDone, setShareDone] = useState(false);
+  // Elección de tipo de sesión antes de arrancar (pase ilimitado vs. gratis).
+  const [showSessionType, setShowSessionType] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [sending, setSending] = useState(false);
-  // Total de sesiones disponibles (base + bonus) y cuántas quedan.
-  const freeSessions = FREE_SESSIONS + bonus;
-  const sessionsLeft = Math.max(0, freeSessions - sessionsUsed);
+  const sessionsLeft = Math.max(0, FREE_SESSIONS - sessionsUsed);
   // Countdown de la sesión (10 min gratis), estilo Parakeet.
   const [remainingSec, setRemainingSec] = useState(Math.round(SESSION_MAX_MS / 1000));
   // Al terminar una sesión el copiloto cae en la lista de sesiones (como
@@ -734,17 +733,13 @@ export default function Page() {
     track("enter_app");
   }, []);
 
-  // Carga la cuota gratuita usada + bonus (persistidos en el navegador).
+  // Carga la cuota gratuita usada (persistida en el navegador).
   useEffect(() => {
     try {
       const n = parseInt(localStorage.getItem(SESSIONS_KEY) || "0", 10);
       const used = Number.isFinite(n) ? Math.max(0, n) : 0;
       sessionsUsedRef.current = used;
       setSessionsUsed(used);
-      const b = parseInt(localStorage.getItem(BONUS_KEY) || "0", 10);
-      const earned = Number.isFinite(b) ? Math.min(MAX_BONUS, Math.max(0, b)) : 0;
-      bonusRef.current = earned;
-      setBonus(earned);
     } catch {}
   }, []);
 
@@ -1000,33 +995,16 @@ export default function Page() {
     }
   }, [email]);
 
-  // Loop viral: compartir por WhatsApp otorga +1 sesión (hasta MAX_BONUS).
-  // Honesto con la fase actual: no verifica que el amigo entre (igual que la
-  // cuota client-side), pero convierte a cada usuario en distribuidor.
-  const shareForBonus = useCallback(() => {
-    const msg = `Hey Loro mirá esto.\nUn Loro con IA que te sopla las respuestas en la entrevista, armadas con tu CV, la empresa y el puesto al que aplicás. Tocás un botón y es instantáneo. https://loreado.vercel.app`;
-    try {
-      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-    } catch {}
-    track("share_whatsapp");
-    if (bonusRef.current < MAX_BONUS) {
-      const b = bonusRef.current + 1;
-      bonusRef.current = b;
-      setBonus(b);
-      try {
-        localStorage.setItem(BONUS_KEY, String(b));
-      } catch {}
-    }
-    setShareDone(true);
-  }, []);
-
-  // Pase VIP: abre WhatsApp con un mensaje listo para enviar al creador.
-  const requestVipPass = useCallback(() => {
+  // Pases ilimitados: abren WhatsApp con el mensaje ya escrito. El cobro lo
+  // cierro yo a mano, así que el "checkout" es la conversación.
+  const requestPass = useCallback((plan: "week" | "year") => {
     const msg =
-      "Hola Loro creador! Estuve probando Loreado y quiero solicitar un Pase VIP Early Member para mi próxima entrevista. ¿Cómo avanzo Loro?";
-    track("vip_pass_click");
+      plan === "week"
+        ? `Hola Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`
+        : `Hola Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}). ¿Cómo avanzo Loro?`;
+    track(plan === "week" ? "pass_week_click" : "pass_year_click");
     try {
-      window.open(`https://wa.me/5491164090022?text=${encodeURIComponent(msg)}`, "_blank");
+      window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
     } catch {}
   }, []);
 
@@ -1121,13 +1099,14 @@ export default function Page() {
   }, []);
 
   const start = useCallback(async () => {
-    // Cuota gratuita: si no quedan sesiones, mostramos la lista de espera.
-    if (sessionsUsedRef.current >= FREE_SESSIONS + bonusRef.current) {
+    // Cuota gratuita: si no quedan sesiones, se muestra el paywall.
+    if (sessionsUsedRef.current >= FREE_SESSIONS) {
       setPaywallReason("quota");
       setShowPaywall(true);
       track("paywall_shown");
       return;
     }
+    setShowSessionType(false);
     setError("");
     setStatus("connecting");
     questionBufRef.current = "";
@@ -1790,7 +1769,20 @@ export default function Page() {
       {!hideChrome && (
       <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
         {showSetup ? (
-          <button onClick={start} disabled={connecting} className="btn-action btn-primary">
+          <button
+            onClick={() => {
+              // Antes de arrancar se elige el tipo de sesión. Si ya no quedan
+              // gratis, `start` corta y muestra el paywall directamente.
+              if (sessionsUsedRef.current >= FREE_SESSIONS) {
+                void start();
+                return;
+              }
+              setShowSessionType(true);
+              track("session_type_shown");
+            }}
+            disabled={connecting}
+            className="btn-action btn-primary"
+          >
             {connecting ? "Conectando… 🦜" : "▶ Soltar el Loro (Crear Sesión)"}
           </button>
         ) : (
@@ -1866,47 +1858,100 @@ export default function Page() {
               </>
             ) : (
               <>
-                <div className="paywall-title">🛑 LLEGASTE AL LÍMITE DE TUS SESIONES</div>
+                <div className="paywall-title">🛑 SE TE ACABARON LAS SESIONES GRATIS</div>
                 <p className="paywall-text">
-                  Ya probaste cómo funciona. Las APIs de IA son caras y tuve que frenar el acceso
-                  gratuito para no fundirme. Elegí cómo seguir:
+                  Ya viste cómo funciona. No vayas a tu entrevista real a ciegas. Usalo sin
+                  restricciones.
                 </p>
 
-                {/* Opción primaria: Pase VIP (WhatsApp directo al creador). */}
+                {/* Oferta principal: el pase de la semana, para la entrevista que ya tiene. */}
                 <div className="paywall-vip">
-                  <div className="paywall-vip-title">👑 Pase VIP Ilimitado (7 Días) — $19.99 USD</div>
-                  <p className="paywall-text">
-                    No vayas a tu entrevista real a ciegas. Usalo sin restricciones.
-                  </p>
-                  <button className="btn-action btn-whatsapp" onClick={requestVipPass}>
-                    Entregá al Loro
+                  <div className="paywall-vip-title">
+                    👑 Pase Rey Loro Ilimitado (7 días) — {PASS_WEEK_PRICE}
+                  </div>
+                  <p className="paywall-text">Para la entrevista que tenés esta semana.</p>
+                  <button className="btn-action btn-whatsapp" onClick={() => requestPass("week")}>
+                    Entregá al Loro →
                   </button>
+                  <p className="paywall-fineprint">
+                    Si no te sirve en tu entrevista, te devuelvo la plata. Sin volteretas.
+                  </p>
                 </div>
 
-                {/* Opción secundaria: loop viral, compartir = +1 sesión. */}
-                {shareDone && sessionsLeft > 0 ? (
-                  <div className="paywall-share paywall-share-done">
-                    <div className="paywall-share-title">🦜 ¡Ganaste 1 sesión más!</div>
-                    <button
-                      className="btn-action btn-primary"
-                      onClick={() => setShowPaywall(false)}
-                    >
-                      Seguir gratis →
-                    </button>
-                  </div>
-                ) : bonusRef.current < MAX_BONUS ? (
-                  <div className="paywall-share">
-                    <div className="paywall-share-title">🦜 Regalale un Loro a un amigo</div>
-                    <p className="paywall-text">
-                      ¿Andás ajustado? Compartí el link y ganate +1 sesión gratis.
-                    </p>
-                    <button className="btn-action btn-ghost" onClick={shareForBonus}>
-                      Lorealo por WhatsApp
-                    </button>
-                  </div>
-                ) : null}
+                {/* Oferta secundaria: el anual, para búsquedas largas. */}
+                <div className="paywall-year">
+                  <p className="paywall-text">
+                    🦜 ¿Búsqueda larga? Hice un pase de 12 meses a {PASS_YEAR_PRICE}. Está a ese
+                    precio porque Loreado recién arranca y los primeros que pagan son los que me van
+                    a decir qué arreglar. Cuando salga de beta, los precios to the 🌙.
+                  </p>
+                  <button className="btn-action btn-ghost" onClick={() => requestPass("year")}>
+                    Internaron al Loro, Internaron al Loro, Internaron al Loro →
+                  </button>
+                  <p className="paywall-fineprint">Se abre WhatsApp y te respondo yo.</p>
+                </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Elección de tipo de sesión, antes de arrancar. A diferencia de
+          Parakeet no hay créditos: lo que se vende es acceso ilimitado por
+          tiempo, así que la opción paga manda a WhatsApp y la gratis arranca. */}
+      {showSessionType && (
+        <div className="paywall-overlay" onClick={() => setShowSessionType(false)}>
+          <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="paywall-close"
+              onClick={() => setShowSessionType(false)}
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+            <div className="paywall-title">Elegí tu tipo de sesión</div>
+            <p className="paywall-text">
+              Podés arrancar con un pase ilimitado o probar con una sesión gratis más corta.
+            </p>
+
+            <div className="stype-card stype-card-paid">
+              <div className="stype-head">
+                <span className="stype-name">👑 Pase Rey Loro Ilimitado</span>
+                <span className="stype-badge">7 días</span>
+              </div>
+              <p className="paywall-text">
+                Sesiones sin límite de tiempo ni de cantidad durante 7 días, por {PASS_WEEK_PRICE}.
+                Si no te sirve en tu entrevista, te devuelvo la plata.
+              </p>
+              <button className="btn-action btn-whatsapp" onClick={() => requestPass("week")}>
+                Entregá al Loro →
+              </button>
+            </div>
+
+            <div className="stype-card">
+              <div className="stype-head">
+                <span className="stype-name">🦜 Sesión gratis</span>
+                <span className="stype-badge">
+                  {sessionsLeft === 1 ? "queda 1" : `quedan ${sessionsLeft}`}
+                </span>
+              </div>
+              <p className="paywall-text">
+                Sesión de {SESSION_MAX_MIN} minutos, sin costo. Se corta sola al llegar al límite y
+                no se extiende.
+              </p>
+              <button
+                className="btn-action btn-primary"
+                onClick={() => void start()}
+                disabled={connecting || sessionsLeft <= 0}
+              >
+                {connecting ? "Conectando… 🦜" : "Activar sesión gratis"}
+              </button>
+            </div>
+
+            <button className="btn-action btn-ghost" onClick={() => setShowSessionType(false)}>
+              ← Volver
+            </button>
           </div>
         </div>
       )}
