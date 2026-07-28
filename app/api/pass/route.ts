@@ -1,7 +1,17 @@
-export const runtime = "edge";
-
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
-import { fmtPassExpiry, verifyPass } from "../../lib/pass";
+import { fmtPassExpiry, normalizePassInput, verifyPass } from "../../lib/pass";
+
+export const runtime = "edge";
+/**
+ * Nunca cacheado. Es un endpoint de diagnóstico y de canje: si el navegador o
+ * el CDN guardan la respuesta, se termina mirando el estado de un deploy viejo
+ * y creyendo que el actual está roto. (Pasó.)
+ */
+export const dynamic = "force-dynamic";
+
+const SIN_CACHE = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+} as const;
 
 // Diagnóstico: ¿este deploy tiene PASS_SECRET cargado?
 //
@@ -12,25 +22,32 @@ import { fmtPassExpiry, verifyPass } from "../../lib/pass";
 export async function GET() {
   const secret = process.env.PASS_SECRET;
   if (!secret) {
-    return Response.json({
-      pasesConfigurados: false,
-      ayuda:
-        "Falta PASS_SECRET en este deploy. Cargala en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
-    });
+    return Response.json(
+      {
+        pasesConfigurados: false,
+        ayuda:
+          "Falta PASS_SECRET en este deploy. Cargala en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
+      },
+      { headers: SIN_CACHE }
+    );
   }
-  return Response.json({
-    pasesConfigurados: true,
-    // Huella del secreto: los primeros 8 hex de su SHA-256. Sirve para
-    // comparar si el secreto de Vercel es el mismo con el que se firmaron los
-    // pases, sin exponerlo. Un hash truncado de un secreto aleatorio de 256
-    // bits no se puede revertir.
-    huella: await secretFingerprint(secret),
-    // El error de pegado más común: un espacio o un salto de línea que se
-    // cuela al copiar y rompe TODAS las firmas en silencio.
-    sinEspaciosAlrededor: secret === secret.trim(),
-    ayuda:
-      "Compará 'huella' con la del secreto que firmó tus pases. Si no coinciden, el valor en Vercel es otro.",
-  });
+  return Response.json(
+    {
+      pasesConfigurados: true,
+      // Huella del secreto: los primeros 8 hex de su SHA-256. Sirve para
+      // comparar si el secreto de Vercel es el mismo con el que se firmaron los
+      // pases, sin exponerlo. Un hash truncado de un secreto aleatorio de 256
+      // bits no se puede revertir.
+      huella: await secretFingerprint(secret),
+      // El error de pegado más común: un espacio o un salto de línea que se
+      // cuela al copiar y rompe TODAS las firmas en silencio.
+      sinEspaciosAlrededor: secret === secret.trim(),
+      ayuda:
+        "Compará 'huella' con la del secreto que firmó tus pases. Si no coinciden, el valor en Vercel es otro.",
+      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "desconocido",
+    },
+    { headers: SIN_CACHE }
+  );
 }
 
 async function secretFingerprint(secret: string): Promise<string> {
@@ -72,7 +89,9 @@ export async function POST(req: Request) {
   let token = "";
   try {
     const body = await req.json();
-    token = String(body?.token || "").trim();
+    // Se normaliza también acá, no solo en el cliente: es el contrato del
+    // endpoint y así el arreglo vale venga de donde venga el pedido.
+    token = normalizePassInput(String(body?.token || ""));
   } catch {
     return Response.json({ ok: false, error: "Body inválido." }, { status: 400 });
   }
