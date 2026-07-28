@@ -499,18 +499,33 @@ const TRAILING_INCOMPLETE = new Set([
   "o", "sea", "osea", "ta", "nada",
 ]);
 
-// ¿La respuesta suena terminada? Requiere puntuación terminal (la da
+/**
+ * Palabras mínimas para que una frase puntuada cuente como respuesta terminada.
+ *
+ * Sin esto, la cortesía con la que arranca casi toda primera respuesta —"hola,
+ * buenas tardes.", "sí, claro.", "buena pregunta."— cumple los tres requisitos
+ * de abajo y entra en la ventana rápida: la persona saluda, toma aire para
+ * arrancar de verdad, y a los 2,3s el entrevistador le habla encima. Es EL
+ * corte que se ve en la primera pregunta y casi no se ve después, porque en el
+ * medio se arranca a media idea y eso ya caía en la ventana larga.
+ *
+ * El costo es que una respuesta corta pero genuina ("tengo ocho años de
+ * experiencia") espera ~0,9s más. Barato al lado de que te corten hablando.
+ */
+const MIN_COMPLETE_WORDS = 12;
+
+// ¿La respuesta suena terminada? Requiere sustancia, puntuación terminal (la da
 // smart_format en los finales) y que la última palabra no sea muletilla.
 // Mientras hay interinos sin puntuar cuenta como incompleta → paciente.
 function looksComplete(text: string): boolean {
   const t = text.trim();
   if (t.length < MIN_ANSWER_CHARS) return false;
   if (!/[.!?…]$/.test(t)) return false;
-  const lastWord = t
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < MIN_COMPLETE_WORDS) return false;
+  const lastWord = words[words.length - 1]
     .toLowerCase()
-    .replace(/[.,!?…"”'’)\]]+$/g, "")
-    .split(/\s+/)
-    .pop();
+    .replace(/[.,!?…"”'’)\]]+$/g, "");
   return !!lastWord && !TRAILING_INCOMPLETE.has(lastWord);
 }
 // Sin respuesta real: a los 12s ofrecemos pasar de pregunta; a los 25s la
