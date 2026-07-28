@@ -3,6 +3,21 @@ export const runtime = "edge";
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 import { fmtPassExpiry, verifyPass } from "../../lib/pass";
 
+// Diagnóstico: ¿este deploy tiene PASS_SECRET cargado?
+//
+// En Vercel una variable de entorno nueva NO entra en los deploys que ya
+// estaban corriendo: hay que redeployar. Sin esto, un pase que no activa se ve
+// igual que uno inválido y no hay forma de saber cuál de los dos es. Devuelve
+// solo un booleano, nunca el secreto.
+export async function GET() {
+  return Response.json({
+    pasesConfigurados: !!process.env.PASS_SECRET,
+    ayuda: process.env.PASS_SECRET
+      ? "Los pases están activos en este deploy."
+      : "Falta PASS_SECRET en este deploy. Cargala en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
+  });
+}
+
 // Canje y revalidación de un pase. El navegador no puede verificar la firma
 // (no tiene el secreto), así que pregunta acá: al pegar el código y después
 // cada vez que abre la app, para que un pase vencido deje de valer solo.
