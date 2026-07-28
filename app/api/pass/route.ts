@@ -10,12 +10,36 @@ import { fmtPassExpiry, verifyPass } from "../../lib/pass";
 // igual que uno inválido y no hay forma de saber cuál de los dos es. Devuelve
 // solo un booleano, nunca el secreto.
 export async function GET() {
+  const secret = process.env.PASS_SECRET;
+  if (!secret) {
+    return Response.json({
+      pasesConfigurados: false,
+      ayuda:
+        "Falta PASS_SECRET en este deploy. Cargala en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
+    });
+  }
   return Response.json({
-    pasesConfigurados: !!process.env.PASS_SECRET,
-    ayuda: process.env.PASS_SECRET
-      ? "Los pases están activos en este deploy."
-      : "Falta PASS_SECRET en este deploy. Cargala en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
+    pasesConfigurados: true,
+    // Huella del secreto: los primeros 8 hex de su SHA-256. Sirve para
+    // comparar si el secreto de Vercel es el mismo con el que se firmaron los
+    // pases, sin exponerlo. Un hash truncado de un secreto aleatorio de 256
+    // bits no se puede revertir.
+    huella: await secretFingerprint(secret),
+    // El error de pegado más común: un espacio o un salto de línea que se
+    // cuela al copiar y rompe TODAS las firmas en silencio.
+    sinEspaciosAlrededor: secret === secret.trim(),
+    ayuda:
+      "Compará 'huella' con la del secreto que firmó tus pases. Si no coinciden, el valor en Vercel es otro.",
   });
+}
+
+async function secretFingerprint(secret: string): Promise<string> {
+  const d = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret))
+  );
+  let out = "";
+  for (let i = 0; i < 4; i++) out += d[i].toString(16).padStart(2, "0");
+  return out;
 }
 
 // Canje y revalidación de un pase. El navegador no puede verificar la firma
