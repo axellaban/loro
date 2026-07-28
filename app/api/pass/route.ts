@@ -11,6 +11,10 @@ export const dynamic = "force-dynamic";
 
 const SIN_CACHE = {
   "Cache-Control": "no-store, no-cache, must-revalidate",
+  // Response.json() no declara charset, así que el navegador muestra los
+  // acentos rotos al abrir esto a mano ("ComparÃ¡"). Con fetch no cambia nada
+  // —ahí siempre se decodifica UTF-8—, pero este endpoint se mira a ojo.
+  "Content-Type": "application/json; charset=utf-8",
 } as const;
 
 // Diagnóstico: ¿este deploy tiene PASS_SECRET cargado?
