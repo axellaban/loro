@@ -271,6 +271,24 @@ input {
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
+/* Campo obligatorio vacío al intentar arrancar. Se marca solo al tocar el
+   botón, nunca mientras se escribe. */
+.form-input-error {
+  border-color: #e5484d;
+  background: #fff8f8;
+}
+.form-input-error:focus {
+  border-color: #e5484d;
+  box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.14);
+}
+
+.field-error {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c0392b;
+}
+
 .form-textarea {
   resize: none;
   height: 100px;

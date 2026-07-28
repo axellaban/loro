@@ -519,6 +519,12 @@ export default function SimuladorPage() {
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [profile, setProfile] = useState("");
+  /**
+   * Campos obligatorios que quedaron vacíos al intentar arrancar. Se llena
+   * recién al tocar el botón —no mientras se escribe— para no marcarle nada en
+   * rojo a alguien que todavía está completando el formulario.
+   */
+  const [faltan, setFaltan] = useState<{ company?: boolean; role?: boolean }>({});
   const [lang, setLang] = useState<Lang>("es");
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [interviewType, setInterviewType] = useState<InterviewType>("general");
@@ -1283,7 +1289,27 @@ export default function SimuladorPage() {
 
   // El simulador es gratis e ilimitado a propósito (motor de adquisición):
   // acá no se consume la cuota de sesiones de /app.
+  /**
+   * Marca en rojo los campos obligatorios vacíos y lleva el primero a la vista.
+   * Devuelve true si se puede avanzar.
+   */
+  const marcarFaltantes = () => {
+    const falta = { company: !company.trim(), role: !role.trim() };
+    setFaltan(falta);
+    if (!falta.company && !falta.role) return true;
+    // Si el campo marcado queda fuera de pantalla, el rojo aparece donde nadie
+    // lo ve y el botón parece no hacer nada.
+    const id = falta.company ? "falta-empresa" : "falta-puesto";
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return false;
+  };
+
   const startSimulation = async () => {
+    // Empresa y puesto son obligatorios: sin eso las preguntas salen genéricas
+    // y la simulación no sirve.
+    if (!marcarFaltantes()) return;
     setError("");
     setHistory([]);
     historyRef.current = [];
@@ -1640,10 +1666,20 @@ export default function SimuladorPage() {
               </label>
               <input
                 value={company}
-                onChange={(e) => setCompany(e.target.value)}
+                onChange={(e) => {
+                  setCompany(e.target.value);
+                  if (faltan.company) setFaltan((f) => ({ ...f, company: false }));
+                }}
                 placeholder="Ej: Mercado Libre"
-                className="form-input"
+                className={`form-input${faltan.company ? " form-input-error" : ""}`}
+                aria-invalid={!!faltan.company}
+                aria-describedby={faltan.company ? "falta-empresa" : undefined}
               />
+              {faltan.company && (
+                <p className="field-error" id="falta-empresa">
+                  Completá la empresa para arrancar.
+                </p>
+              )}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
@@ -1653,10 +1689,20 @@ export default function SimuladorPage() {
               </label>
               <textarea
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => {
+                  setRole(e.target.value);
+                  if (faltan.role) setFaltan((f) => ({ ...f, role: false }));
+                }}
                 placeholder="Pegá la descripción del puesto, seniority, requisitos o tecnologías."
-                className="form-textarea form-textarea-sm"
+                className={`form-textarea form-textarea-sm${faltan.role ? " form-input-error" : ""}`}
+                aria-invalid={!!faltan.role}
+                aria-describedby={faltan.role ? "falta-puesto" : undefined}
               />
+              {faltan.role && (
+                <p className="field-error" id="falta-puesto">
+                  Completá la descripción del puesto para arrancar.
+                </p>
+              )}
             </div>
 
             <label className="mono form-mini-label" style={{ marginTop: 4 }}>

@@ -788,6 +788,12 @@ export default function Page() {
   useEffect(() => {
     passRef.current = pass;
   }, [pass]);
+  /**
+   * Campos obligatorios que quedaron vacíos al intentar arrancar. Se llena
+   * recién al tocar el botón —no mientras se escribe— para no marcarle nada en
+   * rojo a alguien que todavía está completando el formulario.
+   */
+  const [faltan, setFaltan] = useState<{ company?: boolean; role?: boolean }>({});
   const [passInput, setPassInput] = useState("");
   const [passOpen, setPassOpen] = useState(false);
   const [passBusy, setPassBusy] = useState(false);
@@ -1158,6 +1164,24 @@ export default function Page() {
       setSending(false);
     }
   }, [email]);
+
+  /**
+   * Marca en rojo los campos obligatorios vacíos y lleva el primero a la vista.
+   * Devuelve true si se puede avanzar.
+   */
+  const marcarFaltantes = useCallback(() => {
+    const falta = { company: !company.trim(), role: !role.trim() };
+    setFaltan(falta);
+    if (!falta.company && !falta.role) return true;
+    // El formulario puede estar fuera de pantalla cuando se toca el botón
+    // (queda fijo abajo), así que se muestra el campo marcado; si no, el rojo
+    // aparece donde nadie lo ve y el botón parece no hacer nada.
+    const id = falta.company ? "falta-empresa" : "falta-puesto";
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return false;
+  }, [company, role]);
 
   // Pases ilimitados: abren WhatsApp con el mensaje ya escrito. El cobro lo
   // cierro yo a mano, así que el "checkout" es la conversación.
@@ -1758,11 +1782,21 @@ export default function Page() {
             </label>
             <input
               value={company}
-              onChange={(e) => setCompany(e.target.value)}
+              onChange={(e) => {
+                setCompany(e.target.value);
+                if (faltan.company) setFaltan((f) => ({ ...f, company: false }));
+              }}
               placeholder="Ej: Mercado Libre"
-              className="form-input"
+              className={`form-input${faltan.company ? " form-input-error" : ""}`}
               disabled={connecting}
+              aria-invalid={!!faltan.company}
+              aria-describedby={faltan.company ? "falta-empresa" : undefined}
             />
+            {faltan.company && (
+              <p className="field-error" id="falta-empresa">
+                Completá la empresa para arrancar.
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
             <label className="mono form-mini-label">
@@ -1771,11 +1805,21 @@ export default function Page() {
             </label>
             <textarea
               value={role}
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) => {
+                setRole(e.target.value);
+                if (faltan.role) setFaltan((f) => ({ ...f, role: false }));
+              }}
               placeholder="Pegá la descripción del puesto: responsabilidades, requisitos, seniority."
-              className="form-textarea form-textarea-sm"
+              className={`form-textarea form-textarea-sm${faltan.role ? " form-input-error" : ""}`}
               disabled={connecting}
+              aria-invalid={!!faltan.role}
+              aria-describedby={faltan.role ? "falta-puesto" : undefined}
             />
+            {faltan.role && (
+              <p className="field-error" id="falta-puesto">
+                Completá la descripción del puesto para arrancar.
+              </p>
+            )}
           </div>
           <label className="mono form-mini-label" style={{ marginTop: 4 }}>
             <UserIcon /> Tu perfil / CV
@@ -1956,6 +2000,10 @@ export default function Page() {
         {showSetup ? (
           <button
             onClick={() => {
+              // Empresa y puesto son obligatorios: sin eso el Loro responde
+              // genérico y la sesión no sirve. Se marcan los que falten y no
+              // se avanza.
+              if (!marcarFaltantes()) return;
               // Con pase se arranca derecho: no hay tipo de sesión que elegir.
               // Sin pase, se elige; y si ya no quedan gratis, `start` corta y
               // muestra el paywall.
