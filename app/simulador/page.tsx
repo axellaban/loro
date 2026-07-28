@@ -28,7 +28,20 @@ type Phase =
 type HistoryItem = {
   question: string;
   answer: string;
+  /**
+   * El turno fue un rescate ("uy, se cortó, ¿querés terminar la idea?"), no una
+   * pregunta nueva. Se guarda igual porque es parte de la conversación —el
+   * modelo necesita leerlo—, pero NO consume una de las preguntas de la
+   * entrevista: si contara, un corte de transcripción le comería un tema al
+   * candidato y el informe saldría con menos material.
+   */
+  recovery?: boolean;
 };
+
+/** Preguntas de verdad hechas hasta ahora: los rescates no cuentan. */
+function realQuestionCount(h: HistoryItem[]): number {
+  return h.reduce((n, t) => n + (t.recovery ? 0 : 1), 0);
+}
 
 type FeedbackQuestion = {
   question: string;
@@ -636,6 +649,13 @@ export default function SimuladorPage() {
   // "¿algo más?" (si ya se ofreció, no se vuelve a ofrecer al toque).
   const lastCutRef = useRef(false);
   const recoveryOfferedRef = useRef(false);
+  /**
+   * La pregunta que está en pantalla AHORA es un rescate. Se fija al pedir el
+   * turno y se lee al cerrar la respuesta, para marcar bien esa entrada del
+   * historial. No alcanza con mirar `lastCutRef` al cerrar: para entonces ya se
+   * recalculó para el turno siguiente.
+   */
+  const currentIsRecoveryRef = useRef(false);
   const dgMessageRef = useRef<(raw: string) => void>(() => {});
   const connectWsRef = useRef<(first: boolean) => Promise<void>>(async () => {});
   const scheduleReconnectRef = useRef<() => void>(() => {});
@@ -786,14 +806,21 @@ export default function SimuladorPage() {
     stuckRef.current = false;
     setStuck(false);
     const answer = currentAnswerRef.current.trim() || "(No respondí a esta pregunta)";
-    const updated = [...historyRef.current, { question: questionRef.current, answer }];
+    const updated: HistoryItem[] = [
+      ...historyRef.current,
+      { question: questionRef.current, answer, recovery: currentIsRecoveryRef.current },
+    ];
     historyRef.current = updated;
     setHistory(updated);
     currentAnswerRef.current = "";
     setCurrentAnswer("");
     setLines([]);
-    track("sim_answer_closed", { auto: true, skipped: true, question_index: updated.length });
-    if (updated.length >= questionsCount) finishToFeedback(updated);
+    track("sim_answer_closed", {
+      auto: true,
+      skipped: true,
+      question_index: realQuestionCount(updated),
+    });
+    if (realQuestionCount(updated) >= questionsCount) finishToFeedback(updated);
     else beginTurnRef.current(updated);
   };
 
@@ -1015,7 +1042,14 @@ export default function SimuladorPage() {
     };
 
     try {
-      const questionIndex = currentHistory.length + 1;
+      // Este turno es un rescate si la respuesta anterior quedó cortada. Se
+      // registra ahora para poder marcar bien la entrada del historial cuando
+      // se cierre la respuesta.
+      const esRescate = !closing && lastCutRef.current;
+      currentIsRecoveryRef.current = esRescate;
+      // El índice que ve el modelo cuenta preguntas de verdad, no rescates: si
+      // no, cree que va por la 4 cuando hizo 2 y empieza a cerrar antes.
+      const questionIndex = realQuestionCount(currentHistory) + (esRescate ? 0 : 1);
       // Frame en las preguntas 1 y 2: garantiza el comentario "te estoy
       // viendo" temprano (en la 1 la cámara puede no tener frames todavía).
       // En el cierre no se manda imagen ni señal de corte.
@@ -1124,18 +1158,29 @@ export default function SimuladorPage() {
       .pop();
     const seemsCut = auto && !!lastWord && TRAILING_INCOMPLETE.has(lastWord);
     const offerRecovery = seemsCut && !recoveryOfferedRef.current;
+    // Se lee ANTES de pisar lastCutRef: acá todavía describe al turno que se
+    // está cerrando, no al que viene.
+    const eraRescate = currentIsRecoveryRef.current;
     lastCutRef.current = offerRecovery;
     recoveryOfferedRef.current = offerRecovery;
 
-    const updated = [...historyRef.current, { question: questionRef.current, answer }];
+    const updated: HistoryItem[] = [
+      ...historyRef.current,
+      { question: questionRef.current, answer, recovery: eraRescate },
+    ];
     historyRef.current = updated;
     setHistory(updated);
     currentAnswerRef.current = "";
     setCurrentAnswer("");
     setLines([]);
-    track("sim_answer_closed", { auto, question_index: updated.length, cut: offerRecovery });
+    track("sim_answer_closed", {
+      auto,
+      question_index: realQuestionCount(updated),
+      cut: offerRecovery,
+      recovery: eraRescate,
+    });
 
-    if (updated.length >= questionsCount) {
+    if (realQuestionCount(updated) >= questionsCount) {
       // Terminación natural: el entrevistador cierra (agradece) y recién ahí
       // se procesa el informe.
       beginTurnRef.current(updated, true);
@@ -1320,6 +1365,7 @@ export default function SimuladorPage() {
     questionRef.current = "";
     lastCutRef.current = false;
     recoveryOfferedRef.current = false;
+    currentIsRecoveryRef.current = false;
     setFeedbackReport(null);
     setElapsed(0);
     setMicOn(true);
@@ -1748,7 +1794,8 @@ export default function SimuladorPage() {
               </button>
               <h1 className="sim-room-title">Sala de Entrevista</h1>
               <span className="sim-room-meta mono">
-                {fmtElapsed(Math.max(0, SIM_TARGET_SEC - elapsed))} · Pregunta {Math.min(history.length + 1, questionsCount)} de {questionsCount}
+                {fmtElapsed(Math.max(0, SIM_TARGET_SEC - elapsed))} · Pregunta{" "}
+                {Math.min(realQuestionCount(history) + 1, questionsCount)} de {questionsCount}
               </span>
             </div>
             <div className="sim-room-header-right">

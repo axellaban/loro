@@ -150,7 +150,7 @@ export async function POST(req: Request) {
     answerLang?: string;
     provider?: string;
     model?: string;
-    history?: Array<{ question: string; answer: string }>;
+    history?: Array<{ question: string; answer: string; recovery?: boolean }>;
     questionIndex?: number;
     questionsCount?: number;
     lastAnswerLikelyCut?: boolean;
@@ -178,10 +178,24 @@ export async function POST(req: Request) {
   const history = (body.history || []).slice(0, 20).map((h) => ({
     question: String(h?.question || "").slice(0, 600),
     answer: String(h?.answer || "").slice(0, 2500),
+    recovery: !!h?.recovery,
   }));
-  const historyText = history.length > 0
-    ? history.map((h, i) => `Pregunta ${i + 1}: ${h.question}\nRespuesta ${i + 1}: ${h.answer}`).join("\n\n")
-    : "(Aún no comenzó la entrevista)";
+  // Los turnos de rescate no llevan número de pregunta: si lo llevaran, el
+  // modelo leería "Pregunta 4" mientras el progreso le dice que va por la 2, y
+  // empezaría a cerrar la entrevista antes de tiempo.
+  let nQ = 0;
+  const historyText =
+    history.length > 0
+      ? history
+          .map((h) => {
+            if (h.recovery) {
+              return `(Repregunta para completar la respuesta ${nQ}): ${h.question}\nContinuación: ${h.answer}`;
+            }
+            nQ += 1;
+            return `Pregunta ${nQ}: ${h.question}\nRespuesta ${nQ}: ${h.answer}`;
+          })
+          .join("\n\n")
+      : "(Aún no comenzó la entrevista)";
 
   const qIndex = Math.max(1, Math.min(50, Number(body.questionIndex) || history.length + 1));
   const qCount = Math.max(0, Math.min(20, Number(body.questionsCount) || 0));
