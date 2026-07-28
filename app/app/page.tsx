@@ -1615,9 +1615,14 @@ export default function Page() {
               {/* Solo el tiempo restante: el contador de sesiones se sacó de la
                   vista para que la primera línea quede como la de Parakeet. */}
               {pass ? (
-                <span className="timer-pill timer-pill-pass" title={`Pase de ${pass.email}`}>
-                  👑 Rey Loro{" "}
-                  <span className="timer-free">vence {fmtPassExpiry(pass.expiresAt)}</span>
+                /* Solo "Rey Loro": con la fecha al lado el pill se comía los
+                   botones del header en mobile. El vencimiento sigue a mano en
+                   la pantalla de setup y en el tooltip. */
+                <span
+                  className="timer-pill timer-pill-pass"
+                  title={`Pase de ${pass.email} · vence ${fmtPassExpiry(pass.expiresAt)}`}
+                >
+                  👑 Rey Loro
                 </span>
               ) : (
                 <span className="timer-pill" title="Tiempo restante de la sesión">
