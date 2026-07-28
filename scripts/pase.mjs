@@ -69,8 +69,10 @@ ${link}
 Con eso las sesiones no se cortan y no tenés tope. Cualquier cosa me escribís por acá.
 ─────────────────────────────────────────────
 
-Si necesitás el código suelto (para pegarlo en "¿Tenés un pase?"), es la línea
-de abajo entera — sin espacios ni nada alrededor:
+Mandá EL LINK, no el código: tocándolo se activa solo. El código suelto es solo
+por si alguien pierde el link — va abajo, y la app ahora también lo acepta si
+se pega el link entero o si al copiar se pierde el "LORO." del principio (en el
+celular, tocar dos veces selecciona solo un tramo).
 
 ${token}
 `);

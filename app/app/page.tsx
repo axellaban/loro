@@ -2012,8 +2012,8 @@ export default function Page() {
                 className="form-input"
                 value={passInput}
                 onChange={(e) => setPassInput(e.target.value)}
-                placeholder="LORO.…"
-                aria-label="Código de tu pase"
+                placeholder="Pegá tu código o el link del pase"
+                aria-label="Código o link de tu pase"
                 autoFocus
               />
               <button
@@ -2026,9 +2026,15 @@ export default function Page() {
               {passError && <p className="paywall-error">{passError}</p>}
             </form>
           ) : (
-            <button type="button" className="cs-link-btn" onClick={() => setPassOpen(true)}>
-              ¿Ya sos Loro?
-            </button>
+            <>
+              <button type="button" className="cs-link-btn" onClick={() => setPassOpen(true)}>
+                ¿Ya sos Loro?
+              </button>
+              {/* Si el pase del link no validó, el error tiene que verse acá:
+                  el formulario está cerrado, así que si no, abrir el link
+                  parece "no hacer nada" y no hay pista de por qué. */}
+              {passError && <p className="paywall-error">{passError}</p>}
+            </>
           ))}
         {showSetup && (
           <p className="mono btn-hint">

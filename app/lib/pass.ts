@@ -151,6 +151,40 @@ export const PASS_HEADER = "x-loro-pass";
 /** Nombre del parámetro del link de canje: /app?pase=LORO.… */
 export const PASS_QUERY = "pase";
 
+/**
+ * Limpia lo que la persona pegó en el campo del pase.
+ *
+ * Tres cosas que pasan de verdad al copiar desde un chat en el celular:
+ *  - Se pega el LINK entero en vez del código.
+ *  - Tocar dos veces selecciona solo un tramo entre puntos y se come el
+ *    "LORO." del principio (el caso más común, y el más frustrante porque el
+ *    resto del código está perfecto).
+ *  - Se cuelan espacios o saltos de línea.
+ *
+ * Ninguna de las tres es culpa de quien pagó, así que se corrigen acá en vez
+ * de rechazar el pase. La firma sigue decidiendo: esto solo arma bien la
+ * cadena antes de verificarla.
+ */
+export function normalizePassInput(raw: string): string {
+  let s = String(raw || "").trim();
+  if (!s) return "";
+
+  // ¿Pegó el link? Sacamos el código de adentro.
+  if (/^https?:\/\//i.test(s) || s.includes(`${PASS_QUERY}=`)) {
+    try {
+      const u = new URL(s, "https://loreado.local");
+      const t = u.searchParams.get(PASS_QUERY);
+      if (t) s = t;
+    } catch {}
+  }
+
+  s = s.replace(/\s+/g, "");
+
+  // Le falta el prefijo pero tiene las dos partes: se lo devolvemos.
+  if (!s.startsWith(`${PREFIX}.`) && s.split(".").length === 2) s = `${PREFIX}.${s}`;
+  return s;
+}
+
 /** "3 ago 2026" — cómo se muestra el vencimiento en la app. */
 export function fmtPassExpiry(ts: number): string {
   const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

@@ -8,7 +8,7 @@
 // alcanzaría con editar el localStorage para tener acceso ilimitado.
 
 import { useCallback, useEffect, useState } from "react";
-import { PASS_QUERY, type PassPlan } from "./pass";
+import { PASS_QUERY, normalizePassInput, type PassPlan } from "./pass";
 
 const PASS_KEY = "loreado:pass:v1";
 
@@ -147,7 +147,7 @@ export function usePass() {
   /** Canje manual, desde el input "¿Ya sos Loro?". */
   const activate = useCallback(
     async (token: string) => {
-      const clean = token.trim();
+      const clean = normalizePassInput(token);
       if (!clean) return false;
       setError("");
       return apply(clean, await redeem(clean), true);
