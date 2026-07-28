@@ -53,19 +53,35 @@ export function capacityClosed(): boolean {
   return process.env.CAPACITY_CLOSED === "1";
 }
 
-// Guard de mismo-origen estricto: exige Origin y que su host coincida con el
-// del request. Un navegador SIEMPRE manda Origin en un fetch POST (mismo o
-// cross origin), así que la app real pasa; curl/scripts nativos que omiten
-// Origin quedan bloqueados. Un atacante puede spoofear el header, por eso esto
-// NO es protección fuerte por sí solo (para eso: auth) — se combina con el
-// rate-limit de arriba.
+// Guard de mismo-origen: acepta el pedido si Origin coincide con el host, o si
+// no hay Origin pero el navegador declara que el pedido es same-site.
+//
+// Por qué el segundo camino: NO todos los navegadores mandan Origin en un POST
+// del mismo origen. Safari en particular lo omite en varios casos, y con la
+// versión anterior de este guard —que exigía Origin sí o sí— la app entera
+// devolvía 403 en esos navegadores: no se podía dejar el email, ni activar un
+// pase, ni pedir una respuesta.
+//
+// Sec-Fetch-Site es tan confiable como Origin para esto: los navegadores lo
+// mandan siempre y el JavaScript de la página NO puede escribirlo (es un
+// header prohibido). Un script fuera del navegador puede falsificar cualquiera
+// de los dos, así que esto NO es protección fuerte por sí solo (para eso:
+// auth) — se combina con el rate-limit de arriba.
 export function sameOriginStrict(req: Request): boolean {
-  const origin = req.headers.get("origin");
   const host = req.headers.get("host");
-  if (!origin || !host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
+  if (!host) return false;
+
+  const origin = req.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
   }
+
+  // Sin Origin: vale si el navegador dice que el pedido nació en este mismo
+  // sitio. "none" (la persona escribió la URL) también es legítimo.
+  const site = req.headers.get("sec-fetch-site");
+  return site === "same-origin" || site === "same-site" || site === "none";
 }

@@ -46,11 +46,16 @@ async function redeem(token: string): Promise<{ pass?: ActivePass; error?: strin
       body: JSON.stringify({ token }),
       signal: ctrl.signal,
     });
-    const j = await r.json().catch(() => ({}));
+    const j = await r.json().catch(() => null);
     if (r.ok && j?.ok) {
       return { pass: { email: j.email, expiresAt: j.expiresAt, plan: j.plan } };
     }
-    return { error: j?.error || "No se pudo validar el pase." };
+    // El código HTTP va en el mensaje a propósito. Sin él, "falta la variable
+    // en el server", "el endpoint no existe en este deploy" y "el pase está
+    // mal copiado" se ven todos iguales, y no hay forma de saber a quién
+    // reclamarle. Con el número, se resuelve mirando una vez.
+    if (j?.error) return { error: j.error };
+    return { error: `No se pudo validar el pase (error ${r.status}).` };
   } catch {
     return { error: "No hay conexión para validar el pase." };
   } finally {
