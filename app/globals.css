@@ -965,44 +965,36 @@ input {
    En desktop la entrevista queda a la izquierda y las respuestas a la derecha,
    así no hay que cambiar de ventana para leer lo que sopla el Loro. En mobile
    no aplica: ahí el modo es micrófono y no hay pestaña que compartir. */
-/* La columna izquierda entera (llamada + transcripción) es de escritorio: en
-   mobile el modo es micrófono y no hay pestaña que compartir. */
+/* ===== Sesión en vivo con la pestaña compartida =====
+   Copia la estructura de la referencia: a pantalla completa, la llamada y la
+   transcripción a la izquierda, el copiloto a la derecha, y un divisor que se
+   arrastra para repartir el ancho. En mobile no aplica: ahí el modo es
+   micrófono y no hay pestaña que compartir. */
 .live-left {
   display: none;
 }
 
-/* ---- Transcripción en vivo, debajo de la llamada ---- */
 .transcript-pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0;
   overflow: hidden;
-}
-.transcript-head {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--ink-dim);
-  flex: none;
+  background: #fff;
 }
 .transcript-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 12px 14px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 12px;
 }
 .transcript-empty {
   margin: 0;
   color: var(--ink-faint);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .t-line {
   display: flex;
@@ -1011,13 +1003,13 @@ input {
   gap: 4px;
 }
 .t-bubble {
-  background: #eef2f7;
+  background: #eef2fb;
   border-radius: 14px;
-  padding: 9px 13px;
-  font-size: 14.5px;
+  padding: 10px 14px;
+  font-size: 15px;
   line-height: 1.45;
   color: var(--ink);
-  max-width: 92%;
+  max-width: 94%;
   overflow-wrap: anywhere;
 }
 /* Lo que todavía no cerró Deepgram: se ve, pero se nota que puede cambiar. */
@@ -1026,12 +1018,61 @@ input {
   color: var(--ink-dim);
 }
 .t-meta {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--ink-faint);
   padding-left: 4px;
 }
 
-/* Acciones de la sesión cuando viven dentro de la columna derecha. */
+/* Barra de acciones bajo la llamada. */
+.live-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+  flex: none;
+}
+.tb-btn {
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #e2e4e8;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+.tb-btn:hover {
+  background: #f7f8fa;
+}
+.tb-rec {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e5484d;
+  animation: recPulse 1.6s ease-in-out infinite;
+}
+@keyframes recPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.tb-spacer {
+  flex: 1;
+}
+.tb-listening {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Acciones del copiloto, al pie de su columna. */
 .live-actions {
   display: flex;
   flex-direction: column;
@@ -1039,54 +1080,153 @@ input {
   flex: none;
 }
 
+/* Cambiar de pestaña, encima del video (como la referencia). */
+.share-switch {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  /* Aparece al pasar por encima del video para no taparlo todo el tiempo, pero
+     sigue siendo alcanzable con el teclado. */
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.share-pane:hover .share-switch,
+.share-switch:focus-visible {
+  opacity: 1;
+}
+.share-switch:hover {
+  background: #fff;
+}
+
+/* El divisor arrastrable. */
+.live-resizer {
+  display: none;
+}
+
 @media (min-width: 1000px) {
-  /* Solo cuando hay algo que mostrar; sin compartir, la sesión sigue siendo
-     de una sola columna y a todo el ancho. */
+  /* A pantalla completa: sin márgenes ni ancho máximo, como la referencia. */
+  .app-container.app-split {
+    max-width: none;
+    padding: 0;
+    gap: 0;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .live-split {
     display: grid !important;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: var(--live-left, 52%) 9px minmax(0, 1fr);
     align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    margin-top: 0 !important;
+    background: var(--line);
   }
-  /* Izquierda: la llamada arriba y la transcripción abajo, como la referencia.
-     El video se lleva la parte de arriba y el transcript el resto. */
+
+  /* Izquierda: la llamada arriba, la barra y la transcripción abajo. */
   .live-split .live-left {
     display: grid;
-    grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr);
-    gap: 12px;
+    grid-template-rows: auto auto minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
+    background: #fff;
   }
   .live-split .share-pane {
     min-width: 0;
-    min-height: 0;
-  }
-  /* Derecha: las respuestas ocupan lo que sobra y las acciones quedan
-     debajo, dentro de la misma columna. */
-  .live-split .live-right {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-    min-height: 0;
-  }
-  .live-split .answers-pane {
-    min-width: 0;
+    background: #000;
+    line-height: 0;
+    position: relative;
   }
   .share-video {
     width: 100%;
-    height: 100%;
-    max-height: 100%;
+    /* La llamada manda: se le da el alto que pide su proporción, sin recortar
+       ni deformar, y el resto de la columna es para la transcripción. */
+    max-height: 52vh;
     object-fit: contain;
-    background: #0b0f0d;
-    border: 1px solid var(--line);
-    border-radius: 14px;
+    background: #000;
     display: block;
   }
-  /* Con la pantalla compartida al lado, la app usa todo el ancho disponible:
-     con el contenedor angosto las dos columnas quedaban ilegibles. */
-  .app-live.app-container {
-    max-width: min(1560px, 96vw);
+
+  /* Derecha: header propio, respuestas y acciones. */
+  .live-split .live-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: #fff;
+    gap: 0;
+  }
+  .split-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    flex: none;
+    margin: 0;
+  }
+  .live-split .answers-pane {
+    min-width: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+  .live-split .live-actions {
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .live-resizer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--line);
+    cursor: col-resize;
+    position: relative;
+  }
+  .live-resizer:hover,
+  .live-dragging .live-resizer {
+    background: var(--loro-green);
+  }
+  .live-resizer:focus-visible {
+    outline: 2px solid var(--loro-green-deep);
+    outline-offset: -2px;
+  }
+  /* El agarre: las rayitas del medio que invitan a arrastrar. */
+  .live-resizer-grip {
+    width: 3px;
+    height: 34px;
+    border-radius: 2px;
+    background: var(--ink-faint);
+    opacity: 0.55;
+  }
+  .live-resizer:hover .live-resizer-grip,
+  .live-dragging .live-resizer-grip {
+    background: #fff;
+    opacity: 1;
+  }
+  /* Mientras se arrastra, nada de seleccionar texto ni robarle el puntero al
+     divisor (el <video> se lo quedaría). */
+  .live-dragging {
+    user-select: none;
+  }
+  .live-dragging .live-left,
+  .live-dragging .live-right {
+    pointer-events: none;
   }
 }
 

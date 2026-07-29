@@ -180,6 +180,15 @@ function ClockBigIcon() {
   );
 }
 
+function TabsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="6" width="13" height="13" rx="2" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3H20a1 1 0 0 1 1 1v10.5a1.5 1.5 0 0 1-1.5 1.5H18" />
+    </svg>
+  );
+}
+
 function CalendarIcon() {
   return (
     <svg {...stypeIconProps}>
@@ -855,6 +864,15 @@ function PagoPaso({
 
 const LS_KEY = "copiloto:context:v1";
 
+// ---------- Reparto de la sesión en vivo ----------
+// Cuánto se lleva la columna de la llamada, en % del ancho. Se arrastra el
+// divisor del medio y queda guardado: cada persona mira más una cosa u otra.
+const SPLIT_KEY = "loreado:split:v1";
+const LIVE_SPLIT_DEFAULT = 52;
+const LIVE_SPLIT_MIN = 26;
+const LIVE_SPLIT_MAX = 74;
+const clampSplit = (v: number) => Math.min(LIVE_SPLIT_MAX, Math.max(LIVE_SPLIT_MIN, v));
+
 /**
  * El pase viaja en cada pedido caro. Se lee del storage en el momento (y no de
  * un estado de React) para que el header sea correcto incluso en la primera
@@ -959,6 +977,38 @@ export default function Page() {
   const [payPlan, setPayPlan] = useState<PassPlan | null>(null);
   // Hay video de la pestaña compartida para mostrar al lado de las respuestas.
   const [sharing, setSharing] = useState(false);
+  /**
+   * Ancho de la columna izquierda, en % del alto total. Se puede arrastrar el
+   * divisor del medio y queda guardado: cada persona reparte distinto según si
+   * mira más la llamada o las respuestas.
+   */
+  const [leftPct, setLeftPct] = useState(LIVE_SPLIT_DEFAULT);
+  const splitRef = useRef<HTMLElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    try {
+      const v = parseFloat(localStorage.getItem(SPLIT_KEY) || "");
+      if (Number.isFinite(v)) setLeftPct(clampSplit(v));
+    } catch {}
+  }, []);
+
+  const applySplit = useCallback((pct: number) => {
+    const v = clampSplit(pct);
+    setLeftPct(v);
+    try {
+      localStorage.setItem(SPLIT_KEY, String(v));
+    } catch {}
+  }, []);
+
+  const onSplitDrag = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const box = splitRef.current?.getBoundingClientRect();
+      if (!box || box.width === 0) return;
+      applySplit(((e.clientX - box.left) / box.width) * 100);
+    },
+    [applySplit]
+  );
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -1006,6 +1056,10 @@ export default function Page() {
    * Deepgram solo se le manda audio, pero el video se muestra en pantalla.
    */
   const shareStreamRef = useRef<MediaStream | null>(null);
+  /** Tu micrófono, cuando la sesión captura la pestaña: se mezcla con ella. */
+  const micStreamRef = useRef<MediaStream | null>(null);
+  /** Nodo del audio de la pestaña, para poder reemplazarlo al cambiar de tab. */
+  const tabSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const wakeLockRef = useRef<any>(null);
@@ -1464,30 +1518,78 @@ export default function Page() {
   );
 
   // ---------- Captura ----------
+
+  /**
+   * Pide la pestaña a compartir.
+   *
+   * Dos cosas que no son obvias:
+   *  - `setFocusBehavior("no-focus-change")` evita que el navegador te lleve a
+   *    la pestaña elegida. Sin esto, elegís el Meet y quedás parado ahí, con
+   *    Loreado atrás — justo lo contrario de lo que se busca.
+   *  - `surfaceSwitching: "include"` habilita cambiar de pestaña sin cortar la
+   *    sesión, que es lo que usa el botón "Cambiar pestaña".
+   */
+  const pedirPestania = useCallback(async (): Promise<MediaStream> => {
+    const opts: any = {
+      video: true,
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      surfaceSwitching: "include",
+      selfBrowserSurface: "exclude",
+    };
+    try {
+      const Ctrl = (window as any).CaptureController;
+      if (Ctrl) {
+        const controller = new Ctrl();
+        // Va ANTES de pedir: después de que la promesa resuelve ya es tarde.
+        controller.setFocusBehavior?.("no-focus-change");
+        opts.controller = controller;
+      }
+    } catch {}
+    return navigator.mediaDevices.getDisplayMedia(opts);
+  }, []);
+
+  /** Cuelga el video de la pestaña y avisa si se deja de compartir. */
+  const usarVideoCompartido = useCallback((vt: MediaStreamTrack[]) => {
+    shareStreamRef.current?.getTracks().forEach((t) => t.stop());
+    if (!vt.length) {
+      shareStreamRef.current = null;
+      setSharing(false);
+      return;
+    }
+    shareStreamRef.current = new MediaStream(vt);
+    setSharing(true);
+    // Si se corta el compartir desde la barra del navegador, el recuadro tiene
+    // que desaparecer en vez de quedar congelado en el último cuadro.
+    vt[0].addEventListener("ended", () => {
+      shareStreamRef.current = null;
+      setSharing(false);
+    });
+  }, []);
+
   const acquireStream = useCallback(async (m: Mode): Promise<MediaStream> => {
     if (m === "tab") {
-      const s = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
+      const s = await pedirPestania();
       const at = s.getAudioTracks();
       if (at.length === 0) {
         s.getTracks().forEach((t) => t.stop());
         throw new Error('No se compartió audio. Al elegir la pestaña activá "Compartir audio de la pestaña".');
       }
-      // El video de la pestaña compartida se conserva (antes se descartaba)
-      // para mostrarlo al lado de las respuestas: así se ve la entrevista y el
-      // copiloto en la misma pantalla, sin cambiar de ventana.
-      const vt = s.getVideoTracks();
-      if (vt.length) {
-        shareStreamRef.current = new MediaStream(vt);
-        setSharing(true);
-        // Si se corta el compartir desde la barra del navegador, el recuadro
-        // tiene que desaparecer en vez de quedar congelado.
-        vt[0].addEventListener("ended", () => {
-          shareStreamRef.current = null;
-          setSharing(false);
+      // El video de la pestaña se conserva (antes se descartaba) para mostrarlo
+      // al lado de las respuestas.
+      usarVideoCompartido(s.getVideoTracks());
+
+      // Además del audio de la pestaña, TU micrófono: si no, el transcript solo
+      // tiene lo que dice el entrevistador y el informe queda con la mitad de
+      // la conversación. Si no hay permiso, la sesión sigue igual con la
+      // pestaña sola.
+      try {
+        const mic = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
+        micStreamRef.current = mic;
+      } catch {
+        micStreamRef.current = null;
+        track("mic_denied_on_tab");
       }
       return new MediaStream(at);
     }
@@ -1495,7 +1597,34 @@ export default function Page() {
     return navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
-  }, []);
+  }, [pedirPestania, usarVideoCompartido]);
+
+  /** Cambiar de pestaña compartida sin cortar la sesión. */
+  const cambiarPestania = useCallback(async () => {
+    try {
+      const s = await pedirPestania();
+      usarVideoCompartido(s.getVideoTracks());
+      // El audio nuevo reemplaza al anterior en el mismo grafo: la sesión y el
+      // socket de Deepgram siguen vivos.
+      const at = s.getAudioTracks();
+      const ctx = audioCtxRef.current;
+      const worklet = workletRef.current;
+      if (at.length && ctx && worklet) {
+        tabSourceRef.current?.disconnect();
+        streamRef.current?.getAudioTracks().forEach((t) => t.stop());
+        const nuevo = new MediaStream(at);
+        streamRef.current = nuevo;
+        const src = ctx.createMediaStreamSource(nuevo);
+        src.connect(worklet);
+        tabSourceRef.current = src;
+      } else {
+        at.forEach((t) => t.stop());
+      }
+      track("tab_switched");
+    } catch {
+      // Canceló el selector: no pasa nada, sigue compartiendo lo de antes.
+    }
+  }, [pedirPestania, usarVideoCompartido]);
 
   const start = useCallback(async () => {
     // Cuota gratuita: si no quedan sesiones, se muestra el paywall. Con pase
@@ -1534,6 +1663,18 @@ export default function Page() {
         if (w && w.readyState === WebSocket.OPEN) w.send(e.data);
       };
       source.connect(worklet);
+      tabSourceRef.current = mode === "tab" ? source : null;
+
+      // Con la pestaña capturada, TU micrófono entra al mismo grafo: dos
+      // fuentes conectadas al mismo nodo se suman, así que Deepgram recibe la
+      // conversación completa en vez de solo al entrevistador. El micrófono va
+      // con cancelación de eco para no volver a transcribir lo que ya entró por
+      // la pestaña a través de los parlantes.
+      if (micStreamRef.current) {
+        try {
+          audioCtx.createMediaStreamSource(micStreamRef.current).connect(worklet);
+        } catch {}
+      }
 
       // Abre (o reabre) el WebSocket contra Deepgram reusando el mismo
       // stream/worklet: en una reconexión NO se vuelve a pedir permiso de
@@ -1738,6 +1879,9 @@ export default function Page() {
     // el navegador sigue mostrando "estás compartiendo pantalla" para siempre.
     shareStreamRef.current?.getTracks().forEach((t) => t.stop());
     shareStreamRef.current = null;
+    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    micStreamRef.current = null;
+    tabSourceRef.current = null;
     setSharing(false);
     try {
       wakeLockRef.current?.release?.();
@@ -1849,11 +1993,71 @@ export default function Page() {
   // formulario: ni el área de contenido ni el footer con su CTA.
   const hideChrome = !live && view !== "setup";
 
+  // El header de la sesión se dibuja en dos lugares distintos: arriba de todo
+  // en la vista normal, y dentro de la columna derecha cuando se comparte
+  // pantalla (como la referencia). Se arma una sola vez para que no se
+  // desincronicen.
+  const headerControls = (
+        <div className="header-right">
+      {live && (
+        <div className="header-center">
+          {/* Solo el tiempo restante: el contador de sesiones se sacó de la
+              vista para que la primera línea quede como la de Parakeet. */}
+          {pass ? (
+            /* Solo "Rey Loro": con la fecha al lado el pill se comía los
+               botones del header en mobile. El vencimiento sigue a mano en
+               la pantalla de setup y en el tooltip. */
+            <span
+              className="timer-pill timer-pill-pass"
+              title={`Pase de ${pass.email} · vence ${fmtPassExpiry(pass.expiresAt)}`}
+            >
+              👑 Rey Loro
+            </span>
+          ) : (
+            <span className="timer-pill" title="Tiempo restante de la sesión">
+              <ClockIcon />
+              {fmtCountdown(remainingSec)} <span className="timer-free">(Free)</span>
+            </span>
+          )}
+        </div>
+      )}
+      {!live && connecting && <span className="status-chip">conectando…</span>}
+      {!live && status === "error" && <span className="status-chip">error</span>}
+      {live && (
+        <SessionMenu
+          lang={lang}
+          onLang={(l) => {
+            setLang(l);
+            track("lang_changed", { lang: l, from: "session_menu" });
+          }}
+          sizeId={answerSize}
+          onSize={(id) => {
+            setAnswerSize(id);
+            track("answer_size_changed", { size: id });
+          }}
+          autoAnswer={autoAnswer}
+          onAutoAnswer={(v) => {
+            setAutoAnswer(v);
+            track("auto_answer_toggled", { on: v });
+          }}
+        />
+      )}
+      {live && (
+        <button className="stop-x" onClick={stop} aria-label="Detener" title="Detener">
+          ✕
+        </button>
+      )}
+    </div>
+  );
+
+  const splitLive = live && sharing;
+
   return (
     <main
-      className={`app-container ${live ? "app-live" : ""} ${view === "sessions" && !live ? "app-sessions" : ""}`}
+      className={`app-container ${live ? "app-live" : ""} ${splitLive ? "app-split" : ""} ${view === "sessions" && !live ? "app-sessions" : ""}`}
       style={{ ["--answer-size" as string]: `${answerSizePx(answerSize)}px` }}
     >
+      {!splitLive && (
       <header className="brand-header">
         <div className="brand">
           <BrandLogo />
@@ -1909,6 +2113,7 @@ export default function Page() {
           )}
         </div>
       </header>
+      )}
 
       {showSetup && (
         <p className="tagline">
@@ -2082,13 +2287,27 @@ export default function Page() {
 
       {/* Contenido */}
       {!hideChrome && (
-      <section className={live && sharing ? "live-split" : ""} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
+      <section
+        ref={splitRef}
+        className={`${splitLive ? "live-split" : ""}${dragging ? " live-dragging" : ""}`}
+        style={
+          splitLive
+            ? ({ ["--live-left" as string]: `${leftPct}%` } as React.CSSProperties)
+            : { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }
+        }
+      >
         {/* Pestaña compartida: la entrevista y el copiloto en la misma
             pantalla. En desktop va a la izquierda; en mobile no existe (ahí el
             modo es micrófono y no hay nada que compartir). */}
         {live && sharing && (
           <div className="live-left">
             <div className="share-pane">
+              {/* Cambiar de pestaña sin cortar la sesión, como la referencia:
+                  el selector vuelve a abrirse y el audio nuevo entra al mismo
+                  grafo, sin reconectar Deepgram ni perder el transcript. */}
+              <button className="share-switch" onClick={() => void cambiarPestania()}>
+                <TabsIcon /> Cambiar pestaña
+              </button>
               <video
                 className="share-video"
                 autoPlay
@@ -2101,19 +2320,29 @@ export default function Page() {
                 }}
               />
             </div>
-            {/* Transcript en vivo, debajo de la llamada. Con la pantalla
-                compartida ocupando la izquierda hay lugar para verlo entero,
-                no solo la última línea. */}
-            <div className="panel transcript-pane">
-              <div className="transcript-head mono">
+            {/* Barra bajo la llamada, como la referencia: lo que se toca
+                durante la sesión, a mano y sin entrar al menú. */}
+            <div className="live-toolbar">
+              <button onClick={stop} className="tb-btn tb-stop">
+                <span className="tb-rec" aria-hidden="true" /> Terminar
+              </button>
+              <button onClick={clearAll} className="tb-btn">
+                ✕ Limpiar
+              </button>
+              <span className="tb-spacer" />
+              <span className="tb-listening mono">
                 <span className="eq" aria-hidden="true">
                   <span />
                   <span />
                   <span />
                   <span />
                 </span>
-                Transcripción en vivo
-              </div>
+                escuchando
+              </span>
+            </div>
+            {/* Transcript en vivo, debajo de la llamada. Sin tarjeta ni título:
+                es el cuerpo de la columna, no un panel más. */}
+            <div className="transcript-pane">
               <div ref={scrollT} className="transcript-body">
                 {lines.length === 0 ? (
                   <p className="transcript-empty mono">Escuchando…</p>
@@ -2129,8 +2358,50 @@ export default function Page() {
             </div>
           </div>
         )}
+        {splitLive && (
+          <div
+            className="live-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ancho de la llamada"
+            aria-valuenow={Math.round(leftPct)}
+            aria-valuemin={LIVE_SPLIT_MIN}
+            aria-valuemax={LIVE_SPLIT_MAX}
+            tabIndex={0}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setDragging(true);
+            }}
+            onPointerMove={(e) => {
+              if (dragging) onSplitDrag(e);
+            }}
+            onPointerUp={(e) => {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+              setDragging(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft") applySplit(leftPct - 2);
+              else if (e.key === "ArrowRight") applySplit(leftPct + 2);
+              else if (e.key === "Home") applySplit(LIVE_SPLIT_DEFAULT);
+              else return;
+              e.preventDefault();
+            }}
+            onDoubleClick={() => applySplit(LIVE_SPLIT_DEFAULT)}
+            title="Arrastrá para repartir el ancho (doble clic para volver al medio)"
+          >
+            <span className="live-resizer-grip" aria-hidden="true" />
+          </div>
+        )}
         {live && (
           <div className="live-right">
+            {splitLive && (
+              <header className="brand-header split-header">
+                <div className="brand">
+                  <BrandLogo />
+                </div>
+                {headerControls}
+              </header>
+            )}
           <div className="panel answers-pane" style={{ flex: 1, minHeight: 0 }}>
             <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
@@ -2200,12 +2471,9 @@ export default function Page() {
               propia columna —como en la referencia— en vez de cruzar toda la
               pantalla. Sin compartir siguen en el pie de siempre. */}
           {sharing && (
+            /* Sin "Limpiar" acá: ya está en la barra de la izquierda, y
+               repetirlo era la única diferencia con la referencia. */
             <div className="live-actions">
-              <div className="clear-row">
-                <button onClick={clearAll} className="clear-pill mono">
-                  ✕ Limpiar
-                </button>
-              </div>
               <button onClick={() => answerNow()} className="btn-action btn-primary btn-answer">
                 <span className="btn-answer-inner">
                   <SparkleIcon />

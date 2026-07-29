@@ -28,6 +28,9 @@ export type FunnelEvent =
   | "session_notes_generated"
   | "session_chat_message"
   | "mode_changed"
+  // Captura de pestaña: si el micrófono propio quedó afuera y cambios de tab.
+  | "mic_denied_on_tab"
+  | "tab_switched"
   | "paywall_shown"
   | "capacity_closed_shown"
   | "waitlist_submit"
