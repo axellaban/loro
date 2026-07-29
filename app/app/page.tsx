@@ -742,66 +742,75 @@ function PassParty({ pass, onDone }: { pass: ActivePass; onDone: () => void }) {
  */
 function PagoPaso({
   plan,
-  onBack,
+  onClose,
   onWhatsApp,
 }: {
   plan: PassPlan;
-  onBack: () => void;
+  onClose: () => void;
   onWhatsApp: (msg: string) => void;
 }) {
   const p = PLANES[plan];
   return (
-    <>
-      <div className="paywall-title">Elegí cómo pagar</div>
-      <p className="paywall-text">
-        {p.titulo} — <strong>{p.precio}</strong>
-      </p>
+    <div className="paywall-overlay" onClick={onClose}>
+      <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="paywall-close" onClick={onClose} aria-label="Cerrar">
+          ✕
+        </button>
+        <div className="paywall-title">Elegí cómo pagar</div>
+        <p className="paywall-text">
+          {p.titulo} — <strong>{p.precio}</strong>
+        </p>
 
-      <div className="stype-card">
-        <div className="stype-head">
-          <span className="stype-name">
-            <BannerIcon /> Argentina
-          </span>
-          <span className="stype-badge">Mercado Pago</span>
+        {/* El nombre del método está en el badge, así que el botón solo dice
+            "Pagar": repetirlo era ruido en una tarjeta que ya se entiende. */}
+        <div className="stype-card">
+          <div className="stype-head">
+            <span className="stype-name">
+              <BannerIcon /> Argentina
+            </span>
+            <span className="stype-badge">Mercado Pago</span>
+          </div>
+          <a
+            className="btn-action btn-primary"
+            href={p.mercadoPago}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => track(plan === "week" ? "pay_mp_week" : "pay_mp_year")}
+          >
+            Pagar
+          </a>
         </div>
-        <p className="paywall-text">Pagás con tarjeta, débito o dinero en cuenta.</p>
-        <a
-          className="btn-action btn-primary"
-          href={p.mercadoPago}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => track(plan === "week" ? "pay_mp_week" : "pay_mp_year")}
-        >
-          Pagar con Mercado Pago
-        </a>
-      </div>
 
-      <div className="stype-card">
-        <div className="stype-head">
-          <span className="stype-name">
-            <WorldIcon /> Resto del mundo
-          </span>
-          <span className="stype-badge">Binance Pay</span>
-        </div>
-        {p.binance ? (
-          <>
-            <p className="paywall-text">Desde el celular abrís la app directo. Desde la compu, escaneá el QR.</p>
-            <a
-              className="btn-action btn-primary"
-              href={p.binance.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => track(plan === "week" ? "pay_binance_week" : "pay_binance_year")}
-            >
-              Pagar con Binance Pay
-            </a>
-            {/* Imagen normal y no next/image: es un QR chico y estático, y así
-                se puede tocar y guardar para escanearlo desde la galería. */}
-            <img className="pago-qr" src={p.binance.qr} alt="QR de Binance Pay para pagar el pase" />
-          </>
-        ) : (
-          <>
-            <p className="paywall-text">En breve te paso el QR.</p>
+        <div className="stype-card">
+          <div className="stype-head">
+            <span className="stype-name">
+              <WorldIcon /> Resto del mundo
+            </span>
+            <span className="stype-badge">Binance Pay</span>
+          </div>
+          {p.binance ? (
+            <>
+              <a
+                className="btn-action btn-primary"
+                href={p.binance.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track(plan === "week" ? "pay_binance_week" : "pay_binance_year")}
+              >
+                Pagar
+              </a>
+              {/* Imagen normal y no next/image: es un QR chico y estático, y así
+                  se puede tocar y guardar para escanearlo desde la galería.
+                  Sirve para quien está en la compu; en el celular el botón de
+                  arriba abre la app directo. */}
+              <img
+                className="pago-qr"
+                src={p.binance.qr}
+                alt="QR de Binance Pay para pagar el pase"
+              />
+              <p className="paywall-fineprint pago-qr-nota">o escaneá el QR desde la compu</p>
+            </>
+          ) : (
             <button
               className="btn-action btn-outline"
               onClick={() => {
@@ -811,29 +820,25 @@ function PagoPaso({
             >
               Pedime el QR por WhatsApp
             </button>
-          </>
-        )}
+          )}
+        </div>
+
+        <p className="paywall-fineprint pago-nota">
+          Cuando pagues, mandame el comprobante por{" "}
+          <a
+            href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
+              `${p.wa} Ya pagué, te mando el comprobante.`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => track("pay_receipt_click")}
+          >
+            WhatsApp
+          </a>{" "}
+          y te activo en minutos.
+        </p>
       </div>
-
-      <p className="paywall-fineprint pago-nota">
-        Cuando pagues, mandame el comprobante por{" "}
-        <a
-          href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
-            `${p.wa} Ya pagué, te mando el comprobante.`
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => track("pay_receipt_click")}
-        >
-          WhatsApp
-        </a>{" "}
-        y te activo en minutos.
-      </p>
-
-      <button className="btn-action btn-outline" onClick={onBack}>
-        ← Volver
-      </button>
-    </>
+    </div>
   );
 }
 
@@ -2271,22 +2276,25 @@ export default function Page() {
       </footer>
       )}
 
-      {showPaywall && (
-        <div
-          className="paywall-overlay"
-          onClick={() => {
-            setShowPaywall(false);
-            setPayPlan(null);
-          }}
-        >
+      {/* El paso de pago es su propia ventana, no un estado dentro del paywall:
+          se llega tanto desde el paywall como desde el selector de tipo de
+          sesión, y metido adentro de uno solo no aparecía desde el otro. */}
+      {payPlan && (
+        <PagoPaso plan={payPlan} onClose={() => setPayPlan(null)} onWhatsApp={openWhatsApp} />
+      )}
+
+      {showPaywall && !payPlan && (
+        <div className="paywall-overlay" onClick={() => setShowPaywall(false)}>
           <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
-            {payPlan ? (
-              <PagoPaso
-                plan={payPlan}
-                onBack={() => setPayPlan(null)}
-                onWhatsApp={openWhatsApp}
-              />
-            ) : paywallReason === "capacity" ? (
+            <button
+              type="button"
+              className="paywall-close"
+              onClick={() => setShowPaywall(false)}
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+            {paywallReason === "capacity" ? (
               <>
                 <div className="paywall-title">🛑 CUPOS AGOTADOS POR HOY</div>
                 <p className="paywall-text">
@@ -2378,8 +2386,9 @@ export default function Page() {
 
       {/* Elección de tipo de sesión, antes de arrancar. A diferencia de
           Parakeet no hay créditos: lo que se vende es acceso ilimitado por
-          tiempo, así que la opción paga manda a WhatsApp y la gratis arranca. */}
-      {showSessionType && (
+          tiempo, así que la opción paga abre el paso de pago y la gratis
+          arranca la sesión. */}
+      {showSessionType && !payPlan && (
         <div className="paywall-overlay" onClick={() => setShowSessionType(false)}>
           <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
             <button
@@ -2433,9 +2442,6 @@ export default function Page() {
               </button>
             </div>
 
-            <button className="btn-action btn-outline" onClick={() => setShowSessionType(false)}>
-              ← Volver
-            </button>
           </div>
         </div>
       )}
