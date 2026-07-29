@@ -38,6 +38,8 @@ export type FunnelEvent =
   | "vip_pass_click"
   // Elección de tipo de sesión y los dos pases ilimitados que la reemplazan.
   | "session_type_shown"
+  // Ventana de "cómo conectar el audio", el paso previo a compartir la pestaña.
+  | "connect_shown"
   | "pass_week_click"
   | "pass_year_click"
   | "pass_activated"

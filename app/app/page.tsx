@@ -238,6 +238,33 @@ function BannerIcon() {
   );
 }
 
+function BrowserIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M7 6.5h.01M10 6.5h.01" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+      <path d="M11 18.5h2" />
+    </svg>
+  );
+}
+
+function MicBigIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <rect x="9" y="2.5" width="6" height="11" rx="3" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5" />
+    </svg>
+  );
+}
+
 function DotsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -883,6 +910,113 @@ function PagoPaso({
   );
 }
 
+/**
+ * Cómo conectar el audio de la reunión, en su propia ventana y justo antes de
+ * arrancar. Antes esto vivía en la pantalla de configuración —un selector de
+ * "Micrófono / Pestaña" y una línea de ayuda— y tenía dos problemas: obligaba a
+ * decidir algo técnico antes de tiempo, y la explicación quedaba lejos del
+ * momento en que hace falta (cuando el navegador abre el selector de pestañas).
+ *
+ * Ahora el modo lo decide el navegador (pestaña en desktop, micrófono donde no
+ * hay captura de pestaña) y acá se explica lo único que la persona tiene que
+ * hacer bien: tener la reunión abierta EN EL NAVEGADOR y tildar "compartir
+ * audio de la pestaña". Para quien solo tiene la app de escritorio no hay
+ * captura posible todavía, así que se ofrece el rodeo del celular hasta que
+ * exista la app nativa.
+ */
+function ConectarPaso({
+  soloMic,
+  connecting,
+  onClose,
+  onStart,
+}: {
+  soloMic: boolean;
+  connecting: boolean;
+  onClose: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <div className="paywall-overlay" onClick={onClose}>
+      <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="paywall-close" onClick={onClose} aria-label="Cerrar">
+          ✕
+        </button>
+        <div className="paywall-title">Conectá el audio de tu reunión</div>
+
+        {soloMic ? (
+          <>
+            <p className="paywall-text">
+              En este dispositivo el Loro escucha por el micrófono.
+            </p>
+            <div className="stype-card">
+              <div className="stype-head">
+                <span className="stype-name">
+                  <MicBigIcon /> Poné el altavoz
+                </span>
+                <span className="stype-badge">Sin auriculares</span>
+              </div>
+              <ol className="conectar-pasos">
+                <li>Sacate los auriculares y activá el altavoz de la reunión.</li>
+                <li>Dejá este celular cerca, con la pantalla de Loreado abierta.</li>
+                <li>Hablá normal: el Loro escucha al entrevistador y a vos.</li>
+              </ol>
+              <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
+                {connecting ? "Conectando… 🦜" : "Empezar a escuchar"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="paywall-text">
+              El Loro escucha el audio de la pestaña donde está tu reunión, y también tu micrófono.
+            </p>
+            <div className="stype-card">
+              <div className="stype-head">
+                <span className="stype-name">
+                  <BrowserIcon /> Compartí la pestaña
+                </span>
+                <span className="stype-badge">Recomendado</span>
+              </div>
+              <ol className="conectar-pasos">
+                <li>
+                  Abrí tu reunión <strong>en el navegador</strong> (Meet, Zoom o Teams tienen
+                  versión web) en otra pestaña de esta misma ventana.
+                </li>
+                <li>
+                  Tocá el botón de acá abajo y, en el cuadro que abre Chrome, elegí{" "}
+                  <strong>Pestaña de Chrome</strong> y seleccioná la de tu reunión.
+                </li>
+                <li>
+                  Antes de aceptar, tildá <strong>“Compartir audio de la pestaña”</strong>. Sin ese
+                  tilde el Loro se queda mudo.
+                </li>
+              </ol>
+              <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
+                {connecting ? "Conectando… 🦜" : "Compartir pestaña"}
+              </button>
+            </div>
+
+            <div className="stype-card">
+              <div className="stype-head">
+                <span className="stype-name">
+                  <PhoneIcon /> ¿Solo tenés la app de escritorio?
+                </span>
+                <span className="stype-badge">Mientras tanto</span>
+              </div>
+              <p className="paywall-text">
+                Zoom o Teams instalados no se pueden compartir con audio desde el navegador. Hasta
+                que salga la app de escritorio de Loreado: abrí <strong>loreado.vercel.app</strong>{" "}
+                en tu celular, poné el altavoz de la reunión y dejá el celular cerca. Escucha igual
+                de bien.
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const LS_KEY = "copiloto:context:v1";
 
 // ---------- Reparto de la sesión en vivo ----------
@@ -994,6 +1128,9 @@ export default function Page() {
   const [paywallReason, setPaywallReason] = useState<"quota" | "capacity">("quota");
   // Elección de tipo de sesión antes de arrancar (pase ilimitado vs. gratis).
   const [showSessionType, setShowSessionType] = useState(false);
+  // Ventana de "cómo conectar el audio", después de elegir el tipo de sesión y
+  // justo antes de que el navegador pida la pestaña.
+  const [showConnect, setShowConnect] = useState(false);
   // Pase elegido: mientras está seteado se muestra el paso de pago.
   const [payPlan, setPayPlan] = useState<PassPlan | null>(null);
   // Hay video de la pestaña compartida para mostrar al lado de las respuestas.
@@ -1693,6 +1830,7 @@ export default function Page() {
       return;
     }
     setShowSessionType(false);
+    setShowConnect(false);
     setError("");
     setStatus("connecting");
     questionBufRef.current = "";
@@ -2221,29 +2359,9 @@ export default function Page() {
         </div>
       )}
 
-      {/* Selector de modo: se oculta en mobile (iOS/Android) y en Safari
-          —incluso de escritorio—, donde "Pestaña" no tiene sentido o no
-          funciona; en esos casos se usa directamente el micrófono. */}
-      {showSetup && !noTabCapture && (
-        <div className={`grid-responsive`}>
-          <button
-            className={`btn-select ${mode === "mic" ? "btn-select-active" : ""}`}
-            onClick={() => { setMode("mic"); track("mode_changed", { mode: "mic" }); }}
-            disabled={connecting}
-          >
-            🎙️ Micrófono
-            <span className="btn-select-sub">Escuchar la sala por mic</span>
-          </button>
-          <button
-            className={`btn-select ${mode === "tab" ? "btn-select-active" : ""}`}
-            onClick={() => { setMode("tab"); track("mode_changed", { mode: "tab" }); }}
-            disabled={connecting}
-          >
-            🖥️ Pestaña
-            <span className="btn-select-sub">Audio digital de Meet/Zoom</span>
-          </button>
-        </div>
-      )}
+      {/* El modo (pestaña o micrófono) ya no se elige a mano: lo decide el
+          navegador y se explica en la ventana de conexión, que aparece recién
+          cuando hace falta. */}
       {error && (
         <div className="mono error-box" style={{
           fontSize: 13,
@@ -2344,16 +2462,17 @@ export default function Page() {
         </div>
       )}
 
-      {/* Contenido */}
+      {/* Contenido. El layout base (columna que ocupa lo que sobra y deja
+          scrollear adentro) vive en .live-content y vale SIEMPRE; `live-split`
+          solo suma las dos columnas, y solo a partir de 1000px. Antes estaba
+          todo mezclado en un estilo inline condicional y, al compartir pantalla
+          en una ventana angosta, la sección se quedaba sin flex y el scroll de
+          las respuestas desaparecía. */}
       {!hideChrome && (
       <section
         ref={splitRef}
-        className={`${splitLive ? "live-split" : ""}${dragging ? " live-dragging" : ""}`}
-        style={
-          splitLive
-            ? ({ ["--live-left" as string]: `${leftPct}%` } as React.CSSProperties)
-            : { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }
-        }
+        className={`live-content${splitLive ? " live-split" : ""}${dragging ? " live-dragging" : ""}`}
+        style={{ ["--live-left" as string]: `${leftPct}%` } as React.CSSProperties}
       >
         {/* Pestaña compartida: la entrevista y el copiloto en la misma
             pantalla. En desktop va a la izquierda; en mobile no existe (ahí el
@@ -2637,11 +2756,19 @@ export default function Page() {
               // genérico y la sesión no sirve. Se marcan los que falten y no
               // se avanza.
               if (!marcarFaltantes()) return;
-              // Con pase se arranca derecho: no hay tipo de sesión que elegir.
-              // Sin pase, se elige; y si ya no quedan gratis, `start` corta y
-              // muestra el paywall.
-              if (pass || sessionsUsedRef.current >= FREE_SESSIONS) {
-                void start();
+              // Sin pase y sin sesiones gratis no hay nada que elegir ni que
+              // conectar: derecho al paywall.
+              if (!pass && sessionsUsedRef.current >= FREE_SESSIONS) {
+                setPaywallReason("quota");
+                setShowPaywall(true);
+                track("paywall_shown");
+                return;
+              }
+              // Con pase no hay tipo de sesión que elegir: se pasa directo a
+              // cómo conectar el audio.
+              if (pass) {
+                setShowConnect(true);
+                track("connect_shown");
                 return;
               }
               setShowSessionType(true);
@@ -2722,13 +2849,6 @@ export default function Page() {
               {passError && <p className="paywall-error">{passError}</p>}
             </>
           ))}
-        {showSetup && (
-          <p className="mono btn-hint">
-            {mode === "mic"
-              ? "Activá los parlantes (sin auriculares) para que el micrófono escuche al entrevistador."
-              : "Elegí la pestaña del Meet y activá “Compartir audio de la pestaña”."}
-          </p>
-        )}
       </footer>
       )}
 
@@ -2844,6 +2964,17 @@ export default function Page() {
           Parakeet no hay créditos: lo que se vende es acceso ilimitado por
           tiempo, así que la opción paga abre el paso de pago y la gratis
           arranca la sesión. */}
+      {/* Cómo conectar el audio: viene después de elegir el tipo de sesión y es
+          lo último antes de que el navegador pida la pestaña. */}
+      {showConnect && !payPlan && (
+        <ConectarPaso
+          soloMic={noTabCapture}
+          connecting={connecting}
+          onClose={() => setShowConnect(false)}
+          onStart={() => void start()}
+        />
+      )}
+
       {showSessionType && !payPlan && (
         <div className="paywall-overlay" onClick={() => setShowSessionType(false)}>
           <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
@@ -2891,7 +3022,11 @@ export default function Page() {
               </p>
               <button
                 className="btn-action btn-outline"
-                onClick={() => void start()}
+                onClick={() => {
+                  setShowSessionType(false);
+                  setShowConnect(true);
+                  track("connect_shown");
+                }}
                 disabled={connecting || sessionsLeft <= 0}
               >
                 {connecting ? "Conectando… 🦜" : "Activar sesión gratis"}

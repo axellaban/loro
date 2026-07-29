@@ -91,19 +91,6 @@ input {
   margin-top: -6px;
 }
 
-/* Grid responsive genérico */
-.grid-responsive {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 500px) {
-  .grid-responsive {
-    grid-template-columns: 1fr !important;
-  }
-}
-
 /* Fila de selectores (idioma + modelo en una misma línea, como Parakeet). */
 .selectors-row {
   display: grid;
@@ -130,42 +117,6 @@ input {
   flex-direction: column;
   gap: 12px;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-}
-
-/* Botones de modo (Micrófono / Pestaña) */
-.btn-select {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: flex-start;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  color: var(--ink-dim);
-  font-size: 14px;
-  font-weight: 600;
-  text-align: left;
-  transition: all 0.15s ease;
-  width: 100%;
-}
-
-.btn-select:hover:not(:disabled) {
-  border-color: var(--loro-green);
-  color: var(--ink);
-}
-
-.btn-select-active {
-  background: #f0fdf9 !important;
-  border-color: var(--loro-green) !important;
-  color: var(--ink) !important;
-  box-shadow: inset 0 0 0 1px var(--loro-green);
-}
-
-.btn-select-sub {
-  font-size: 10.5px;
-  color: var(--ink-faint);
-  font-weight: 400;
 }
 
 /* Labels de formulario */
@@ -869,13 +820,6 @@ input {
   background: rgba(239, 68, 68, 0.04);
 }
 
-.btn-hint {
-  font-size: 11.5px;
-  color: var(--ink-faint);
-  text-align: center;
-  line-height: 1.4;
-}
-
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
@@ -996,6 +940,16 @@ input {
    transcripción a la izquierda, el copiloto a la derecha, y un divisor que se
    arrastra para repartir el ancho. En mobile no aplica: ahí el modo es
    micrófono y no hay pestaña que compartir. */
+/* Contenedor del cuerpo de la sesión: ocupa lo que sobra y deja que el panel
+   de adentro scrollee. Vale en todos los anchos. */
+.live-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
 .live-left {
   display: none;
 }
@@ -1098,6 +1052,20 @@ input {
   color: var(--ink-faint);
 }
 
+/* La columna del copiloto. Los estilos de flex van FUERA del media query: sin
+   ellos, este div es un bloque común, el panel de respuestas deja de estar
+   limitado por el alto del viewport y crece hasta el alto del contenido — o
+   sea, el scroll interno desaparece y en mobile las respuestas quedan
+   cortadas sin forma de bajar. */
+.live-right {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  gap: 8px;
+}
+
 /* Acciones del copiloto, al pie de su columna. */
 .live-actions {
   display: flex;
@@ -1156,7 +1124,7 @@ input {
   }
 
   .live-split {
-    display: grid !important;
+    display: grid;
     grid-template-columns: var(--live-left, 52%) 9px minmax(0, 1fr);
     align-items: stretch;
     flex: 1;
@@ -2413,6 +2381,47 @@ input {
   line-height: 1.55;
   margin-bottom: 18px;
 }
+/* Pasos numerados de la ventana de conexión. Numeración propia para que el
+   número quede alineado arriba con la primera línea de textos de dos renglones,
+   que es lo normal acá. */
+.conectar-pasos {
+  list-style: none;
+  counter-reset: paso;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.conectar-pasos li {
+  counter-increment: paso;
+  position: relative;
+  padding-left: 30px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+.conectar-pasos li::before {
+  content: counter(paso);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #f2f3f5;
+  border-radius: 999px;
+}
+.conectar-pasos strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* Botones del selector: más altos y con más radio que los del resto de la app,
    para que la tarjeta respire como en la referencia. */
 .paywall-wide .btn-action {
