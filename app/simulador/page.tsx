@@ -481,17 +481,6 @@ function buildDgUrl(sttLang: string): string {
   return `wss://api.deepgram.com/v1/listen?${params}`;
 }
 
-// Duración objetivo del simulacro Sprint. El reloj del header muestra cuánto
-// queda de ese presupuesto, no cuánto pasó: un contador que sube no le dice
-// nada a nadie, y este arranca en 05:00 y baja.
-const SIM_TARGET_SEC = 5 * 60;
-
-function fmtElapsed(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
 const LS_KEY_CONTEXT = "simulador:context:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";
 
@@ -594,7 +583,6 @@ export default function SimuladorPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const currentAnswerRef = useRef("");
-  const [elapsed, setElapsed] = useState(0);
   const [cameraOn, setCameraOn] = useState(false);
   const [camAvailable, setCamAvailable] = useState(false);
   const [micOn, setMicOn] = useState(true);
@@ -664,7 +652,6 @@ export default function SimuladorPage() {
   // pasa igual a escuchar en vez de quedar trabada.
   const speakFailsafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const postTtsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const wakeLockRef = useRef<any>(null);
 
@@ -1248,10 +1235,6 @@ export default function SimuladorPage() {
       clearInterval(keepAliveRef.current);
       keepAliveRef.current = null;
     }
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
     ttsRef.current?.stop();
     ttsRef.current = null;
     setAnalyser(null);
@@ -1407,7 +1390,6 @@ export default function SimuladorPage() {
     recoveryOfferedRef.current = false;
     currentIsRecoveryRef.current = false;
     setFeedbackReport(null);
-    setElapsed(0);
     setMicOn(true);
     setConnectStep(0);
     setStuck(false);
@@ -1480,7 +1462,6 @@ export default function SimuladorPage() {
       } catch {}
 
       startedAtRef.current = Date.now();
-      timerIntervalRef.current = setInterval(() => setElapsed(elapsedNow()), 1000);
     } catch (err: any) {
       cleanupMedia();
       const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
@@ -1833,9 +1814,12 @@ export default function SimuladorPage() {
                 <BackIcon />
               </button>
               <h1 className="sim-room-title">Sala de Entrevista</h1>
+              {/* Sin cuenta regresiva: la entrevista no termina por tiempo sino
+                  por temas cubiertos, así que un reloj bajando solo metía
+                  presión y prometía algo que no se cumple. */}
               <span className="sim-room-meta mono">
-                {fmtElapsed(Math.max(0, SIM_TARGET_SEC - elapsed))} · Pregunta{" "}
-                {Math.min(realQuestionCount(history) + 1, questionsCount)} de {questionsCount}
+                Pregunta {Math.min(realQuestionCount(history) + 1, questionsCount)} de{" "}
+                {questionsCount}
               </span>
             </div>
             <div className="sim-room-header-right">

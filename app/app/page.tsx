@@ -169,6 +169,34 @@ function ClockBigIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <rect x="3" y="5" width="18" height="16" rx="2.5" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+/** Mundo, para "resto del mundo". Hay otro GlobeIcon más chico para el menú. */
+function WorldIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18" />
+    </svg>
+  );
+}
+
+/** Banderita, para la opción de Argentina. */
+function BannerIcon() {
+  return (
+    <svg {...stypeIconProps}>
+      <path d="M5 21V4M5 5h12l-2 3.5L17 12H5" />
+    </svg>
+  );
+}
+
 function DotsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -704,6 +732,91 @@ function PassParty({ pass, onDone }: { pass: ActivePass; onDone: () => void }) {
   );
 }
 
+/**
+ * Paso de pago: se elige el pase y acá se elige CÓMO pagarlo.
+ *
+ * Argentina va por Mercado Pago con link directo; el resto del mundo por
+ * Binance Pay, cuyo QR todavía se manda a mano. En los dos casos el alta la
+ * hace una persona con el comprobante, así que el cierre siempre es WhatsApp —
+ * y eso se dice de entrada para que nadie pague esperando un alta automática.
+ */
+function PagoPaso({
+  plan,
+  onBack,
+  onWhatsApp,
+}: {
+  plan: PassPlan;
+  onBack: () => void;
+  onWhatsApp: (msg: string) => void;
+}) {
+  const p = PLANES[plan];
+  return (
+    <>
+      <div className="paywall-title">Elegí cómo pagar</div>
+      <p className="paywall-text">
+        {p.titulo} — <strong>{p.precio}</strong>
+      </p>
+
+      <div className="stype-card">
+        <div className="stype-head">
+          <span className="stype-name">
+            <BannerIcon /> Argentina
+          </span>
+          <span className="stype-badge">Mercado Pago</span>
+        </div>
+        <p className="paywall-text">Pagás con tarjeta, débito o dinero en cuenta.</p>
+        <a
+          className="btn-action btn-primary"
+          href={p.mercadoPago}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => track(plan === "week" ? "pay_mp_week" : "pay_mp_year")}
+        >
+          Pagar con Mercado Pago
+        </a>
+      </div>
+
+      <div className="stype-card">
+        <div className="stype-head">
+          <span className="stype-name">
+            <WorldIcon /> Resto del mundo
+          </span>
+          <span className="stype-badge">Binance Pay</span>
+        </div>
+        <p className="paywall-text">En breve te paso el QR.</p>
+        <button
+          className="btn-action btn-outline"
+          onClick={() => {
+            track(plan === "week" ? "pay_binance_week" : "pay_binance_year");
+            onWhatsApp(`${p.wa} Pago desde afuera de Argentina, ¿me pasás el QR de Binance?`);
+          }}
+        >
+          Pedime el QR por WhatsApp
+        </button>
+      </div>
+
+      <p className="paywall-fineprint pago-nota">
+        Cuando pagues, mandame el comprobante por{" "}
+        <a
+          href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
+            `${p.wa} Ya pagué, te mando el comprobante.`
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => track("pay_receipt_click")}
+        >
+          WhatsApp
+        </a>{" "}
+        y te activo en minutos.
+      </p>
+
+      <button className="btn-action btn-outline" onClick={onBack}>
+        ← Volver
+      </button>
+    </>
+  );
+}
+
 const LS_KEY = "copiloto:context:v1";
 
 /**
@@ -726,11 +839,36 @@ const FREE_SESSIONS = 10;
 const SESSION_MAX_MS = 10 * 60 * 1000;
 const SESSION_MAX_MIN = Math.round(SESSION_MAX_MS / 60000);
 
-// Pases pagos. No hay créditos: se vende acceso ilimitado por tiempo y el
-// cierre lo hago yo por WhatsApp, así que el "checkout" es un mensaje armado.
+// Pases pagos. No hay créditos: se vende acceso ilimitado por tiempo.
 const WA_NUMBER = "5491164090022";
 const PASS_WEEK_PRICE = "$19.99 USD";
 const PASS_YEAR_PRICE = "$89";
+
+type PassPlan = "week" | "year";
+
+/**
+ * Cómo se cobra cada pase. Argentina va por Mercado Pago (link directo); el
+ * resto del mundo por Binance Pay, cuyo QR todavía mando a mano por WhatsApp.
+ * En los dos casos el alta la hago yo con el comprobante, así que el último
+ * paso siempre es el chat.
+ */
+const PLANES: Record<
+  PassPlan,
+  { titulo: string; precio: string; mercadoPago: string; wa: string }
+> = {
+  week: {
+    titulo: "Pase Rey Loro Ilimitado (7 días)",
+    precio: PASS_WEEK_PRICE,
+    mercadoPago: "https://mpago.la/17qBami",
+    wa: `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`,
+  },
+  year: {
+    titulo: "Pase de 12 meses",
+    precio: PASS_YEAR_PRICE,
+    mercadoPago: "https://mpago.la/1W9PQTG",
+    wa: `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`,
+  },
+};
 
 // ---------- Endpointing semántico ----------
 export default function Page() {
@@ -769,6 +907,8 @@ export default function Page() {
   const [paywallReason, setPaywallReason] = useState<"quota" | "capacity">("quota");
   // Elección de tipo de sesión antes de arrancar (pase ilimitado vs. gratis).
   const [showSessionType, setShowSessionType] = useState(false);
+  // Pase elegido: mientras está seteado se muestra el paso de pago.
+  const [payPlan, setPayPlan] = useState<PassPlan | null>(null);
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -1183,14 +1323,14 @@ export default function Page() {
     return false;
   }, [company, role]);
 
-  // Pases ilimitados: abren WhatsApp con el mensaje ya escrito. El cobro lo
-  // cierro yo a mano, así que el "checkout" es la conversación.
-  const requestPass = useCallback((plan: "week" | "year") => {
-    const msg =
-      plan === "week"
-        ? `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`
-        : `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`;
+  // Elegir un pase abre el paso de pago (Mercado Pago / Binance). El alta la
+  // hago yo a mano con el comprobante, así que el último paso es WhatsApp.
+  const requestPass = useCallback((plan: PassPlan) => {
     track(plan === "week" ? "pass_week_click" : "pass_year_click");
+    setPayPlan(plan);
+  }, []);
+
+  const openWhatsApp = useCallback((msg: string) => {
     try {
       window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
     } catch {}
@@ -2100,9 +2240,21 @@ export default function Page() {
       )}
 
       {showPaywall && (
-        <div className="paywall-overlay" onClick={() => setShowPaywall(false)}>
-          <div className="paywall" onClick={(e) => e.stopPropagation()}>
-            {paywallReason === "capacity" ? (
+        <div
+          className="paywall-overlay"
+          onClick={() => {
+            setShowPaywall(false);
+            setPayPlan(null);
+          }}
+        >
+          <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
+            {payPlan ? (
+              <PagoPaso
+                plan={payPlan}
+                onBack={() => setPayPlan(null)}
+                onWhatsApp={openWhatsApp}
+              />
+            ) : paywallReason === "capacity" ? (
               <>
                 <div className="paywall-title">🛑 CUPOS AGOTADOS POR HOY</div>
                 <p className="paywall-text">
@@ -2142,37 +2294,47 @@ export default function Page() {
               </>
             ) : (
               <>
-                <div className="paywall-title">🛑 SE TE ACABARON LAS SESIONES GRATIS</div>
+                {/* Mismo lenguaje visual que el selector de tipo de sesión:
+                    tarjetas neutras, el botón marca la jerarquía. */}
+                <div className="paywall-title">🛑 Se te acabaron las sesiones gratis</div>
                 <p className="paywall-text">
                   Ya viste cómo funciona. No vayas a tu entrevista real a ciegas. Usalo sin
                   restricciones.
                 </p>
 
-                {/* Oferta principal: el pase de la semana, para la entrevista que ya tiene. */}
-                <div className="paywall-vip">
-                  <div className="paywall-vip-title">
-                    👑 Pase Rey Loro Ilimitado (7 días) — {PASS_WEEK_PRICE}
+                <div className="stype-card">
+                  <div className="stype-head">
+                    <span className="stype-name">
+                      <CardIcon /> Pase Rey Loro
+                    </span>
+                    <span className="stype-badge">{PASS_WEEK_PRICE}</span>
                   </div>
-                  <p className="paywall-text">Para la entrevista que tenés esta semana.</p>
-                  <button className="btn-action btn-whatsapp" onClick={() => requestPass("week")}>
-                    Entregá al Loro →
+                  <p className="paywall-text">
+                    Ilimitado por 7 días. Para la entrevista que tenés esta semana.
+                  </p>
+                  <button className="btn-action btn-primary" onClick={() => requestPass("week")}>
+                    Entregá al Loro
                   </button>
                   <p className="paywall-fineprint">
                     Si no te sirve en tu entrevista, te devuelvo la plata. Sin volteretas.
                   </p>
                 </div>
 
-                {/* Oferta secundaria: el anual, para búsquedas largas. */}
-                <div className="paywall-year">
+                <div className="stype-card">
+                  <div className="stype-head">
+                    <span className="stype-name">
+                      <CalendarIcon /> Pase de 12 meses
+                    </span>
+                    <span className="stype-badge">{PASS_YEAR_PRICE}</span>
+                  </div>
                   <p className="paywall-text">
-                    🦜 ¿Búsqueda larga? Hice un pase de 12 meses a {PASS_YEAR_PRICE}. Está a ese
-                    precio porque Loreado recién arranca y los primeros que pagan son los que me van
-                    a decir qué arreglar. Cuando salga de beta, los precios to the 🌙.
+                    🦜 ¿Búsqueda larga? Está a ese precio porque Loreado recién arranca y los
+                    primeros que pagan son los que me van a decir qué arreglar. Cuando salga de
+                    beta, los precios to the 🌙.
                   </p>
-                  <button className="btn-action btn-ghost" onClick={() => requestPass("year")}>
-                    Internaron al Loro, Internaron al Loro, Internaron al Loro →
+                  <button className="btn-action btn-outline" onClick={() => requestPass("year")}>
+                    Internaron al Loro, Internaron al Loro, Internaron al Loro
                   </button>
-                  <p className="paywall-fineprint">Se abre WhatsApp y te respondo yo.</p>
                 </div>
               </>
             )}

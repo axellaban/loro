@@ -2074,7 +2074,12 @@ input {
    min-width: 0 es lo que le permite achicarse debajo del ancho de su texto. */
 .stype-name {
   flex: 1 1 auto;
-  min-width: 0;
+  /* Sin min-width: 0 a propósito. Con él, el nombre se encoge por debajo de su
+     palabra más larga y termina partido al medio ("Argentin/a") o escrito
+     encima del badge. Dejando el mínimo por defecto, el nombre nunca baja de su
+     ancho mínimo y el badge se acomoda. Los badges se mantienen cortos para que
+     los dos entren. */
+  min-width: auto;
 }
 .stype-name {
   display: inline-flex;
@@ -2121,6 +2126,25 @@ input {
   border-radius: 14px;
   font-size: 16px;
 }
+/* Los links de pago son <a> pero se ven y se tocan como botones. */
+a.btn-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+/* Nota del comprobante: separada de los botones, con el link subrayado. */
+.pago-nota {
+  margin: 4px 0 16px;
+  text-align: center;
+}
+.pago-nota a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* Botón secundario: blanco con borde, el par del sólido negro. */
 .btn-outline {
   background: #fff;

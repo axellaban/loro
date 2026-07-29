@@ -38,6 +38,12 @@ export type FunnelEvent =
   | "pass_week_click"
   | "pass_year_click"
   | "pass_activated"
+  // Paso de pago: qué medio elige cada quien y quién vuelve con comprobante.
+  | "pay_mp_week"
+  | "pay_mp_year"
+  | "pay_binance_week"
+  | "pay_binance_year"
+  | "pay_receipt_click"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"
