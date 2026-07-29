@@ -43,7 +43,8 @@ type Mode = "mic" | "tab";
  * `text` es lo ya confirmado; `interim` es lo que Deepgram todavía está
  * escuchando y puede cambiar; `ts` es cuándo empezó el turno.
  */
-type Line = { id: number; text: string; interim: string; closed: boolean; ts: number };
+type Speaker = "interviewer" | "me";
+type Line = { id: number; text: string; interim: string; closed: boolean; ts: number; speaker: Speaker };
 
 /** Lo que se lee de una línea: lo confirmado más lo que va llegando. */
 const lineText = (l: Line) => `${l.text} ${l.interim}`.trim();
@@ -54,6 +55,19 @@ const lineText = (l: Line) => `${l.text} ${l.interim}`.trim();
  * un párrafo interminable.
  */
 const TURN_GAP_MS = 6000;
+
+/** ¿[aStart,aEnd] cae dentro (con margen `padMs`) de alguna ventana de `ranges`? */
+function rangesOverlap(
+  aStart: number,
+  aEnd: number,
+  ranges: { start: number; end: number }[],
+  padMs: number
+): boolean {
+  for (const r of ranges) {
+    if (aStart - padMs <= r.end && aEnd + padMs >= r.start) return true;
+  }
+  return false;
+}
 type Feedback = "up" | "down" | null;
 type Answer = { id: number; question: string; text: string; done: boolean; ts: number; feedback: Feedback };
 
@@ -266,6 +280,34 @@ function GlobeIcon() {
     </svg>
   );
 }
+function TranscriptIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M7 9h10M7 13h6" />
+    </svg>
+  );
+}
+function MicIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+    </svg>
+  );
+}
+function MicOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 9v3a3 3 0 0 0 4.6 2.5M15 6.4V5a3 3 0 0 0-5.9-.7" />
+      <path d="M5 11a7 7 0 0 0 10.3 6.2" />
+      <path d="M19 11a7 7 0 0 1-.4 2.3" />
+      <path d="M12 18v3" />
+      <path d="M3 3l18 18" />
+    </svg>
+  );
+}
 function ChevronRightIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -316,6 +358,8 @@ function SessionMenu({
   onSize,
   autoAnswer,
   onAutoAnswer,
+  saveTranscript,
+  onSaveTranscript,
 }: {
   lang: Lang;
   onLang: (l: Lang) => void;
@@ -323,6 +367,8 @@ function SessionMenu({
   onSize: (id: AnswerSizeId) => void;
   autoAnswer: boolean;
   onAutoAnswer: (v: boolean) => void;
+  saveTranscript: boolean;
+  onSaveTranscript: (v: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"root" | "size" | "lang">("root");
@@ -429,6 +475,20 @@ function SessionMenu({
             <span className="sess-row-icon"><SparkleIcon /></span>
             <span className="sess-row-label">Respuesta automática</span>
             <span className={`sess-switch ${autoAnswer ? "sess-switch-on" : ""}`} aria-hidden="true">
+              <span className="sess-switch-knob" />
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="sess-row sess-row-toggle"
+            role="switch"
+            aria-checked={saveTranscript}
+            onClick={() => onSaveTranscript(!saveTranscript)}
+          >
+            <span className="sess-row-icon"><TranscriptIcon /></span>
+            <span className="sess-row-label">Guardar transcripción</span>
+            <span className={`sess-switch ${saveTranscript ? "sess-switch-on" : ""}`} aria-hidden="true">
               <span className="sess-switch-knob" />
             </span>
           </button>
@@ -1054,6 +1114,13 @@ export default function Page() {
   // si el entrevistador sigue hablando, así que solo responde cuando la pausa
   // se sostiene de verdad.
   const autoAnswerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guardar transcripción: si se apaga, la sesión no queda en el historial ni
+  // pasa por el análisis al terminar — como pedir que no se registre nada.
+  const [saveTranscript, setSaveTranscript] = useState(true);
+  const saveTranscriptRef = useRef(true);
+  useEffect(() => {
+    saveTranscriptRef.current = saveTranscript;
+  }, [saveTranscript]);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
   const [lines, setLines] = useState<Line[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -1075,6 +1142,14 @@ export default function Page() {
   const [payPlan, setPayPlan] = useState<PassPlan | null>(null);
   // Hay video de la pestaña compartida para mostrar al lado de las respuestas.
   const [sharing, setSharing] = useState(false);
+  // Tu micrófono, en sesión de pestaña: arranca apagado (como la referencia) y
+  // se conecta a mano con el botón bajo la llamada, no solo con permiso.
+  const [micOn, setMicOn] = useState(false);
+  const micOnRef = useRef(false);
+  useEffect(() => {
+    micOnRef.current = micOn;
+  }, [micOn]);
+  const [micBusy, setMicBusy] = useState(false);
   /**
    * Ancho de la columna izquierda, en % del alto total. Se puede arrastrar el
    * divisor del medio y queda guardado: cada persona reparte distinto según si
@@ -1154,16 +1229,33 @@ export default function Page() {
    * Deepgram solo se le manda audio, pero el video se muestra en pantalla.
    */
   const shareStreamRef = useRef<MediaStream | null>(null);
-  /** Cuándo se oyó lo último: marca el corte entre turnos de habla. */
-  const lastSpeechAtRef = useRef(0);
-  /** El turno abierto en el transcript guardado (espejo del de pantalla). */
-  const sessionTurnOpenRef = useRef(false);
+  /** Cuándo se oyó lo último de cada hablante: marca el corte entre turnos. */
+  const lastSpeechAtRef = useRef<Record<Speaker, number>>({ interviewer: 0, me: 0 });
+  /** El turno abierto en el transcript guardado (espejo del `closed` de
+   *  pantalla, que ahí vive en cada línea; acá se sigue por hablante porque
+   *  las entradas persistidas no tienen ese campo). */
+  const sessionTurnOpenRef = useRef<Record<Speaker, boolean>>({ interviewer: false, me: false });
   /** Tu micrófono, cuando la sesión captura la pestaña: se mezcla con ella. */
   const micStreamRef = useRef<MediaStream | null>(null);
   /** Nodo del audio de la pestaña, para poder reemplazarlo al cambiar de tab. */
   const tabSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
+  /**
+   * Detección local de "estás hablando vos": un analizador aparte, conectado
+   * SOLO a tu micrófono (nunca al worklet que se manda a Deepgram), mide la
+   * energía del audio cada ~80ms. Deepgram no distingue quién dijo cada cosa
+   * —pestaña y mic van mezclados al mismo socket—, así que la única forma de
+   * etiquetar una línea como "vos" es correlacionar el instante en que la dijo
+   * (según `start`/`duration` del mensaje, referidos al reloj de pared vía
+   * `streamStartAtRef`) contra estas ventanas de energía.
+   */
+  const micAnalyserRef = useRef<AnalyserNode | null>(null);
+  const micVadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const micActiveRangesRef = useRef<{ start: number; end: number }[]>([]);
+  /** Reloj de pared en el que abrió el socket de Deepgram vigente: los
+   *  timestamps `start`/`duration` de sus mensajes son relativos a este 0. */
+  const streamStartAtRef = useRef(0);
   const wakeLockRef = useRef<any>(null);
   const keepAliveRef = useRef<any>(null);
   const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1185,7 +1277,7 @@ export default function Page() {
   // porque lo lee `stop()`, que se crea una sola vez y no puede cerrar sobre
   // el estado sin quedar viejo.
   const sessionStartRef = useRef(0);
-  const sessionLinesRef = useRef<{ text: string; ts: number }[]>([]);
+  const sessionLinesRef = useRef<{ text: string; ts: number; speaker: Speaker }[]>([]);
   const answersRef = useRef<Answer[]>([]);
   const sessionCtxRef = useRef({ company: "", role: "", modelId: "", lang: "es" as Lang, mode: "mic" as Mode });
   const transcriptRef = useRef(""); // todo lo transcripto (contexto para el LLM)
@@ -1282,16 +1374,17 @@ export default function Page() {
         setAnswerSize(saved.answerSize);
       }
       if (typeof saved.autoAnswer === "boolean") setAutoAnswer(saved.autoAnswer);
+      if (typeof saved.saveTranscript === "boolean") setSaveTranscript(saved.saveTranscript);
     } catch {}
   }, []);
   useEffect(() => {
     try {
       localStorage.setItem(
         LS_KEY,
-        JSON.stringify({ company, role, profile, modelId, lang, answerSize, autoAnswer })
+        JSON.stringify({ company, role, profile, modelId, lang, answerSize, autoAnswer, saveTranscript })
       );
     } catch {}
-  }, [company, role, profile, modelId, lang, answerSize, autoAnswer]);
+  }, [company, role, profile, modelId, lang, answerSize, autoAnswer, saveTranscript]);
 
   // ---------- Generación ----------
   // Ejecuta el fetch/stream para una tarjeta ya asignada (id + controller ya
@@ -1568,7 +1661,8 @@ export default function Page() {
       // eso el mismo texto dispararía dos veces.
       if (msg.type === "UtteranceEnd") {
         // Pausa real: se cierra el turno para que lo próximo abra una burbuja
-        // nueva en vez de seguir pegándose a la anterior.
+        // nueva en vez de seguir pegándose a la anterior. Aplica a quien
+        // estuviera hablando, así que se cierran los dos hablantes.
         setLines((prev) => {
           if (!prev.length || prev[prev.length - 1].closed) return prev;
           const next = [...prev];
@@ -1576,7 +1670,7 @@ export default function Page() {
           next[next.length - 1] = { ...u, text: lineText(u), interim: "", closed: true };
           return next;
         });
-        sessionTurnOpenRef.current = false;
+        sessionTurnOpenRef.current = { interviewer: false, me: false };
         if (autoAnswerRef.current && looksLikeQuestion(questionBufRef.current)) {
           if (autoAnswerTimerRef.current) clearTimeout(autoAnswerTimerRef.current);
           autoAnswerTimerRef.current = setTimeout(() => {
@@ -1604,15 +1698,35 @@ export default function Page() {
       }
 
       const ahora = Date.now();
+
+      // Pestaña y mic van mezclados en el mismo socket de Deepgram, que no
+      // distingue quién habló. Para saberlo, se ubica CUÁNDO se dijo este
+      // tramo en el reloj de pared (vía start/duration, relativos al momento
+      // en que abrió el socket) y se compara contra las ventanas en las que el
+      // analizador de energía detectó que tu mic sonaba. Sin mic conectado no
+      // hay ambigüedad: es siempre el entrevistador.
+      const startS = typeof msg.start === "number" ? msg.start : 0;
+      const durS = typeof msg.duration === "number" ? msg.duration : 0;
+      const speaker: Speaker =
+        micOnRef.current &&
+        rangesOverlap(
+          streamStartAtRef.current + startS * 1000,
+          streamStartAtRef.current + (startS + durS) * 1000,
+          micActiveRangesRef.current,
+          300
+        )
+          ? "me"
+          : "interviewer";
+
       // ¿Sigue el mismo turno de habla? Se corta por UtteranceEnd (marcado más
-      // arriba) o por un silencio largo.
-      const turnoNuevo = ahora - lastSpeechAtRef.current > TURN_GAP_MS;
-      lastSpeechAtRef.current = ahora;
+      // arriba), por un silencio largo, o porque habló el otro.
+      const turnoNuevo = ahora - lastSpeechAtRef.current[speaker] > TURN_GAP_MS;
+      lastSpeechAtRef.current[speaker] = ahora;
 
       setLines((prev) => {
         const next = [...prev];
         const ultima = next[next.length - 1];
-        const sigue = ultima && !ultima.closed && !turnoNuevo;
+        const sigue = ultima && !ultima.closed && !turnoNuevo && ultima.speaker === speaker;
         if (sigue) {
           next[next.length - 1] = isFinal
             ? // Un final se pega a lo ya confirmado del mismo turno.
@@ -1625,6 +1739,7 @@ export default function Page() {
             interim: isFinal ? "" : text,
             closed: false,
             ts: ahora,
+            speaker,
           });
         }
         return next.slice(-60);
@@ -1638,14 +1753,19 @@ export default function Page() {
         // informe y la descarga quedan con las mismas frases sueltas.
         const guardadas = sessionLinesRef.current;
         const ultima = guardadas[guardadas.length - 1];
-        if (sessionTurnOpenRef.current && ultima && !turnoNuevo) {
+        if (sessionTurnOpenRef.current[speaker] && ultima && ultima.speaker === speaker) {
           ultima.text = `${ultima.text} ${text}`.trim();
         } else {
-          guardadas.push({ text, ts: ahora });
+          guardadas.push({ text, ts: ahora, speaker });
         }
-        sessionTurnOpenRef.current = true;
-        transcriptRef.current = (transcriptRef.current + " " + text).slice(-8000);
-        questionBufRef.current = (questionBufRef.current + " " + text).slice(-1500);
+        sessionTurnOpenRef.current[speaker] = true;
+        // El contexto que arma la respuesta es SOLO lo que preguntó el
+        // entrevistador: lo que decís vos por mic no debe terminar
+        // realimentando tu propia pregunta detectada.
+        if (speaker === "interviewer") {
+          transcriptRef.current = (transcriptRef.current + " " + text).slice(-8000);
+          questionBufRef.current = (questionBufRef.current + " " + text).slice(-1500);
+        }
       }
     },
     []
@@ -1712,19 +1832,10 @@ export default function Page() {
       // al lado de las respuestas.
       usarVideoCompartido(s.getVideoTracks());
 
-      // Además del audio de la pestaña, TU micrófono: si no, el transcript solo
-      // tiene lo que dice el entrevistador y el informe queda con la mitad de
-      // la conversación. Si no hay permiso, la sesión sigue igual con la
-      // pestaña sola.
-      try {
-        const mic = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-        micStreamRef.current = mic;
-      } catch {
-        micStreamRef.current = null;
-        track("mic_denied_on_tab");
-      }
+      // El micrófono NO se pide acá: arranca apagado y se conecta a mano con
+      // el botón bajo la llamada (ver connectMic). Pedirlo solo, en silencio,
+      // era además la razón por la que no se podía distinguir en pantalla
+      // quién decía qué: todo entraba mezclado desde el arranque.
       return new MediaStream(at);
     }
     // mic
@@ -1759,6 +1870,96 @@ export default function Page() {
       // Canceló el selector: no pasa nada, sigue compartiendo lo de antes.
     }
   }, [pedirPestania, usarVideoCompartido]);
+
+  /** Apaga el detector de energía del mic y olvida las ventanas ya medidas. */
+  const stopMicVad = useCallback(() => {
+    if (micVadTimerRef.current) clearInterval(micVadTimerRef.current);
+    micVadTimerRef.current = null;
+    micAnalyserRef.current = null;
+    micActiveRangesRef.current = [];
+  }, []);
+
+  /**
+   * Umbral de energía (RMS sobre -1..1) a partir del cual se considera que el
+   * micrófono está captando tu voz y no solo el ruido de fondo. Se mide cada
+   * 80ms; ventanas que quedan a menos de 250ms se pegan en un mismo tramo para
+   * no partir una palabra en fragmentos.
+   */
+  const startMicVad = useCallback(
+    (stream: MediaStream, ctx: AudioContext) => {
+      stopMicVad();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0;
+      src.connect(analyser);
+      micAnalyserRef.current = analyser;
+      const buf = new Float32Array(analyser.fftSize);
+      micVadTimerRef.current = setInterval(() => {
+        const an = micAnalyserRef.current;
+        if (!an) return;
+        an.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        const rms = Math.sqrt(sum / buf.length);
+        const now = Date.now();
+        if (rms >= 0.02) {
+          const ranges = micActiveRangesRef.current;
+          const last = ranges[ranges.length - 1];
+          if (last && now - last.end <= 250) last.end = now;
+          else ranges.push({ start: now, end: now });
+        }
+        // Poda lo viejo: ninguna línea necesita compararse contra algo de
+        // hace más de 30s.
+        const cutoff = now - 30000;
+        while (micActiveRangesRef.current.length && micActiveRangesRef.current[0].end < cutoff) {
+          micActiveRangesRef.current.shift();
+        }
+      }, 80);
+    },
+    [stopMicVad]
+  );
+
+  /**
+   * Conectar/soltar tu micrófono durante una sesión de pestaña, como el botón
+   * de la referencia. Arranca apagado a propósito: mientras no se conecta,
+   * todo lo transcripto es inequívocamente el entrevistador.
+   */
+  const connectMic = useCallback(async () => {
+    if (micOnRef.current || micBusy) return;
+    setMicBusy(true);
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      micStreamRef.current = mic;
+      const ctx = audioCtxRef.current;
+      const worklet = workletRef.current;
+      if (ctx && worklet) {
+        // Se suma a lo que ya se manda a Deepgram por el mismo socket: el
+        // grafo de audio no cambia, solo qué fuentes lo alimentan. En
+        // paralelo, el analizador de energía (nunca conectado al worklet)
+        // es lo que permite después etiquetar cada línea como "vos".
+        ctx.createMediaStreamSource(mic).connect(worklet);
+        startMicVad(mic, ctx);
+      }
+      setMicOn(true);
+      track("mic_connected");
+    } catch {
+      micStreamRef.current = null;
+      track("mic_denied_on_tab");
+    } finally {
+      setMicBusy(false);
+    }
+  }, [micBusy, startMicVad]);
+
+  const disconnectMic = useCallback(() => {
+    stopMicVad();
+    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    micStreamRef.current = null;
+    setMicOn(false);
+    track("mic_disconnected");
+  }, [stopMicVad]);
 
   const start = useCallback(async () => {
     // Cuota gratuita: si no quedan sesiones, se muestra el paywall. Con pase
@@ -1841,6 +2042,10 @@ export default function Page() {
         ws.onopen = () => {
           setError("");
           setStatus("live");
+          // Los `start`/`duration` de los mensajes de este socket son
+          // relativos a este instante: sin este 0, no se puede ubicar una
+          // línea en el reloj de pared para cruzarla con la energía del mic.
+          streamStartAtRef.current = Date.now();
           // Renueva el presupuesto de reintentos solo si la conexión aguanta
           // 10s estable (no apenas abre): evita el loop infinito de flapping.
           if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
@@ -1938,8 +2143,9 @@ export default function Page() {
       const startedAt = Date.now();
       sessionStartRef.current = startedAt;
       sessionLinesRef.current = [];
-      sessionTurnOpenRef.current = false;
-      lastSpeechAtRef.current = 0;
+      sessionTurnOpenRef.current = { interviewer: false, me: false };
+      lastSpeechAtRef.current = { interviewer: 0, me: 0 };
+      micActiveRangesRef.current = [];
       if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (!conPase) {
@@ -2018,6 +2224,8 @@ export default function Page() {
     shareStreamRef.current = null;
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
+    stopMicVad();
+    setMicOn(false);
     tabSourceRef.current = null;
     setSharing(false);
     try {
@@ -2040,7 +2248,9 @@ export default function Page() {
     const startedAt = sessionStartRef.current;
     const lines = sessionLinesRef.current;
     const qa = answersRef.current.filter((a) => a.text.trim()).map((a) => ({ q: a.question, a: a.text, ts: a.ts }));
-    if (startedAt && (lines.length || qa.length)) {
+    // "Guardar transcripción" apagado: nada queda en el historial ni pasa por
+    // el análisis, como si la sesión no hubiera dejado material.
+    if (startedAt && saveTranscriptRef.current && (lines.length || qa.length)) {
       const ctx = sessionCtxRef.current;
       const session: CallSession = {
         id: `${startedAt}-${Math.random().toString(36).slice(2, 8)}`,
@@ -2177,6 +2387,11 @@ export default function Page() {
             setAutoAnswer(v);
             track("auto_answer_toggled", { on: v });
           }}
+          saveTranscript={saveTranscript}
+          onSaveTranscript={(v) => {
+            setSaveTranscript(v);
+            track("save_transcript_toggled", { on: v });
+          }}
         />
       )}
       {live && (
@@ -2240,6 +2455,11 @@ export default function Page() {
               onAutoAnswer={(v) => {
                 setAutoAnswer(v);
                 track("auto_answer_toggled", { on: v });
+              }}
+              saveTranscript={saveTranscript}
+              onSaveTranscript={(v) => {
+                setSaveTranscript(v);
+                track("save_transcript_toggled", { on: v });
               }}
             />
           )}
@@ -2444,6 +2664,26 @@ export default function Page() {
               <button onClick={stop} className="tb-btn tb-stop">
                 <span className="tb-rec" aria-hidden="true" /> Terminar
               </button>
+              <button
+                onClick={() => (micOn ? disconnectMic() : void connectMic())}
+                className={`tb-btn tb-mic ${micOn ? "tb-mic-on" : ""}`}
+                disabled={micBusy}
+                title={
+                  micOn
+                    ? "Dejá de incluir lo que decís vos: solo va a quedar el audio de la pestaña."
+                    : "Conectá tu micrófono para incluir lo que decís vos en la respuesta de la IA."
+                }
+              >
+                {micOn ? (
+                  <>
+                    <span className="tb-rec" aria-hidden="true" /> Detener mic
+                  </>
+                ) : (
+                  <>
+                    <MicIcon /> {micBusy ? "Conectando…" : "Conectar mic"}
+                  </>
+                )}
+              </button>
               <button onClick={clearAll} className="tb-btn">
                 ✕ Limpiar
               </button>
@@ -2466,7 +2706,7 @@ export default function Page() {
                   <p className="transcript-empty mono">Escuchando…</p>
                 ) : (
                   lines.map((l) => (
-                    <div key={l.id} className="t-line">
+                    <div key={l.id} className={`t-line ${l.speaker === "me" ? "t-line-me" : ""}`}>
                       <div className="t-bubble">
                         {l.text}
                         {l.interim && (
@@ -2478,7 +2718,9 @@ export default function Page() {
                           </span>
                         )}
                       </div>
-                      <span className="t-meta mono">Entrevistador · {fmtHora(l.ts)}</span>
+                      <span className="t-meta mono">
+                        {l.speaker === "me" ? "Vos" : "Entrevistador"} · {fmtHora(l.ts)}
+                      </span>
                     </div>
                   ))
                 )}

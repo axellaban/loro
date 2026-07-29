@@ -417,9 +417,12 @@ function SessionModal({
   // entrevistador y las tarjetas de Q&A intercaladas por tiempo.
   const timeline = useMemo(() => {
     const items: Array<
-      { kind: "line"; ts: number; text: string } | { kind: "qa"; ts: number; q: string; a: string; i: number }
+      | { kind: "line"; ts: number; text: string; speaker: "interviewer" | "me" }
+      | { kind: "qa"; ts: number; q: string; a: string; i: number }
     > = [
-      ...session.lines.map((l) => ({ kind: "line" as const, ts: l.ts, text: l.text })),
+      // Sesiones viejas no tienen `speaker` (se guardaban antes de distinguir
+      // quién habla): se tratan como entrevistador, que es lo único que había.
+      ...session.lines.map((l) => ({ kind: "line" as const, ts: l.ts, text: l.text, speaker: l.speaker || "interviewer" })),
       ...session.qa.map((p, i) => ({ kind: "qa" as const, ts: p.ts, q: p.q, a: p.a, i })),
     ];
     return items.sort((a, b) => a.ts - b.ts);
@@ -492,9 +495,14 @@ function SessionModal({
                 <div className="cs-timeline">
                   {timeline.map((item, i) =>
                     item.kind === "line" ? (
-                      <div key={`l${i}`} className="cs-bubble-wrap">
+                      <div
+                        key={`l${i}`}
+                        className={`cs-bubble-wrap ${item.speaker === "me" ? "cs-bubble-wrap-me" : ""}`}
+                      >
                         <div className="cs-bubble">{item.text}</div>
-                        <span className="cs-bubble-meta">Entrevistador · {fmtClock(item.ts)}</span>
+                        <span className="cs-bubble-meta">
+                          {item.speaker === "me" ? "Vos" : "Entrevistador"} · {fmtClock(item.ts)}
+                        </span>
                       </div>
                     ) : (
                       <div key={`q${i}`} className="cs-qa">
