@@ -670,9 +670,35 @@ input {
   /* Lo controla el menú de sesión (tres puntitos → Tamaño del texto). */
   font-size: var(--answer-size, 16.5px);
   line-height: 1.72;
-  white-space: pre-wrap;
   color: var(--ink);
   letter-spacing: 0.005em;
+}
+/* Ahora la respuesta viene en Markdown (viñetas con etiqueta en negrita), así
+   que se estilan los bloques que arma el parser en vez de un bloque de texto
+   preformateado. */
+.answer-card-text > :first-child {
+  margin-top: 0;
+}
+.answer-card-text > :last-child {
+  margin-bottom: 0;
+}
+.answer-card-text p {
+  margin: 0 0 12px;
+}
+.answer-card-text ul,
+.answer-card-text ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.answer-card-text li {
+  padding-left: 2px;
+}
+.answer-card-text strong {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .answer-card-loading {
@@ -1012,9 +1038,9 @@ input {
   max-width: 94%;
   overflow-wrap: anywhere;
 }
-/* Lo que todavía no cerró Deepgram: se ve, pero se nota que puede cambiar. */
-.t-line-interim .t-bubble {
-  background: #f5f7fa;
+/* Lo que Deepgram todavía escucha va en el MISMO globo que lo confirmado, solo
+   que más claro: así una frase larga no se parte en varias burbujas. */
+.t-interim {
   color: var(--ink-dim);
 }
 .t-meta {

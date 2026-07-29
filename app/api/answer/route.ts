@@ -42,10 +42,21 @@ Usá la TRANSCRIPCIÓN para sonar como una conversación real: no repitas algo q
 - Profesional pero cercano, seguro sin sonar ensayado ni sobreactuado.
 
 ## Formato de salida (CLAVE: el candidato lee mientras habla y la respuesta va apareciendo de a poco)
+La respuesta tiene DOS partes, en este orden exacto:
+
+**1) La respuesta hablada.**
 - Arrancá con UNA frase de apertura completa y auto-suficiente (1-2 oraciones, SIN viñeta) que YA contesta el núcleo de la pregunta y se puede decir sola tal cual. Es lo primero que el candidato empieza a leer en voz alta, así que tiene que ser una respuesta directa, no un preámbulo. Nunca empieces con relleno tipo "Bueno, primero..." o "Es una buena pregunta".
-- Después de esa apertura, dejá una línea en blanco y seguí con viñetas (cada una arranca con "- ") que desarrollan y cierran: una o dos frases por viñeta, continuando la idea como un único discurso cortado en pedazos fáciles de leer de un vistazo.
-- Largo VARIABLE según la pregunta: una factual se contesta con la apertura y 1 viñeta; una de comportamiento pide el arco completo (hasta 4-5 viñetas). Nunca infles con relleno para llegar a un largo. Nunca te quedes a medias.
+- Después de esa apertura, línea en blanco y viñetas (cada una arranca con "- "). CADA VIÑETA EMPIEZA CON UNA ETIQUETA EN NEGRITA de 2-4 palabras que resume su idea, seguida de dos puntos, y después el desarrollo. Ejemplo: "- **Escala regional:** manejé operaciones en cinco países, y lo que más me sirvió fue...". La etiqueta es lo que permite barrer la respuesta de un vistazo mientras hablás: sin ella hay que leer todo el renglón para saber de qué va.
+- Cada viñeta desarrolla DE VERDAD: 2 a 4 oraciones con un hecho, un número o una decisión concreta. Una viñeta de media línea no le sirve a nadie: es lo que separa una respuesta que impresiona de una que suena a lugar común.
+- 3 o 4 viñetas para una pregunta que pide desarrollo (trayectoria, debilidades, por qué esta empresa, comportamiento). Una pregunta factual se contesta con la apertura y 1 viñeta. Nunca infles con relleno; nunca te quedes a medias.
 - Todo en primera persona, listo para decir en voz alta tal cual — no son "ideas para desarrollar", son la respuesta misma ya hablada.
+
+**2) Por qué funciona.**
+- Después de la última viñeta, línea en blanco y una línea que dice exactamente: **💡 Por qué funciona**
+- Debajo, 3 viñetas cortas (1 oración cada una), cada una con su etiqueta en negrita, explicándole al candidato QUÉ está logrando esa respuesta con el entrevistador: qué señal manda, con qué del puesto o la empresa conecta, o por qué esa estructura convence. Ejemplo: "- **Autoconciencia:** al elegir una debilidad de crecimiento y no un defecto de fondo, mostrás que sabés mirarte sin quedar débil.".
+- Esta parte NO se dice en voz alta: es para que el candidato entienda su propia respuesta y pueda defenderla si lo repreguntan. Escribila en segunda persona (hablándole a él), no en primera.
+
+Reglas generales de salida:
 - Sin preámbulo, sin "Podrías decir", sin "aquí está tu respuesta": arrancá directo con la frase de apertura.
 - Respondé en el idioma indicado en "## IDIOMA DE LA RESPUESTA" (puede diferir del idioma de la pregunta). Dentro de ese idioma, espejá el registro (tú/vos/usted) del entrevistador.
 
@@ -133,8 +144,11 @@ ${transcript || "(vacío)"}
     specs: fallbackChain(spec),
     system: SYSTEM_PROMPT,
     user: userContent,
-    maxTokens: 512,
-    reasoningMaxTokens: 900,
+    // Alcanza para la respuesta con viñetas desarrolladas MÁS el bloque de "por
+    // qué funciona". Con 512 (lo de antes, cuando las viñetas eran de media
+    // línea) el nuevo formato se cortaba a mitad de frase.
+    maxTokens: 1100,
+    reasoningMaxTokens: 1500,
     temperature: 0.4,
     tag: "answer",
   });

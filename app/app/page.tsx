@@ -12,6 +12,7 @@ import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 import { rememberEmail, savedEmail } from "../lib/email";
 import { usePass, storedPassToken, type ActivePass } from "../lib/passClient";
 import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
+import { Markdown } from "../lib/Markdown";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -31,8 +32,28 @@ function lastQuestions(text: string): string {
 
 type Status = "idle" | "connecting" | "live" | "error";
 type Mode = "mic" | "tab";
-// `ts` es la hora en que se oyó: se muestra bajo cada burbuja del transcript.
-type Line = { id: number; text: string; final: boolean; ts: number };
+/**
+ * Una intervención del entrevistador en el transcript.
+ *
+ * NO es un "final" de Deepgram: Deepgram cierra un final cada medio segundo, y
+ * una burbuja por cada uno deja la transcripción picada en pedacitos. Acá una
+ * línea es un TURNO DE HABLA: se le van pegando los finales hasta que hay una
+ * pausa de verdad, y recién ahí se cierra y se abre la siguiente.
+ *
+ * `text` es lo ya confirmado; `interim` es lo que Deepgram todavía está
+ * escuchando y puede cambiar; `ts` es cuándo empezó el turno.
+ */
+type Line = { id: number; text: string; interim: string; closed: boolean; ts: number };
+
+/** Lo que se lee de una línea: lo confirmado más lo que va llegando. */
+const lineText = (l: Line) => `${l.text} ${l.interim}`.trim();
+
+/**
+ * Silencio a partir del cual se considera que el turno terminó. Deepgram avisa
+ * con UtteranceEnd, pero si esa señal se pierde este tope corta igual y evita
+ * un párrafo interminable.
+ */
+const TURN_GAP_MS = 6000;
 type Feedback = "up" | "down" | null;
 type Answer = { id: number; question: string; text: string; done: boolean; ts: number; feedback: Feedback };
 
@@ -1056,6 +1077,10 @@ export default function Page() {
    * Deepgram solo se le manda audio, pero el video se muestra en pantalla.
    */
   const shareStreamRef = useRef<MediaStream | null>(null);
+  /** Cuándo se oyó lo último: marca el corte entre turnos de habla. */
+  const lastSpeechAtRef = useRef(0);
+  /** El turno abierto en el transcript guardado (espejo del de pantalla). */
+  const sessionTurnOpenRef = useRef(false);
   /** Tu micrófono, cuando la sesión captura la pestaña: se mezcla con ella. */
   const micStreamRef = useRef<MediaStream | null>(null);
   /** Nodo del audio de la pestaña, para poder reemplazarlo al cambiar de tab. */
@@ -1465,6 +1490,16 @@ export default function Page() {
       // que tener texto sin usar: `answerNow` lo vacía al generar, así que sin
       // eso el mismo texto dispararía dos veces.
       if (msg.type === "UtteranceEnd") {
+        // Pausa real: se cierra el turno para que lo próximo abra una burbuja
+        // nueva en vez de seguir pegándose a la anterior.
+        setLines((prev) => {
+          if (!prev.length || prev[prev.length - 1].closed) return prev;
+          const next = [...prev];
+          const u = next[next.length - 1];
+          next[next.length - 1] = { ...u, text: lineText(u), interim: "", closed: true };
+          return next;
+        });
+        sessionTurnOpenRef.current = false;
         if (autoAnswerRef.current && looksLikeQuestion(questionBufRef.current)) {
           if (autoAnswerTimerRef.current) clearTimeout(autoAnswerTimerRef.current);
           autoAnswerTimerRef.current = setTimeout(() => {
@@ -1491,14 +1526,29 @@ export default function Page() {
         autoAnswerTimerRef.current = null;
       }
 
+      const ahora = Date.now();
+      // ¿Sigue el mismo turno de habla? Se corta por UtteranceEnd (marcado más
+      // arriba) o por un silencio largo.
+      const turnoNuevo = ahora - lastSpeechAtRef.current > TURN_GAP_MS;
+      lastSpeechAtRef.current = ahora;
+
       setLines((prev) => {
         const next = [...prev];
-        if (next.length && !next[next.length - 1].final) {
-          // Se conserva la hora del primer trozo: es cuando empezó a decirlo.
-          const prev0 = next[next.length - 1];
-          next[next.length - 1] = { id: prev0.id, text, final: isFinal, ts: prev0.ts };
+        const ultima = next[next.length - 1];
+        const sigue = ultima && !ultima.closed && !turnoNuevo;
+        if (sigue) {
+          next[next.length - 1] = isFinal
+            ? // Un final se pega a lo ya confirmado del mismo turno.
+              { ...ultima, text: `${ultima.text} ${text}`.trim(), interim: "" }
+            : { ...ultima, interim: text };
         } else {
-          next.push({ id: ++lineId.current, text, final: isFinal, ts: Date.now() });
+          next.push({
+            id: ++lineId.current,
+            text: isFinal ? text : "",
+            interim: isFinal ? "" : text,
+            closed: false,
+            ts: ahora,
+          });
         }
         return next.slice(-60);
       });
@@ -1507,9 +1557,16 @@ export default function Page() {
       // generación ocurre EXCLUSIVAMENTE al tocar el botón, así la conversación
       // no avanza sola con respuestas nuevas mientras la persona habla.
       if (isFinal) {
-        // Se guarda con hora para poder reconstruir después la conversación en
-        // el orden en que pasó, intercalada con las respuestas generadas.
-        sessionLinesRef.current.push({ text, ts: Date.now() });
+        // El transcript guardado se agrupa igual que el de pantalla: si no, el
+        // informe y la descarga quedan con las mismas frases sueltas.
+        const guardadas = sessionLinesRef.current;
+        const ultima = guardadas[guardadas.length - 1];
+        if (sessionTurnOpenRef.current && ultima && !turnoNuevo) {
+          ultima.text = `${ultima.text} ${text}`.trim();
+        } else {
+          guardadas.push({ text, ts: ahora });
+        }
+        sessionTurnOpenRef.current = true;
         transcriptRef.current = (transcriptRef.current + " " + text).slice(-8000);
         questionBufRef.current = (questionBufRef.current + " " + text).slice(-1500);
       }
@@ -1803,6 +1860,8 @@ export default function Page() {
       const startedAt = Date.now();
       sessionStartRef.current = startedAt;
       sessionLinesRef.current = [];
+      sessionTurnOpenRef.current = false;
+      lastSpeechAtRef.current = 0;
       if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (!conPase) {
@@ -2280,7 +2339,7 @@ export default function Page() {
             <span />
           </span>
           <span className="listen-text listen-text-live">
-            <ListenText text={lines.length ? lines[lines.length - 1].text : ""} />
+            <ListenText text={lines.length ? lineText(lines[lines.length - 1]) : ""} />
           </span>
         </div>
       )}
@@ -2348,8 +2407,18 @@ export default function Page() {
                   <p className="transcript-empty mono">Escuchando…</p>
                 ) : (
                   lines.map((l) => (
-                    <div key={l.id} className={`t-line${l.final ? "" : " t-line-interim"}`}>
-                      <div className="t-bubble">{l.text}</div>
+                    <div key={l.id} className="t-line">
+                      <div className="t-bubble">
+                        {l.text}
+                        {l.interim && (
+                          /* Lo que Deepgram todavía escucha, en el mismo globo
+                             pero más claro: se ve venir sin partir la frase. */
+                          <span className="t-interim">
+                            {l.text ? " " : ""}
+                            {l.interim}
+                          </span>
+                        )}
+                      </div>
                       <span className="t-meta mono">Entrevistador · {fmtHora(l.ts)}</span>
                     </div>
                   ))
@@ -2429,17 +2498,20 @@ export default function Page() {
                     </div>
                     <div className="answer-card-a-row">
                       <span className="answer-card-label answer-card-label-a">⭐ Respuesta</span>
-                      <div className="answer-card-text">
-                        {a.text ? (
-                          // Colapsa líneas en blanco de más entre viñetas, pero conserva
-                          // el salto simple que separa la apertura de las viñetas.
-                          a.text.replace(/\n{3,}/g, "\n\n").trim()
-                        ) : (
-                          <span className="mono answer-card-loading">
-                            generando…
-                          </span>
-                        )}
-                      </div>
+                      {a.text ? (
+                        // Markdown y no texto plano: las viñetas llevan una
+                        // etiqueta en negrita al principio para poder barrer la
+                        // respuesta de un vistazo mientras se habla. Sin esto se
+                        // verían los asteriscos crudos.
+                        <Markdown
+                          text={a.text.replace(/\n{3,}/g, "\n\n").trim()}
+                          className="answer-card-text"
+                        />
+                      ) : (
+                        <div className="answer-card-text">
+                          <span className="mono answer-card-loading">generando…</span>
+                        </div>
+                      )}
                     </div>
                     {a.text && (
                       <div className="answer-footer">
