@@ -965,8 +965,78 @@ input {
    En desktop la entrevista queda a la izquierda y las respuestas a la derecha,
    así no hay que cambiar de ventana para leer lo que sopla el Loro. En mobile
    no aplica: ahí el modo es micrófono y no hay pestaña que compartir. */
-.share-pane {
+/* La columna izquierda entera (llamada + transcripción) es de escritorio: en
+   mobile el modo es micrófono y no hay pestaña que compartir. */
+.live-left {
   display: none;
+}
+
+/* ---- Transcripción en vivo, debajo de la llamada ---- */
+.transcript-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.transcript-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-dim);
+  flex: none;
+}
+.transcript-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.transcript-empty {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
+.t-line {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.t-bubble {
+  background: #eef2f7;
+  border-radius: 14px;
+  padding: 9px 13px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  max-width: 92%;
+  overflow-wrap: anywhere;
+}
+/* Lo que todavía no cerró Deepgram: se ve, pero se nota que puede cambiar. */
+.t-line-interim .t-bubble {
+  background: #f5f7fa;
+  color: var(--ink-dim);
+}
+.t-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding-left: 4px;
+}
+
+/* Acciones de la sesión cuando viven dentro de la columna derecha. */
+.live-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
 }
 
 @media (min-width: 1000px) {
@@ -974,12 +1044,29 @@ input {
      de una sola columna y a todo el ancho. */
   .live-split {
     display: grid !important;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     gap: 14px;
     align-items: stretch;
   }
+  /* Izquierda: la llamada arriba y la transcripción abajo, como la referencia.
+     El video se lleva la parte de arriba y el transcript el resto. */
+  .live-split .live-left {
+    display: grid;
+    grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+  }
   .live-split .share-pane {
-    display: block;
+    min-width: 0;
+    min-height: 0;
+  }
+  /* Derecha: las respuestas ocupan lo que sobra y las acciones quedan
+     debajo, dentro de la misma columna. */
+  .live-split .live-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     min-width: 0;
     min-height: 0;
   }

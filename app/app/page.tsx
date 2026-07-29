@@ -31,12 +31,23 @@ function lastQuestions(text: string): string {
 
 type Status = "idle" | "connecting" | "live" | "error";
 type Mode = "mic" | "tab";
-type Line = { id: number; text: string; final: boolean };
+// `ts` es la hora en que se oyó: se muestra bajo cada burbuja del transcript.
+type Line = { id: number; text: string; final: boolean; ts: number };
 type Feedback = "up" | "down" | null;
 type Answer = { id: number; question: string; text: string; done: boolean; ts: number; feedback: Feedback };
 
 // Cuenta regresiva de la sesión, mm:ss. Con solo los minutos ("5 mins") la
 // píldora se quedaba quieta un minuto entero y parecía trabada.
+/** "02:10 p.m." — la hora bajo cada línea del transcript. */
+function fmtHora(ts: number): string {
+  const d = new Date(ts);
+  const h24 = d.getHours();
+  const h = h24 % 12 || 12;
+  return `${String(h).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} ${
+    h24 < 12 ? "a.m." : "p.m."
+  }`;
+}
+
 function fmtCountdown(secs: number): string {
   const s = Math.max(0, secs);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -1029,6 +1040,7 @@ export default function Page() {
   const turnRef = useRef<{ id: number; sentText: string; controller: AbortController | null } | null>(null);
 
   const scrollA = useRef<HTMLDivElement | null>(null);
+  const scrollT = useRef<HTMLDivElement | null>(null);
 
   // Modelo elegido, siempre fresco (evita closures viejas en runGenerate).
   const selectedModel = MODELS.find((m) => m.id === modelId) || MODELS[0];
@@ -1428,9 +1440,11 @@ export default function Page() {
       setLines((prev) => {
         const next = [...prev];
         if (next.length && !next[next.length - 1].final) {
-          next[next.length - 1] = { id: next[next.length - 1].id, text, final: isFinal };
+          // Se conserva la hora del primer trozo: es cuando empezó a decirlo.
+          const prev0 = next[next.length - 1];
+          next[next.length - 1] = { id: prev0.id, text, final: isFinal, ts: prev0.ts };
         } else {
-          next.push({ id: ++lineId.current, text, final: isFinal });
+          next.push({ id: ++lineId.current, text, final: isFinal, ts: Date.now() });
         }
         return next.slice(-60);
       });
@@ -1799,6 +1813,15 @@ export default function Page() {
   // Depende del texto de la última card porque mientras llega en streaming la
   // card crece y hay que recalcular. NO depende de `feedback`, así tocar 👍/👎
   // no mueve el scroll.
+  // El transcript sigue lo último que se oye, salvo que la persona haya
+  // scrolleado hacia arriba para releer algo: ahí no se le mueve el piso.
+  useEffect(() => {
+    const el = scrollT.current;
+    if (!el) return;
+    const alFinal = el.scrollHeight - el.clientHeight - el.scrollTop < 80;
+    if (alFinal) el.scrollTop = el.scrollHeight;
+  }, [lines]);
+
   const lastAnswerText = answers.length ? answers[answers.length - 1].text : "";
   useEffect(() => {
     const container = scrollA.current;
@@ -2037,9 +2060,10 @@ export default function Page() {
         </div>
       )}
 
-      {/* Tira de escucha en vivo: muestra lo último que se oye y da acceso
-          secundario a la transcripción. La respuesta es la protagonista. */}
-      {live && (
+      {/* Tira de escucha de una línea. Con la pestaña compartida al lado hay
+          lugar para el transcript completo, así que esta franja solo se usa
+          cuando la sesión es de una sola columna. */}
+      {live && !sharing && (
         // Franja de escucha: una sola línea de borde a borde, sin tarjeta ni
         // botones (como Parakeet). Lo único que importa acá es ver que el Loro
         // está escuchando y qué viene oyendo.
@@ -2063,21 +2087,50 @@ export default function Page() {
             pantalla. En desktop va a la izquierda; en mobile no existe (ahí el
             modo es micrófono y no hay nada que compartir). */}
         {live && sharing && (
-          <div className="share-pane">
-            <video
-              className="share-video"
-              autoPlay
-              playsInline
-              muted
-              ref={(el) => {
-                if (el && shareStreamRef.current && el.srcObject !== shareStreamRef.current) {
-                  el.srcObject = shareStreamRef.current;
-                }
-              }}
-            />
+          <div className="live-left">
+            <div className="share-pane">
+              <video
+                className="share-video"
+                autoPlay
+                playsInline
+                muted
+                ref={(el) => {
+                  if (el && shareStreamRef.current && el.srcObject !== shareStreamRef.current) {
+                    el.srcObject = shareStreamRef.current;
+                  }
+                }}
+              />
+            </div>
+            {/* Transcript en vivo, debajo de la llamada. Con la pantalla
+                compartida ocupando la izquierda hay lugar para verlo entero,
+                no solo la última línea. */}
+            <div className="panel transcript-pane">
+              <div className="transcript-head mono">
+                <span className="eq" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                Transcripción en vivo
+              </div>
+              <div ref={scrollT} className="transcript-body">
+                {lines.length === 0 ? (
+                  <p className="transcript-empty mono">Escuchando…</p>
+                ) : (
+                  lines.map((l) => (
+                    <div key={l.id} className={`t-line${l.final ? "" : " t-line-interim"}`}>
+                      <div className="t-bubble">{l.text}</div>
+                      <span className="t-meta mono">Entrevistador · {fmtHora(l.ts)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         )}
         {live && (
+          <div className="live-right">
           <div className="panel answers-pane" style={{ flex: 1, minHeight: 0 }}>
             <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
@@ -2142,6 +2195,25 @@ export default function Page() {
                 ))
               )}
             </div>
+          </div>
+          {/* Con la pantalla compartida al lado, las acciones van debajo de su
+              propia columna —como en la referencia— en vez de cruzar toda la
+              pantalla. Sin compartir siguen en el pie de siempre. */}
+          {sharing && (
+            <div className="live-actions">
+              <div className="clear-row">
+                <button onClick={clearAll} className="clear-pill mono">
+                  ✕ Limpiar
+                </button>
+              </div>
+              <button onClick={() => answerNow()} className="btn-action btn-primary btn-answer">
+                <span className="btn-answer-inner">
+                  <SparkleIcon />
+                  Responder
+                </span>
+              </button>
+            </div>
+          )}
           </div>
         )}
 
@@ -2214,8 +2286,9 @@ export default function Page() {
         />
       )}
 
-      {/* Footer */}
-      {!hideChrome && (
+      {/* Footer. Con la pantalla compartida las acciones de la sesión ya viven
+          debajo de la columna derecha, así que acá no se repiten. */}
+      {!hideChrome && !(live && sharing) && (
       <footer style={{ display: "flex", flexDirection: "column", gap: 8, position: "sticky", bottom: 0, paddingTop: 4, background: "var(--bg)" }}>
         {showSetup ? (
           <button
