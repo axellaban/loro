@@ -979,7 +979,7 @@ function ConectarPaso({
           <>
             <div className="paywall-title">Poné el altavoz</div>
             <ol className="conectar-pasos">
-              <li>Sacá los auriculares y poné el altavoz de la reunión.</li>
+              <li>Poné el altavoz de tu notebook para la meeting (auriculares no).</li>
               <li>Dejá el celular cerca, con Loreado abierto.</li>
             </ol>
             <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
