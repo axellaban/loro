@@ -38,9 +38,24 @@ type HistoryItem = {
   recovery?: boolean;
 };
 
-/** Preguntas de verdad hechas hasta ahora: los rescates no cuentan. */
+/** Preguntas de verdad hechas hasta ahora: las continuaciones no cuentan. */
 function realQuestionCount(h: HistoryItem[]): number {
   return h.reduce((n, t) => n + (t.recovery ? 0 : 1), 0);
+}
+
+/**
+ * Tope duro de turnos.
+ *
+ * Como las continuaciones (follow-ups, repreguntas, correcciones) no consumen
+ * pregunta, un entrevistador muy repreguntón podría estirar la entrevista sin
+ * final. Con 5 preguntas y hasta 4 continuaciones, el simulacro sigue entrando
+ * en los ~5 minutos que promete el reloj del header.
+ */
+const MAX_TURNS = 9;
+
+/** ¿Se terminó la entrevista? Por temas cubiertos o por tope de turnos. */
+function interviewDone(h: HistoryItem[], questionsCount: number): boolean {
+  return realQuestionCount(h) >= questionsCount || h.length >= MAX_TURNS;
 }
 
 type FeedbackQuestion = {
@@ -835,7 +850,7 @@ export default function SimuladorPage() {
       skipped: true,
       question_index: realQuestionCount(updated),
     });
-    if (realQuestionCount(updated) >= questionsCount) finishToFeedback(updated);
+    if (interviewDone(updated, questionsCount)) finishToFeedback(updated);
     else beginTurnRef.current(updated);
   };
 
@@ -1094,6 +1109,16 @@ export default function SimuladorPage() {
         }),
       });
       if (!res.ok || !res.body) throw new Error("Error al obtener la pregunta.");
+      // El entrevistador declara si su turno abre un tema nuevo o sigue con el
+      // que estaba (follow-up, repregunta por corte, o corrección porque el
+      // candidato le aclaró algo que había entendido mal). Solo los temas
+      // nuevos consumen una de las preguntas de la entrevista: aclararle algo
+      // al Loro no debería costarte un tema.
+      // Si el header no viene —modelo que se olvidó la marca, o un fallback—
+      // se asume tema nuevo, que es como venía funcionando.
+      if (!closing) {
+        currentIsRecoveryRef.current = esRescate || res.headers.get("x-loro-nueva") === "0";
+      }
       track("sim_question_asked", { question_index: questionIndex, model: selectedModel.model, with_image: !!image });
 
       const reader = res.body.getReader();
@@ -1195,7 +1220,7 @@ export default function SimuladorPage() {
       recovery: eraRescate,
     });
 
-    if (realQuestionCount(updated) >= questionsCount) {
+    if (interviewDone(updated, questionsCount)) {
       // Terminación natural: el entrevistador cierra (agradece) y recién ahí
       // se procesa el informe.
       beginTurnRef.current(updated, true);

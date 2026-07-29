@@ -35,9 +35,14 @@ Reglas críticas:
 6. Responde SIEMPRE en el idioma indicado en "## IDIOMA DE LA RESPUESTA".
 7. Si aparece un bloque "## SEÑAL DEL SISTEMA" indicando que la última respuesta pudo cortarse: tu próximo turno NO es una pregunta nueva ni un follow-up de desafío. Es una repregunta breve y amable para que el candidato COMPLETE lo que estaba diciendo ("uy, se cortó un poco eso, ¿querés terminar la idea?" / "¿ahí llegaste a lo que querías decir o querés agregar algo?"). No lo trates como un error suyo — pudo ser un problema técnico. Ofrecelo UNA sola vez; si igual queda corta, seguí normal.
 8. Si aparece un bloque "## CIERRE": la entrevista terminó. NO hagas ninguna pregunta. Cerrá con calidez en 1-2 oraciones: agradecé el tiempo del candidato y hacé un comentario final humano y positivo (SIN dar feedback ni puntuar), y avisá que en un momento le preparás el informe. Ej: "Buenísimo, con esto cerramos. Te agradezco un montón el tiempo, dame unos segundos que te armo el informe."
-9. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:".
+9. Devuelve ÚNICAMENTE el texto que diría el entrevistador. Sin preámbulos, sin "Aquí está la pregunta", sin etiquetas como "Pregunta:" ni "Entrevistador:". La ÚNICA excepción es la marca de la regla 12.
 10. Si el PROGRESO indica que es la ÚLTIMA pregunta, avisale brevemente al candidato que es la última antes de formularla.
-11. Si recibís una imagen del candidato (un frame de su cámara), INCLUÍ antes de la pregunta un comentario positivo y específico sobre lo que realmente ves — su ropa ("qué buena esa camisa"), lentes, sonrisa, el espacio de fondo, la iluminación. Si el contexto lo amerita, mencioná 2 o 3 detalles hilados con naturalidad ("me gusta esa camisa, y se ve un espacio muy ordenado detrás tuyo — se nota que te preparaste"). Concreto y natural, para que se note que lo estás viendo de verdad; que no suene a checklist. Siempre amable y profesional: nunca negativo, nunca sobre el cuerpo, nunca incómodo. Después seguís con la pregunta. Si en este turno NO recibís imagen, NO menciones NADA sobre su apariencia, ropa, cara, fondo, entorno ni iluminación, y NO retomes comentarios visuales de turnos anteriores: enfocate solo en el contenido de sus respuestas.`;
+11. Si recibís una imagen del candidato (un frame de su cámara), INCLUÍ antes de la pregunta un comentario positivo y específico sobre lo que realmente ves — su ropa ("qué buena esa camisa"), lentes, sonrisa, el espacio de fondo, la iluminación. Si el contexto lo amerita, mencioná 2 o 3 detalles hilados con naturalidad ("me gusta esa camisa, y se ve un espacio muy ordenado detrás tuyo — se nota que te preparaste"). Concreto y natural, para que se note que lo estás viendo de verdad; que no suene a checklist. Siempre amable y profesional: nunca negativo, nunca sobre el cuerpo, nunca incómodo. Después seguís con la pregunta. Si en este turno NO recibís imagen, NO menciones NADA sobre su apariencia, ropa, cara, fondo, entorno ni iluminación, y NO retomes comentarios visuales de turnos anteriores: enfocate solo en el contenido de sus respuestas.
+12. MARCA OBLIGATORIA. Tu PRIMERA LÍNEA, sola y antes de todo lo demás, tiene que ser exactamente una de estas dos:
+#NUEVA — abrís un TEMA NUEVO: una pregunta sobre algo que todavía no se habló.
+#MISMA — seguís con el tema que ya estaba. Entra acá TODO esto: un follow-up que pide un ejemplo o un número sobre la respuesta anterior; una repregunta porque la respuesta se cortó; y una corrección porque entendiste mal algo y el candidato te lo aclaró.
+Si el candidato te corrige ("no es X, es Y") o te aclara algo que interpretaste mal, tu turno es SIEMPRE #MISMA: reconocé el error en media oración y volvé a hacer la MISMA pregunta ya corregida. Nunca cambies de tema en ese turno.
+La marca va sola en su línea y el texto que decís arranca en la línea siguiente. NUNCA la leas en voz alta ni la menciones: es para el sistema, no para el candidato.`;
 
 const SYSTEM_PROMPT_FEEDBACK = `Sos un COACH DE ENTREVISTAS experto. Tu tarea es analizar una simulación de entrevista completa y generar un reporte de feedback detallado, constructivo y accionable.
 Recibís:
@@ -268,13 +273,75 @@ ${historyText}`;
   }
 }
 
-// `x-loro-model` deja registrado qué modelo respondió de verdad (para saber si
-// entró un fallback).
-function textStreamResponse(stream: ReadableStream, model: string) {
-  return new Response(stream, {
+/** Cuánto se lee esperando la marca antes de darse por vencido. */
+const MARK_PEEK_CHARS = 24;
+
+/**
+ * Saca la marca #NUEVA/#MISMA de la primera línea y la devuelve como header.
+ *
+ * Va acá y no en el cliente porque el texto se manda al sintetizador de voz a
+ * medida que llega: si la marca sobreviviera un solo chunk, el entrevistador
+ * diría "numeral nueva" en voz alta. Del lado del cliente nunca existe.
+ *
+ * Si el modelo se olvida de marcar, se asume tema nuevo — que es exactamente el
+ * comportamiento que había antes de existir la marca.
+ *
+ * `x-loro-model` deja registrado qué modelo respondió de verdad (para saber si
+ * entró un fallback).
+ */
+async function textStreamResponse(stream: ReadableStream, model: string) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+
+  // Se espía solo el arranque: lo justo para ver la marca sin retrasar la voz.
+  let head = "";
+  let upstreamDone = false;
+  while (head.length < MARK_PEEK_CHARS && !head.includes("\n")) {
+    const { done, value } = await reader.read();
+    if (done) {
+      upstreamDone = true;
+      break;
+    }
+    head += decoder.decode(value, { stream: true });
+  }
+
+  let nueva = true;
+  const m = head.match(/^\s*#(NUEVA|MISMA)\b[ \t]*\r?\n?/i);
+  if (m) {
+    nueva = m[1].toUpperCase() === "NUEVA";
+    head = head.slice(m[0].length);
+  }
+
+  const rest = new ReadableStream({
+    async pull(controller) {
+      if (head) {
+        controller.enqueue(encoder.encode(head));
+        head = "";
+        return;
+      }
+      if (upstreamDone) {
+        controller.close();
+        return;
+      }
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(value);
+    },
+    cancel(reason) {
+      void reader.cancel(reason);
+    },
+  });
+
+  return new Response(rest, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "x-loro-model": model,
+      // 1 = abre un tema nuevo (consume una de las preguntas de la entrevista).
+      "x-loro-nueva": nueva ? "1" : "0",
     },
   });
 }
@@ -356,7 +423,7 @@ async function streamGemini(
     });
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
-      return textStreamResponse(
+      return await textStreamResponse(
         sseTextStream(upstream.body, (json) => geminiChunk(JSON.parse(json), spec.model)),
         spec.model
       );
@@ -397,7 +464,7 @@ async function streamAnthropic(specs: ModelSpec[], systemPrompt: string, userCon
     });
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
-      return textStreamResponse(
+      return await textStreamResponse(
         sseTextStream(upstream.body, (json) => {
           const evt = JSON.parse(json);
           if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
@@ -447,7 +514,7 @@ async function streamOpenAI(specs: ModelSpec[], systemPrompt: string, userConten
     });
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
-      return textStreamResponse(
+      return await textStreamResponse(
         sseTextStream(upstream.body, (json) => {
           const evt = JSON.parse(json);
           return evt.choices?.[0]?.delta?.content ?? null;
