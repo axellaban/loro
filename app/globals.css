@@ -2381,43 +2381,70 @@ input {
   line-height: 1.55;
   margin-bottom: 18px;
 }
-/* Pasos numerados de la ventana de conexión. Numeración propia para que el
-   número quede alineado arriba con la primera línea de textos de dos renglones,
-   que es lo normal acá. */
+/* ----- Ventana de conexión -----
+   Es un trámite, no una oferta: caja chica, tres pasos de un renglón y el
+   botón. Nada de tarjetas ni de la caja ancha del paywall, que la hacían
+   parecer una pantalla de venta. */
+.conectar {
+  position: relative;
+  text-align: left;
+  padding: 22px;
+  max-width: 23rem;
+}
+.conectar .paywall-title {
+  font-size: 18px;
+  line-height: 1.25;
+  padding-right: 28px;
+  margin-bottom: 14px;
+}
+.conectar .paywall-close {
+  top: 16px;
+  right: 16px;
+}
+.conectar .btn-action {
+  width: 100%;
+}
+.conectar .paywall-fineprint {
+  margin-top: 12px;
+}
+
+/* Pasos numerados. Numeración propia para que el número quede alineado arriba
+   con la primera línea cuando el paso corta en dos renglones. */
 .conectar-pasos {
   list-style: none;
   counter-reset: paso;
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 .conectar-pasos li {
   counter-increment: paso;
   position: relative;
-  padding-left: 30px;
-  font-size: 15px;
-  line-height: 1.55;
+  padding-left: 27px;
+  font-size: 14px;
+  line-height: 1.45;
   color: var(--ink-dim);
 }
 .conectar-pasos li::before {
   content: counter(paso);
   position: absolute;
   left: 0;
-  top: 1px;
-  width: 20px;
-  height: 20px;
+  top: 0;
+  width: 19px;
+  height: 19px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--ink);
   background: #f2f3f5;
   border-radius: 999px;
 }
-.conectar-pasos strong {
+.conectar-pasos strong,
+.conectar .paywall-fineprint strong {
   color: var(--ink);
   font-weight: 700;
 }

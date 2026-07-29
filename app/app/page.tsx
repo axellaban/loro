@@ -238,33 +238,6 @@ function BannerIcon() {
   );
 }
 
-function BrowserIcon() {
-  return (
-    <svg {...stypeIconProps}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 9h18M7 6.5h.01M10 6.5h.01" />
-    </svg>
-  );
-}
-
-function PhoneIcon() {
-  return (
-    <svg {...stypeIconProps}>
-      <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
-      <path d="M11 18.5h2" />
-    </svg>
-  );
-}
-
-function MicBigIcon() {
-  return (
-    <svg {...stypeIconProps}>
-      <rect x="9" y="2.5" width="6" height="11" rx="3" />
-      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5" />
-    </svg>
-  );
-}
-
 function DotsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -937,79 +910,46 @@ function ConectarPaso({
 }) {
   return (
     <div className="paywall-overlay" onClick={onClose}>
-      <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
+      <div className="paywall conectar" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="paywall-close" onClick={onClose} aria-label="Cerrar">
           ✕
         </button>
-        <div className="paywall-title">Conectá el audio de tu reunión</div>
 
         {soloMic ? (
           <>
-            <p className="paywall-text">
-              En este dispositivo el Loro escucha por el micrófono.
-            </p>
-            <div className="stype-card">
-              <div className="stype-head">
-                <span className="stype-name">
-                  <MicBigIcon /> Poné el altavoz
-                </span>
-                <span className="stype-badge">Sin auriculares</span>
-              </div>
-              <ol className="conectar-pasos">
-                <li>Sacate los auriculares y activá el altavoz de la reunión.</li>
-                <li>Dejá este celular cerca, con la pantalla de Loreado abierta.</li>
-                <li>Hablá normal: el Loro escucha al entrevistador y a vos.</li>
-              </ol>
-              <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
-                {connecting ? "Conectando… 🦜" : "Empezar a escuchar"}
-              </button>
-            </div>
+            <div className="paywall-title">Poné el altavoz</div>
+            <ol className="conectar-pasos">
+              <li>Sacá los auriculares y poné el altavoz de la reunión.</li>
+              <li>Dejá el celular cerca, con Loreado abierto.</li>
+            </ol>
+            <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
+              {connecting ? "Conectando… 🦜" : "Empezar a escuchar"}
+            </button>
           </>
         ) : (
           <>
-            <p className="paywall-text">
-              El Loro escucha el audio de la pestaña donde está tu reunión, y también tu micrófono.
+            <div className="paywall-title">Compartí la pestaña de tu reunión</div>
+            <ol className="conectar-pasos">
+              <li>
+                Abrí la reunión <strong>en una pestaña</strong> del navegador.
+              </li>
+              <li>
+                Elegí <strong>Pestaña de Chrome</strong> y seleccioná esa pestaña.
+              </li>
+              <li>
+                Tildá <strong>“Compartir audio de la pestaña”</strong>.
+              </li>
+            </ol>
+            <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
+              {connecting ? "Conectando… 🦜" : "Compartir pestaña"}
+            </button>
+            {/* Zoom/Teams instalados no se pueden capturar con audio desde el
+                navegador. Va como nota al pie y no como tarjeta: le sirve a
+                pocos y no tiene que competir con el paso principal. */}
+            <p className="paywall-fineprint">
+              ¿Solo tenés la app de escritorio? Abrí <strong>loreado.vercel.app</strong> en el
+              celular y dejalo cerca del altavoz.
             </p>
-            <div className="stype-card">
-              <div className="stype-head">
-                <span className="stype-name">
-                  <BrowserIcon /> Compartí la pestaña
-                </span>
-                <span className="stype-badge">Recomendado</span>
-              </div>
-              <ol className="conectar-pasos">
-                <li>
-                  Abrí tu reunión <strong>en el navegador</strong> (Meet, Zoom o Teams tienen
-                  versión web) en otra pestaña de esta misma ventana.
-                </li>
-                <li>
-                  Tocá el botón de acá abajo y, en el cuadro que abre Chrome, elegí{" "}
-                  <strong>Pestaña de Chrome</strong> y seleccioná la de tu reunión.
-                </li>
-                <li>
-                  Antes de aceptar, tildá <strong>“Compartir audio de la pestaña”</strong>. Sin ese
-                  tilde el Loro se queda mudo.
-                </li>
-              </ol>
-              <button className="btn-action btn-primary" onClick={onStart} disabled={connecting}>
-                {connecting ? "Conectando… 🦜" : "Compartir pestaña"}
-              </button>
-            </div>
-
-            <div className="stype-card">
-              <div className="stype-head">
-                <span className="stype-name">
-                  <PhoneIcon /> ¿Solo tenés la app de escritorio?
-                </span>
-                <span className="stype-badge">Mientras tanto</span>
-              </div>
-              <p className="paywall-text">
-                Zoom o Teams instalados no se pueden compartir con audio desde el navegador. Hasta
-                que salga la app de escritorio de Loreado: abrí <strong>loreado.vercel.app</strong>{" "}
-                en tu celular, poné el altavoz de la reunión y dejá el celular cerca. Escucha igual
-                de bien.
-              </p>
-            </div>
           </>
         )}
       </div>
