@@ -808,7 +808,7 @@ function PagoPaso({
                 src={p.binance.qr}
                 alt="QR de Binance Pay para pagar el pase"
               />
-              <p className="paywall-fineprint pago-qr-nota">o escaneá el QR desde la compu</p>
+              <p className="paywall-fineprint pago-qr-nota">o escaneá el QR</p>
             </>
           ) : (
             <button
@@ -867,7 +867,7 @@ const SESSION_MAX_MIN = Math.round(SESSION_MAX_MS / 60000);
 // Pases pagos. No hay créditos: se vende acceso ilimitado por tiempo.
 const WA_NUMBER = "5491164090022";
 const PASS_WEEK_PRICE = "$19.99 USD";
-const PASS_YEAR_PRICE = "$89";
+const PASS_YEAR_PRICE = "$89 USD";
 
 type PassPlan = "week" | "year";
 
@@ -946,6 +946,8 @@ export default function Page() {
   const [showSessionType, setShowSessionType] = useState(false);
   // Pase elegido: mientras está seteado se muestra el paso de pago.
   const [payPlan, setPayPlan] = useState<PassPlan | null>(null);
+  // Hay video de la pestaña compartida para mostrar al lado de las respuestas.
+  const [sharing, setSharing] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -988,6 +990,11 @@ export default function Page() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  /**
+   * Video de la pestaña compartida. Va aparte del stream de audio porque a
+   * Deepgram solo se le manda audio, pero el video se muestra en pantalla.
+   */
+  const shareStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const wakeLockRef = useRef<any>(null);
@@ -1454,7 +1461,20 @@ export default function Page() {
         s.getTracks().forEach((t) => t.stop());
         throw new Error('No se compartió audio. Al elegir la pestaña activá "Compartir audio de la pestaña".');
       }
-      s.getVideoTracks().forEach((t) => t.stop());
+      // El video de la pestaña compartida se conserva (antes se descartaba)
+      // para mostrarlo al lado de las respuestas: así se ve la entrevista y el
+      // copiloto en la misma pantalla, sin cambiar de ventana.
+      const vt = s.getVideoTracks();
+      if (vt.length) {
+        shareStreamRef.current = new MediaStream(vt);
+        setSharing(true);
+        // Si se corta el compartir desde la barra del navegador, el recuadro
+        // tiene que desaparecer en vez de quedar congelado.
+        vt[0].addEventListener("ended", () => {
+          shareStreamRef.current = null;
+          setSharing(false);
+        });
+      }
       return new MediaStream(at);
     }
     // mic
@@ -1700,6 +1720,11 @@ export default function Page() {
       audioCtxRef.current?.close();
     } catch {}
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    // El video de la pestaña no está en streamRef, así que se corta acá: si no,
+    // el navegador sigue mostrando "estás compartiendo pantalla" para siempre.
+    shareStreamRef.current?.getTracks().forEach((t) => t.stop());
+    shareStreamRef.current = null;
+    setSharing(false);
     try {
       wakeLockRef.current?.release?.();
     } catch {}
@@ -2033,9 +2058,27 @@ export default function Page() {
 
       {/* Contenido */}
       {!hideChrome && (
-      <section style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
+      <section className={live && sharing ? "live-split" : ""} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginTop: 4 }}>
+        {/* Pestaña compartida: la entrevista y el copiloto en la misma
+            pantalla. En desktop va a la izquierda; en mobile no existe (ahí el
+            modo es micrófono y no hay nada que compartir). */}
+        {live && sharing && (
+          <div className="share-pane">
+            <video
+              className="share-video"
+              autoPlay
+              playsInline
+              muted
+              ref={(el) => {
+                if (el && shareStreamRef.current && el.srcObject !== shareStreamRef.current) {
+                  el.srcObject = shareStreamRef.current;
+                }
+              }}
+            />
+          </div>
+        )}
         {live && (
-          <div className="panel" style={{ flex: 1, minHeight: 0 }}>
+          <div className="panel answers-pane" style={{ flex: 1, minHeight: 0 }}>
             <div ref={scrollA} className="answers-container">
               {answers.length === 0 ? (
                 <p className="placeholder" style={{ fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", padding: "8px" }}>
