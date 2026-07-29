@@ -783,16 +783,36 @@ function PagoPaso({
           </span>
           <span className="stype-badge">Binance Pay</span>
         </div>
-        <p className="paywall-text">En breve te paso el QR.</p>
-        <button
-          className="btn-action btn-outline"
-          onClick={() => {
-            track(plan === "week" ? "pay_binance_week" : "pay_binance_year");
-            onWhatsApp(`${p.wa} Pago desde afuera de Argentina, ¿me pasás el QR de Binance?`);
-          }}
-        >
-          Pedime el QR por WhatsApp
-        </button>
+        {p.binance ? (
+          <>
+            <p className="paywall-text">Desde el celular abrís la app directo. Desde la compu, escaneá el QR.</p>
+            <a
+              className="btn-action btn-primary"
+              href={p.binance.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track(plan === "week" ? "pay_binance_week" : "pay_binance_year")}
+            >
+              Pagar con Binance Pay
+            </a>
+            {/* Imagen normal y no next/image: es un QR chico y estático, y así
+                se puede tocar y guardar para escanearlo desde la galería. */}
+            <img className="pago-qr" src={p.binance.qr} alt="QR de Binance Pay para pagar el pase" />
+          </>
+        ) : (
+          <>
+            <p className="paywall-text">En breve te paso el QR.</p>
+            <button
+              className="btn-action btn-outline"
+              onClick={() => {
+                track(plan === "week" ? "pay_binance_week" : "pay_binance_year");
+                onWhatsApp(`${p.wa} Pago desde afuera de Argentina, ¿me pasás el QR de Binance?`);
+              }}
+            >
+              Pedime el QR por WhatsApp
+            </button>
+          </>
+        )}
       </div>
 
       <p className="paywall-fineprint pago-nota">
@@ -852,14 +872,26 @@ type PassPlan = "week" | "year";
  * En los dos casos el alta la hago yo con el comprobante, así que el último
  * paso siempre es el chat.
  */
-const PLANES: Record<
-  PassPlan,
-  { titulo: string; precio: string; mercadoPago: string; wa: string }
-> = {
+type Plan = {
+  titulo: string;
+  precio: string;
+  mercadoPago: string;
+  /**
+   * Binance Pay. `url` es lo que codifica el QR: en el celular abre la app
+   * directo, que es mejor que pedirle a alguien que escanee su propia
+   * pantalla. `qr` queda para quien está en la compu y escanea con el teléfono.
+   * Sin esto todavía, se pide por WhatsApp.
+   */
+  binance?: { url: string; qr: string };
+  wa: string;
+};
+
+const PLANES: Record<PassPlan, Plan> = {
   week: {
     titulo: "Pase Rey Loro Ilimitado (7 días)",
     precio: PASS_WEEK_PRICE,
     mercadoPago: "https://mpago.la/17qBami",
+    binance: { url: "https://app.binance.com/uni-qr/XARJMtuK", qr: "/binance-qr-semanal.png" },
     wa: `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`,
   },
   year: {

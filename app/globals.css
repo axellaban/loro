@@ -2135,6 +2135,19 @@ a.btn-action {
   box-sizing: border-box;
 }
 
+/* QR de Binance dentro de la tarjeta de pago. Fondo blanco y aire alrededor:
+   la "zona tranquila" es lo que hace que un lector lo encuentre. */
+.pago-qr {
+  display: block;
+  width: 168px;
+  height: 168px;
+  margin: 14px auto 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+}
+
 /* Nota del comprobante: separada de los botones, con el link subrayado. */
 .pago-nota {
   margin: 4px 0 16px;
