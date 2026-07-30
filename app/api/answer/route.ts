@@ -63,6 +63,39 @@ Reglas generales de salida:
 ## Regla de oro sobre [PREGUNTA]
 Si ese campo tiene CUALQUIER texto —por corto, informal, mal transcrito o inesperado que sea, incluso si el PERFIL o la EMPRESA están vacíos— RESPONDÉLO IGUAL con lo que tengas. Nunca evalúes si "es lo bastante clara". El ÚNICO caso en que devolvés "(esperando pregunta)" es cuando [PREGUNTA] dice literalmente "(ninguna aún)" porque no llegó nada. Nunca lo uses por dudar del contenido.`;
 
+/**
+ * Prompt para cuando hay una CAPTURA de la pantalla compartida. Es otro
+ * trabajo que responder de memoria en una entrevista hablada: acá hay algo
+ * concreto en pantalla (un ejercicio, código, un diagrama, un enunciado) y lo
+ * que sirve es resolverlo bien y explicado, no una respuesta de RRHH.
+ */
+const SCREEN_PROMPT = `Sos el copiloto del candidato en una entrevista técnica en vivo. Te llega una CAPTURA de lo que hay en su pantalla compartida (normalmente el enunciado de un ejercicio, código, un diagrama o una pregunta escrita) y, a veces, un pedido en texto de la persona.
+
+Tu tarea: leer la captura y darle al candidato lo que necesita para responder YA. Es tiempo real: tiene que poder leerlo de un vistazo mientras habla.
+
+## Qué hacer
+1. Identificá qué se está preguntando o pidiendo en la pantalla. Si hay un pedido en texto del candidato, ese manda por sobre tu interpretación de la imagen.
+2. Resolvelo de verdad. Si es código, ejecutalo mentalmente paso a paso y dá el resultado exacto — nada de "depende" ni de aproximar. Si hay una trampa (precedencia de operadores, efectos de borde, off-by-one, mutación inesperada), nombrala explícitamente: casi siempre ES el punto del ejercicio.
+3. Si la captura está borrosa o cortada y no se puede leer lo esencial, decilo en una línea y respondé con lo que SÍ se ve, en vez de inventar.
+
+## Formato de salida (exacto)
+Arrancá con una o dos oraciones que ya contesten el núcleo. Después, SOLO las secciones que apliquen, en este orden y con estos títulos literales:
+
+**🔑 Pasos clave**
+- Viñetas con el razonamiento que lleva al resultado. Cada una empieza con una **etiqueta en negrita** de 2-4 palabras y termina en un valor o conclusión concreta. Si es código, mostrá la sustitución/evaluación real (\`FOO(a+b, c)\` → \`2+3 + 5\` = **10**).
+
+**💻 Código**
+- Solo si el ejercicio es de código o si la respuesta se entiende mejor con código. Bloque cercado con el lenguaje declarado (\`\`\`c, \`\`\`python, \`\`\`js…). Comentá adentro las líneas donde está la gracia. Si el ejercicio pide "qué imprime", el bloque tiene que dejar ver la salida.
+
+**💡 Explicación**
+- 3 o 4 viñetas cortas, cada una con su **etiqueta en negrita**, con el concepto de fondo: por qué pasa lo que pasa, cuál es la trampa, y —si viene al caso— la buena práctica que la evita. Es lo que le permite al candidato defender la respuesta si lo repreguntan.
+
+Reglas:
+- Sin preámbulo ("acá va", "claro"): arrancá por la respuesta.
+- Los resultados numéricos o literales van en **negrita**.
+- Nada de inventar contenido que no esté en la captura.
+- Respondé en el idioma indicado en "## IDIOMA DE LA RESPUESTA".`;
+
 export async function POST(req: Request) {
   // Quien pagó no entra en el cupo gratuito: el kill switch existe para frenar
   // el gasto de los que no pagan, no para dejar afuera a un cliente.
@@ -97,6 +130,9 @@ export async function POST(req: Request) {
     question?: string;
     provider?: string;
     model?: string;
+    /** Captura de la pantalla compartida, base64 sin el prefijo `data:`. */
+    image?: string;
+    imageMime?: string;
   };
   try {
     body = await req.json();
@@ -118,7 +154,34 @@ export async function POST(req: Request) {
       ? "Inglés (English). Respondé SIEMPRE en inglés, aunque la pregunta esté en otro idioma."
       : "Español rioplatense. Respondé SIEMPRE en español, aunque la pregunta esté en inglés u otro idioma.";
 
-  const userContent = `## EMPRESA
+  // Captura de la pantalla compartida. Con imagen cambia el trabajo (hay algo
+  // concreto que leer y resolver), así que cambia también el prompt.
+  const image =
+    typeof body.image === "string" && body.image.length > 0
+      ? {
+          mimeType: typeof body.imageMime === "string" ? body.imageMime : "image/jpeg",
+          data: body.image,
+        }
+      : null;
+
+  const userContent = image
+    ? `## EMPRESA
+${company || "(sin especificar)"}
+
+## DESCRIPCIÓN DEL PUESTO
+${role || "(sin especificar)"}
+
+## IDIOMA DE LA RESPUESTA
+${answerLangLabel}
+
+## TRANSCRIPCIÓN RECIENTE (contexto de lo que se venía hablando)
+${transcript || "(vacío)"}
+
+## PEDIDO DEL CANDIDATO
+${question || "(sin pedido: resolvé lo que se ve en la captura)"}
+
+Analizá la captura adjunta y respondé.`
+    : `## EMPRESA
 ${company || "(sin especificar)"}
 
 ## DESCRIPCIÓN DEL PUESTO
@@ -142,14 +205,16 @@ ${transcript || "(vacío)"}
   // viven en app/lib/stream.ts, compartidos con /api/session.
   return streamLLM({
     specs: fallbackChain(spec),
-    system: SYSTEM_PROMPT,
+    system: image ? SCREEN_PROMPT : SYSTEM_PROMPT,
     user: userContent,
+    image,
     // Alcanza para la respuesta con viñetas desarrolladas MÁS el bloque de "por
     // qué funciona". Con 512 (lo de antes, cuando las viñetas eran de media
-    // línea) el nuevo formato se cortaba a mitad de frase.
-    maxTokens: 1100,
-    reasoningMaxTokens: 1500,
+    // línea) el nuevo formato se cortaba a mitad de frase. Con captura sube
+    // otro poco: un bloque de código entero no entra en 1100.
+    maxTokens: image ? 1600 : 1100,
+    reasoningMaxTokens: image ? 2000 : 1500,
     temperature: 0.4,
-    tag: "answer",
+    tag: image ? "answer-screen" : "answer",
   });
 }

@@ -13,6 +13,7 @@ import {
   logUpstream,
   openaiBody,
   upstreamMessage,
+  type LlmImage,
   type Turn,
 } from "./llm";
 
@@ -97,6 +98,8 @@ export type StreamOpts = {
   /** Los modelos de razonamiento gastan tokens pensando: necesitan más tope. */
   reasoningMaxTokens?: number;
   temperature: number;
+  /** Imagen adjunta (captura de pantalla, frame de cámara). */
+  image?: LlmImage | null;
   /** Prefijo de los logs, para saber qué endpoint falló. */
   tag: string;
 };
@@ -135,6 +138,7 @@ async function streamGemini(opts: StreamOpts): Promise<Response> {
           system: opts.system,
           user: opts.user,
           history: opts.history,
+          image: opts.image,
           maxOutputTokens: opts.maxTokens,
           temperature: opts.temperature,
         })
@@ -176,6 +180,7 @@ async function streamAnthropic(opts: StreamOpts): Promise<Response> {
           system: opts.system,
           user: opts.user,
           history: opts.history,
+          image: opts.image,
           maxTokens: opts.maxTokens,
           temperature: opts.temperature,
           stream: true,
@@ -227,6 +232,7 @@ async function streamOpenAI(opts: StreamOpts): Promise<Response> {
           system: opts.system,
           user: opts.user,
           history: opts.history,
+          image: opts.image,
           maxTokens: spec.reasoning ? opts.reasoningMaxTokens ?? opts.maxTokens : opts.maxTokens,
           temperature: opts.temperature,
           stream: true,

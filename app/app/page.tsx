@@ -215,11 +215,32 @@ function ClockBigIcon() {
   );
 }
 
+/** Marco de recorte: adjuntar una captura al mensaje. */
+function ShotIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8V5.5A1.5 1.5 0 0 1 4.5 4H8M16 4h3.5A1.5 1.5 0 0 1 21 5.5V8M21 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H4.5A1.5 1.5 0 0 1 3 18.5V16" />
+      <rect x="8" y="8" width="8" height="8" rx="1" />
+    </svg>
+  );
+}
+
+/** Monitor: analizar lo que hay en la pantalla compartida. */
+function ScreenIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="4" width="19" height="13" rx="2" />
+      <path d="M9 21h6M12 17v4" />
+    </svg>
+  );
+}
+
+/** Dos ventanas superpuestas, como el "Change Tab" de la referencia. */
 function TabsIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="6" width="13" height="13" rx="2" />
-      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3H20a1 1 0 0 1 1 1v10.5a1.5 1.5 0 0 1-1.5 1.5H18" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="7.5" width="13" height="13" rx="2.5" />
+      <path d="M8.5 4.5h11a2 2 0 0 1 2 2v11" />
     </svg>
   );
 }
@@ -1145,6 +1166,8 @@ export default function Page() {
   // Tu micrófono, en sesión de pestaña: arranca apagado (como la referencia) y
   // se conecta a mano con el botón bajo la llamada, no solo con permiso.
   const [micOn, setMicOn] = useState(false);
+  /** Texto del mensaje manual (la caja al pie de la columna de respuestas). */
+  const [manualMsg, setManualMsg] = useState("");
   const micOnRef = useRef(false);
   useEffect(() => {
     micOnRef.current = micOn;
@@ -1229,6 +1252,8 @@ export default function Page() {
    * Deepgram solo se le manda audio, pero el video se muestra en pantalla.
    */
   const shareStreamRef = useRef<MediaStream | null>(null);
+  /** El <video> de la pantalla compartida: de ahí sale el frame de la captura. */
+  const shareVideoRef = useRef<HTMLVideoElement | null>(null);
   /** Cuándo se oyó lo último de cada hablante: marca el corte entre turnos. */
   const lastSpeechAtRef = useRef<Record<Speaker, number>>({ interviewer: 0, me: 0 });
   /** El turno abierto en el transcript guardado (espejo del `closed` de
@@ -1394,12 +1419,20 @@ export default function Page() {
   // controller, el AbortError se ignora en silencio: ya hay una versión
   // mejor en camino para la misma tarjeta.
   const runGenerate = useCallback(
-    async (id: number, question: string, controller: AbortController, attempt = 0) => {
+    async (
+      id: number,
+      question: string,
+      controller: AbortController,
+      attempt = 0,
+      /** Captura de la pantalla compartida y cómo rotular la tarjeta. */
+      extra?: { image?: { data: string; mime: string } | null; label?: string }
+    ) => {
+      const image = extra?.image || null;
       // Crea/resetea la tarjeta (en un reintento la vaciamos para re-streamear).
       setAnswers((prev) => {
         const card: Answer = {
           id,
-          question: lastQuestions(question),
+          question: extra?.label ?? lastQuestions(question),
           text: "",
           done: false,
           ts: Date.now(),
@@ -1423,6 +1456,7 @@ export default function Page() {
             model: modelRef.current.model,
             transcript: transcriptRef.current.slice(-4000),
             question,
+            ...(image ? { image: image.data, imageMime: image.mime } : {}),
           }),
           signal: controller.signal,
         });
@@ -1460,7 +1494,7 @@ export default function Page() {
         const isPlaceholder =
           !finalText || /esperando pregunta|ninguna a[uú]n/i.test(finalText);
         if (isPlaceholder && attempt < 1 && !controller.signal.aborted) {
-          return runGenerate(id, question, controller, attempt + 1);
+          return runGenerate(id, question, controller, attempt + 1, extra);
         }
         setAnswers((prev) => prev.map((a) => (a.id === id ? { ...a, done: true } : a)));
         track("answer_generated", { model: modelRef.current.model, duration_ms: Date.now() - startedAt });
@@ -1505,6 +1539,63 @@ export default function Page() {
     turnRef.current = { id, sentText: q, controller };
     runGenerate(id, q, controller);
   }, [runGenerate]);
+
+  /**
+   * Saca un cuadro de la pantalla compartida y lo devuelve en base64.
+   *
+   * Se baja a 1280px de ancho y se codifica en JPEG: una captura a resolución
+   * nativa se va a varios MB en base64 y no entra en el body del request (ni
+   * hace falta — el modelo lee el texto igual).
+   */
+  const capturarPantalla = useCallback((): { data: string; mime: string } | null => {
+    const v = shareVideoRef.current;
+    if (!v || !v.videoWidth || !v.videoHeight) return null;
+    const maxW = 1280;
+    const escala = Math.min(1, maxW / v.videoWidth);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(v.videoWidth * escala);
+    canvas.height = Math.round(v.videoHeight * escala);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    const url = canvas.toDataURL("image/jpeg", 0.72);
+    const coma = url.indexOf(",");
+    if (coma < 0) return null;
+    return { data: url.slice(coma + 1), mime: "image/jpeg" };
+  }, []);
+
+  /**
+   * Pide una respuesta puntual: una captura de la pantalla, un mensaje escrito
+   * a mano, o las dos cosas. Es el camino paralelo a `answerNow` (que responde
+   * sobre lo que se dijo en voz).
+   */
+  const preguntarManual = useCallback(
+    (opts: { texto?: string; conCaptura?: boolean }) => {
+      const texto = (opts.texto || "").trim();
+      const image = opts.conCaptura ? capturarPantalla() : null;
+      if (opts.conCaptura && !image) {
+        setError("No se pudo tomar la captura: la pantalla compartida todavía no cargó.");
+        return;
+      }
+      if (!texto && !image) return;
+
+      // Aborta lo que estuviera generándose, igual que el botón de voz.
+      const prev = turnRef.current;
+      prev?.controller?.abort();
+      turnRef.current = null;
+      if (prev) {
+        setAnswers((list) => list.filter((a) => !(a.id === prev.id && !a.done && !a.text)));
+      }
+
+      const id = ++ansId.current;
+      const controller = new AbortController();
+      turnRef.current = { id, sentText: texto, controller };
+      const label = texto || "📸 Captura de pantalla";
+      track(image ? (texto ? "answer_screenshot_msg" : "answer_screenshot") : "answer_manual_msg");
+      runGenerate(id, texto, controller, 0, { image, label });
+    },
+    [capturarPantalla, runGenerate]
+  );
 
   // El handler del socket se crea una sola vez (deps []), así que no puede
   // cerrar sobre `answerNow` sin quedar viejo: se lo pasa por ref.
@@ -2709,6 +2800,7 @@ export default function Page() {
                 playsInline
                 muted
                 ref={(el) => {
+                  shareVideoRef.current = el;
                   if (el && shareStreamRef.current && el.srcObject !== shareStreamRef.current) {
                     el.srcObject = shareStreamRef.current;
                   }
@@ -2904,12 +2996,57 @@ export default function Page() {
             /* Sin "Limpiar" acá: ya está en la barra de la izquierda, y
                repetirlo era la única diferencia con la referencia. */
             <div className="live-actions">
-              <button onClick={() => answerNow()} className="btn-action btn-primary btn-answer">
-                <span className="btn-answer-inner">
-                  <SparkleIcon />
-                  Responder
-                </span>
-              </button>
+              {/* Mensaje escrito a mano: para preguntar algo puntual que no se
+                  dijo en voz. El botón del costado le adjunta una captura de
+                  la pantalla compartida al mismo mensaje. */}
+              <form
+                className="manual-row"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!manualMsg.trim()) return;
+                  preguntarManual({ texto: manualMsg });
+                  setManualMsg("");
+                }}
+              >
+                <input
+                  className="manual-input"
+                  value={manualMsg}
+                  onChange={(e) => setManualMsg(e.target.value)}
+                  placeholder="Escribí un mensaje…"
+                  aria-label="Mensaje manual para el Loro"
+                />
+                <button
+                  type="button"
+                  className="manual-shot"
+                  title="Adjuntar una captura de la pantalla a este mensaje"
+                  aria-label="Adjuntar captura de pantalla al mensaje"
+                  onClick={() => {
+                    preguntarManual({ texto: manualMsg, conCaptura: true });
+                    setManualMsg("");
+                  }}
+                >
+                  <ShotIcon />
+                </button>
+                <button type="submit" className="manual-send" disabled={!manualMsg.trim()}>
+                  Enviar
+                </button>
+              </form>
+              <div className="live-actions-row">
+                <button onClick={() => answerNow()} className="btn-action btn-primary btn-answer">
+                  <span className="btn-answer-inner">
+                    <SparkleIcon />
+                    Responder
+                  </span>
+                </button>
+                <button
+                  onClick={() => preguntarManual({ conCaptura: true })}
+                  className="btn-action btn-outline btn-shot"
+                  title="Analiza lo que hay en la pantalla compartida y responde"
+                >
+                  <ScreenIcon />
+                  Captura
+                </button>
+              </div>
             </div>
           )}
           </div>

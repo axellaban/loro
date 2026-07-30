@@ -12,6 +12,13 @@ import type { ModelSpec } from "./models";
 export type Turn = { role: "user" | "assistant"; text: string };
 
 /**
+ * Imagen adjunta a un pedido, en base64 (sin el prefijo `data:`). Los tres
+ * proveedores la aceptan pero cada uno con su propia forma, así que el tipo es
+ * único y la traducción vive en cada builder.
+ */
+export type LlmImage = { mimeType: string; data: string };
+
+/**
  * Nivel de thinking para Gemini 3.x. Se deja como constante única porque es el
  * valor que puede necesitar ajuste según lo que acepte cada modelo ("low" vs
  * "minimal"); el endpoint /api/models/health lo confirma en un request.
@@ -48,8 +55,9 @@ export function geminiBody(opts: {
   temperature: number;
   json?: boolean;
   history?: Turn[];
-  /** Frame de la cámara del candidato, para que el entrevistador "lo vea". */
-  image?: { mimeType: string; data: string } | null;
+  /** Imagen adjunta: frame de la cámara del candidato, o una captura de la
+      pantalla compartida para que el modelo lea lo que hay ahí. */
+  image?: LlmImage | null;
 }) {
   // `maxOutputTokens` es el presupuesto de la respuesta VISIBLE; a los modelos
   // que piensan se les suma el margen que va a consumir el pensamiento.
@@ -88,13 +96,22 @@ export function openaiBody(opts: {
   stream?: boolean;
   json?: boolean;
   history?: Turn[];
+  image?: LlmImage | null;
 }) {
+  // Con imagen, `content` deja de ser un string y pasa a ser la lista de
+  // partes que espera la API de visión.
+  const userContent = opts.image
+    ? [
+        { type: "text", text: opts.user },
+        { type: "image_url", image_url: { url: `data:${opts.image.mimeType};base64,${opts.image.data}` } },
+      ]
+    : opts.user;
   const body: Record<string, unknown> = {
     model: opts.spec.model,
     messages: [
       { role: "system", content: opts.system },
       ...(opts.history || []).map((t) => ({ role: t.role, content: t.text })),
-      { role: "user", content: opts.user },
+      { role: "user", content: userContent },
     ],
   };
   if (opts.stream) body.stream = true;
@@ -119,7 +136,19 @@ export function anthropicBody(opts: {
   temperature: number;
   stream?: boolean;
   history?: Turn[];
+  image?: LlmImage | null;
 }) {
+  // La imagen va ANTES del texto: Anthropic recomienda ese orden cuando la
+  // consigna se refiere a lo que hay en la imagen.
+  const userContent = opts.image
+    ? [
+        {
+          type: "image",
+          source: { type: "base64", media_type: opts.image.mimeType, data: opts.image.data },
+        },
+        { type: "text", text: opts.user },
+      ]
+    : opts.user;
   const body: Record<string, unknown> = {
     model: opts.spec.model,
     max_tokens: opts.maxTokens,
@@ -127,7 +156,7 @@ export function anthropicBody(opts: {
     system: opts.system,
     messages: [
       ...(opts.history || []).map((t) => ({ role: t.role, content: t.text })),
-      { role: "user", content: opts.user },
+      { role: "user", content: userContent },
     ],
   };
   if (opts.stream) body.stream = true;

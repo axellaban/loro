@@ -14,6 +14,10 @@ export type FunnelEvent =
   | "session_stopped"
   | "session_error"
   | "answer_requested"
+  // Caminos manuales del copiloto: captura de pantalla y mensaje escrito.
+  | "answer_screenshot"
+  | "answer_screenshot_msg"
+  | "answer_manual_msg"
   | "answer_generated"
   | "answer_failed"
   | "answer_feedback"

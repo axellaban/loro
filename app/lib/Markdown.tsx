@@ -33,7 +33,8 @@ type Block =
   | { kind: "h"; level: 2 | 3; text: string }
   | { kind: "p"; text: string }
   | { kind: "ul"; items: string[] }
-  | { kind: "ol"; items: string[] };
+  | { kind: "ol"; items: string[] }
+  | { kind: "code"; lang: string; code: string };
 
 function parse(src: string): Block[] {
   const lines = src.replace(/\r\n/g, "\n").split("\n");
@@ -47,9 +48,37 @@ function parse(src: string): Block[] {
     }
   };
 
+  // Bloque cercado (```lang … ```). Se procesa acá arriba y no dentro del
+  // bucle de líneas normales porque adentro NO vale ninguna otra regla: el
+  // contenido es literal, incluidos los `#` y los `-` que si no se comerían
+  // como títulos y viñetas.
+  let enCodigo = false;
+  let codeLang = "";
+  let codeBuf: string[] = [];
+
   for (const raw of lines) {
     const line = raw.trimEnd();
     const trimmed = line.trim();
+
+    const cerca = trimmed.match(/^```+\s*([A-Za-z0-9+#._-]*)\s*$/);
+    if (cerca) {
+      if (enCodigo) {
+        blocks.push({ kind: "code", lang: codeLang, code: codeBuf.join("\n") });
+        enCodigo = false;
+        codeBuf = [];
+        codeLang = "";
+      } else {
+        flushPara();
+        enCodigo = true;
+        codeLang = cerca[1] || "";
+      }
+      continue;
+    }
+    if (enCodigo) {
+      // `raw` sin trim: la indentación es parte del código.
+      codeBuf.push(raw);
+      continue;
+    }
 
     if (!trimmed) {
       flushPara();
@@ -81,6 +110,9 @@ function parse(src: string): Block[] {
     }
     para.push(trimmed);
   }
+  // El stream puede cortar a mitad de un bloque de código (la respuesta va
+  // llegando de a poco): se emite lo que haya en vez de tragárselo.
+  if (enCodigo && codeBuf.length) blocks.push({ kind: "code", lang: codeLang, code: codeBuf.join("\n") });
   flushPara();
   return blocks;
 }
@@ -95,6 +127,15 @@ export function Markdown({ text, className }: { text: string; className?: string
             <h3 key={i} className="md-h2">{inline(b.text, `h${i}`)}</h3>
           ) : (
             <h4 key={i} className="md-h3">{inline(b.text, `h${i}`)}</h4>
+          );
+        }
+        if (b.kind === "code") {
+          // El contenido va como texto plano (nada de resaltado con HTML): es
+          // lo que garantiza que el código del modelo no pueda inyectar nada.
+          return (
+            <pre key={i} className="md-pre" data-lang={b.lang || undefined}>
+              <code>{b.code}</code>
+            </pre>
           );
         }
         if (b.kind === "ul") {

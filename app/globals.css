@@ -909,13 +909,15 @@ input {
 }
 
 /* En vivo el header se aprieta: entran logo + banderita + pastilla + dos
-   botones. Se le da el aire de Parakeet — la banderita "IA" se va (es
-   decorativa y come ancho), el logo baja un punto y todo respira más. */
+   botones. Se le da el aire de Parakeet: el logo baja un punto y todo respira
+   más. La banderita "IA" se esconde solo cuando el header va de borde a borde
+   (mobile / sin pantalla compartida), que es donde de verdad falta ancho; en
+   el layout partido de desktop vive en su propia columna y entra sobrada. */
 .app-live .brand-header {
   gap: 12px;
   min-height: 52px;
 }
-.app-live .flag-ia {
+.app-live:not(.app-split) .flag-ia {
   display: none;
 }
 .app-live .brand-logo-text {
@@ -1082,6 +1084,14 @@ input {
   border-bottom: 1px solid var(--line);
   background: #fff;
   flex: none;
+  /* Sin esto, al arrastrar el divisor bien a la izquierda los botones no
+     entraban en la columna y la barra se desbordaba por encima del divisor y
+     del panel de respuestas — se veía como si la pantalla se rompiera.
+     min-width:0 deja que la barra se achique de verdad, y el wrap manda los
+     botones a un segundo renglón antes que salirse. */
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 .tb-btn {
   font-family: inherit;
@@ -1096,6 +1106,11 @@ input {
   font-weight: 700;
   color: var(--ink);
   cursor: pointer;
+  /* En una columna angosta el texto se parte en dos renglones y el botón
+     crece en alto: mejor que quede en una línea y ceda ancho. */
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .tb-btn:hover {
   background: #f7f8fa;
@@ -1151,8 +1166,88 @@ input {
 .live-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex: none;
+  min-width: 0;
+}
+
+/* Fila de "Responder" + "Captura", como la referencia: la acción principal
+   ocupa el espacio y la secundaria queda al lado, más chica. */
+.live-actions-row {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.live-actions-row .btn-answer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.btn-shot {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Caja del mensaje manual: input + adjuntar captura + enviar. */
+.manual-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.manual-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #e2e4e8;
+  border-radius: 12px;
+  padding: 11px 14px;
+}
+.manual-input::placeholder {
+  color: var(--ink-faint);
+}
+.manual-input:focus {
+  outline: none;
+  border-color: var(--loro-green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+.manual-shot,
+.manual-send {
+  flex: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #e2e4e8;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.manual-shot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  line-height: 0;
+}
+.manual-send {
+  padding: 11px 16px;
+}
+.manual-shot:hover,
+.manual-send:hover:not(:disabled) {
+  background: #f7f8fa;
+}
+.manual-send:disabled {
+  color: var(--ink-faint);
+  cursor: default;
 }
 
 /* Cambiar de pestaña, encima del video (como la referencia). */
@@ -1163,29 +1258,29 @@ input {
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1;
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  /* Translúcido sobre el video (como la referencia): deja ver lo de atrás y
+     el blur lo mantiene legible sobre cualquier contenido. */
+  color: #fff;
+  background: rgba(20, 22, 26, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
-  padding: 9px 14px;
+  padding: 7px 11px;
   cursor: pointer;
-  backdrop-filter: blur(4px);
-  /* Aparece al pasar por encima del video para no taparlo todo el tiempo, pero
-     sigue siendo alcanzable con el teclado. */
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.share-pane:hover .share-switch,
-.share-switch:focus-visible {
-  opacity: 1;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  /* Siempre visible, como en la referencia: es la acción que más se usa
+     durante la sesión y esconderla detrás del hover la volvía difícil de
+     encontrar. */
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .share-switch:hover {
-  background: #fff;
+  background: rgba(20, 22, 26, 0.68);
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 /* El divisor arrastrable. */
@@ -4537,6 +4632,44 @@ a.btn-action {
   padding: 1px 5px;
   font-size: 0.9em;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Bloque de código cercado (```lang). Oscuro para que se distinga del texto
+   de la respuesta, y con scroll horizontal propio: una línea larga no puede
+   ensanchar la columna de respuestas ni empujar el layout. */
+.md-pre {
+  position: relative;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  background: #16181d;
+  border: 1px solid #24272e;
+  border-radius: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.md-pre code {
+  display: block;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  color: #e6e8ec;
+  font-size: 0.86em;
+  line-height: 1.55;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* El lenguaje declarado en la cerca, como etiqueta discreta. */
+.md-pre[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+  pointer-events: none;
 }
 
 @media (max-width: 720px) {
