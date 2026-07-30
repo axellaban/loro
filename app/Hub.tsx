@@ -96,48 +96,47 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
 // curva y apuntando siempre hacia afuera (radial al centro del arco) — no un
 // tallo con hojas de a pares como en la versión anterior, que no se parecía
 // en nada a la referencia.
-const LAUREL_R = 28;
-const LAUREL_CX = 50;
+const LAUREL_R = 27;
+const LAUREL_CX = 48;
 const LAUREL_CY = 40;
-const LAUREL_ANGLE_START = 255; // grados, convención matemática (0=derecha, 90=arriba)
-const LAUREL_ANGLE_END = 105;
-const LAUREL_COUNT = 11;
+const LAUREL_ANGLE_START = 262; // grados, convención matemática (0=derecha, 90=arriba)
+const LAUREL_ANGLE_END = 98;
+const LAUREL_COUNT = 15;
 
 function laurelPoint(t: number) {
   const deg = LAUREL_ANGLE_START + (LAUREL_ANGLE_END - LAUREL_ANGLE_START) * t;
   const rad = (deg * Math.PI) / 180;
-  // Dirección radial hacia afuera, en pantalla (y crece hacia abajo).
-  const dx = Math.cos(rad);
-  const dy = -Math.sin(rad);
-  // La hoja se ancla con la BASE sobre el arco (no el centro): así solo
-  // sobresale hacia afuera, como una hoja real prendida de la rama, en vez de
-  // quedar centrada a mitad de camino hacia adentro.
+  // Punto sobre el arco (dónde se prende la hoja) y dirección radial hacia
+  // afuera desde ahí, en pantalla (y crece hacia abajo).
   const baseX = LAUREL_CX + LAUREL_R * Math.cos(rad);
   const baseY = LAUREL_CY - LAUREL_R * Math.sin(rad);
+  const dx = Math.cos(rad);
+  const dy = -Math.sin(rad);
   // Ángulo de rotación SVG (sentido horario desde "arriba") que apunta la
   // hoja hacia afuera, en la misma dirección radial del punto.
   const rot = (Math.atan2(dx, -dy) * 180) / Math.PI;
-  return { baseX, baseY, dx, dy, rot };
+  return { baseX, baseY, rot };
 }
+
+// Hoja real (no una almendra simétrica): base redondeada donde se prende al
+// tallo, afinándose hasta una punta bien marcada, con su vena central — como
+// la referencia, no como óvalos girados.
+const LEAF_D = "M0 0C3.4 -1.6 4 -6 2.6 -10.5C1.7 -13.4 0.6 -15 0 -16C-0.6 -15 -1.7 -13.4 -2.6 -10.5C-4 -6 -3.4 -1.6 0 0Z";
 
 function Laurel({ mirrored }: { mirrored?: boolean }) {
   const start = laurelPoint(0);
   const end = laurelPoint(1);
   const leaves = Array.from({ length: LAUREL_COUNT }, (_, i) => {
     const t = i / (LAUREL_COUNT - 1);
-    const edge = Math.min(t, 1 - t) * 2; // 0 en las puntas, 1 en el medio
-    const scale = 0.55 + 0.45 * edge;
-    const p = laurelPoint(t);
-    // La base de la hoja (su punta interna, a 9 unidades del centro de la
-    // plantilla) queda pegada al arco; el resto se proyecta hacia afuera.
-    const offset = 9 * scale;
-    return { x: p.baseX + p.dx * offset, y: p.baseY + p.dy * offset, rot: p.rot, scale };
+    const edge = Math.min(t, 1 - t) * 2.2; // 0 en las puntas, tope 1 en el medio
+    const scale = 0.6 + 0.4 * Math.min(edge, 1);
+    return { ...laurelPoint(t), scale };
   });
   return (
     <svg
-      width="44"
-      height="39"
-      viewBox="0 0 90 80"
+      width="42"
+      height="46"
+      viewBox="0 0 90 90"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
@@ -146,21 +145,17 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
     >
       <path
         d={`M${start.baseX} ${start.baseY} A${LAUREL_R} ${LAUREL_R} 0 0 1 ${end.baseX} ${end.baseY}`}
-        stroke="#c8860a"
-        strokeWidth="1.4"
+        stroke="#b8790a"
+        strokeWidth="1.3"
         strokeLinecap="round"
         fill="none"
-        opacity="0.7"
+        opacity="0.75"
       />
       {leaves.map((l, i) => (
-        <path
-          key={i}
-          d="M0 -9C1.7 -6.5 2.6 -3 2.6 0C2.6 3 1.7 6.5 0 9C-1.7 6.5 -2.6 3 -2.6 0C-2.6 -3 -1.7 -6.5 0 -9Z"
-          fill="#fbbf24"
-          stroke="#b8790a"
-          strokeWidth="0.4"
-          transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${l.scale})`}
-        />
+        <g key={i} transform={`translate(${l.baseX} ${l.baseY}) rotate(${l.rot}) scale(${l.scale})`}>
+          <path d={LEAF_D} fill="#fbbf24" stroke="#b8790a" strokeWidth="0.35" />
+          <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#b8790a" strokeWidth="0.35" opacity="0.6" />
+        </g>
       ))}
     </svg>
   );

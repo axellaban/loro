@@ -2028,6 +2028,12 @@ input {
 }
 
 @media (max-width: 640px) {
+  /* Con todo el contenido nuevo, en mobile el logo quedaba pegado arriba de
+     todo: necesita aire antes de arrancar. */
+  .hub-brand {
+    margin-top: clamp(20px, 6vh, 56px);
+  }
+
   .hub-doors-pills {
     flex-direction: row !important; /* Siempre horizontal en mobile */
     justify-content: space-around;
@@ -2244,9 +2250,9 @@ input {
 .hub-stats {
   width: 100%;
   max-width: 560px;
-  margin: 8px auto 0;
-  padding-top: clamp(28px, 4vh, 44px);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 0 auto 0;
+  /* Sin línea divisoria: solo aire antes de que arranque esta sección. */
+  padding-top: clamp(48px, 9vh, 96px);
   display: flex;
   flex-direction: column;
   align-items: center;
