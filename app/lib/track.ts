@@ -18,6 +18,8 @@ export type FunnelEvent =
   | "answer_screenshot"
   | "answer_screenshot_msg"
   | "answer_manual_msg"
+  // Imagen subida desde el disco y adjuntada al mensaje escrito.
+  | "answer_image_upload"
   | "answer_generated"
   | "answer_failed"
   | "answer_feedback"

@@ -215,12 +215,13 @@ function ClockBigIcon() {
   );
 }
 
-/** Marco de recorte: adjuntar una captura al mensaje. */
-function ShotIcon() {
+/** Imagen: adjuntar un archivo de la computadora al mensaje escrito. */
+function ImageIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 8V5.5A1.5 1.5 0 0 1 4.5 4H8M16 4h3.5A1.5 1.5 0 0 1 21 5.5V8M21 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H4.5A1.5 1.5 0 0 1 3 18.5V16" />
-      <rect x="8" y="8" width="8" height="8" rx="1" />
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M21 16l-5-5-4.5 4.5-2-2L3 18" />
     </svg>
   );
 }
@@ -533,7 +534,14 @@ function InfoTip({ text }: { text: string }) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
   return (
-    <span className="info-tip" ref={ref}>
+    // Se abre al pasar el mouse (como la referencia) y también al hacer clic,
+    // que es lo único que existe en touch.
+    <span
+      className="info-tip"
+      ref={ref}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
         className="info-tip-btn"
@@ -541,6 +549,8 @@ function InfoTip({ text }: { text: string }) {
           e.preventDefault();
           setOpen((o) => !o);
         }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
         aria-label="Ayuda"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1254,6 +1264,8 @@ export default function Page() {
   const shareStreamRef = useRef<MediaStream | null>(null);
   /** El <video> de la pantalla compartida: de ahí sale el frame de la captura. */
   const shareVideoRef = useRef<HTMLVideoElement | null>(null);
+  // Input de archivo escondido: lo dispara el botón de imagen del mensaje.
+  const fileRef = useRef<HTMLInputElement | null>(null);
   /** Cuándo se oyó lo último de cada hablante: marca el corte entre turnos. */
   const lastSpeechAtRef = useRef<Record<Speaker, number>>({ interviewer: 0, me: 0 });
   /** El turno abierto en el transcript guardado (espejo del `closed` de
@@ -1565,15 +1577,17 @@ export default function Page() {
   }, []);
 
   /**
-   * Pide una respuesta puntual: una captura de la pantalla, un mensaje escrito
-   * a mano, o las dos cosas. Es el camino paralelo a `answerNow` (que responde
-   * sobre lo que se dijo en voz).
+   * Pide una respuesta puntual: una captura de la pantalla, una imagen subida
+   * desde la computadora, un mensaje escrito a mano, o una combinación. Es el
+   * camino paralelo a `answerNow` (que responde sobre lo que se dijo en voz).
    */
   const preguntarManual = useCallback(
-    (opts: { texto?: string; conCaptura?: boolean }) => {
+    (opts: { texto?: string; conCaptura?: boolean; imagen?: { data: string; mime: string } | null }) => {
       const texto = (opts.texto || "").trim();
-      const image = opts.conCaptura ? capturarPantalla() : null;
-      if (opts.conCaptura && !image) {
+      // Una imagen ya provista (subida desde la compu) gana sobre la captura:
+      // son los dos caminos del mismo adjunto y nunca se piden juntos.
+      const image = opts.imagen ?? (opts.conCaptura ? capturarPantalla() : null);
+      if (opts.conCaptura && !opts.imagen && !image) {
         setError("No se pudo tomar la captura: la pantalla compartida todavía no cargó.");
         return;
       }
@@ -1590,11 +1604,51 @@ export default function Page() {
       const id = ++ansId.current;
       const controller = new AbortController();
       turnRef.current = { id, sentText: texto, controller };
-      const label = texto || "📸 Captura de pantalla";
-      track(image ? (texto ? "answer_screenshot_msg" : "answer_screenshot") : "answer_manual_msg");
+      const label = texto || (opts.imagen ? "🖼️ Imagen adjunta" : "📸 Captura de pantalla");
+      track(
+        opts.imagen
+          ? "answer_image_upload"
+          : image
+            ? texto
+              ? "answer_screenshot_msg"
+              : "answer_screenshot"
+            : "answer_manual_msg"
+      );
       runGenerate(id, texto, controller, 0, { image, label });
     },
     [capturarPantalla, runGenerate]
+  );
+
+  /**
+   * Adjunta una imagen del disco al mensaje escrito. Es el otro camino del
+   * mismo adjunto: la captura de abajo mira la pantalla compartida, esto sube
+   * un archivo (un enunciado en PDF exportado a imagen, un diagrama, etc.).
+   */
+  const subirImagen = useCallback(
+    (file: File, texto: string) => {
+      if (!file.type.startsWith("image/")) {
+        setError("El archivo tiene que ser una imagen (PNG, JPG o WebP).");
+        return;
+      }
+      // 8 MB: arriba de eso el base64 no entra cómodo en el body del request.
+      if (file.size > 8 * 1024 * 1024) {
+        setError("La imagen pesa más de 8 MB. Probá con una más liviana.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result || "");
+        const coma = url.indexOf(",");
+        if (coma < 0) {
+          setError("No se pudo leer la imagen.");
+          return;
+        }
+        preguntarManual({ texto, imagen: { data: url.slice(coma + 1), mime: file.type } });
+      };
+      reader.onerror = () => setError("No se pudo leer la imagen.");
+      reader.readAsDataURL(file);
+    },
+    [preguntarManual]
   );
 
   // El handler del socket se crea una sola vez (deps []), así que no puede
@@ -2663,7 +2717,7 @@ export default function Page() {
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label className="mono form-mini-label">
               <BriefcaseIcon /> Empresa
-              <InfoTip text="La empresa donde estás entrevistando. Ayuda a que las respuestas suenen específicas de ese lugar." />
+              <InfoTip text="Ingresá el nombre de la empresa donde estás entrevistando. Ayuda a que la IA dé sugerencias y respuestas relevantes." />
             </label>
             <input
               value={company}
@@ -2671,7 +2725,7 @@ export default function Page() {
                 setCompany(e.target.value);
                 if (faltan.company) setFaltan((f) => ({ ...f, company: false }));
               }}
-              placeholder="Ej: Mercado Libre"
+              placeholder="MercadoLibre..."
               className={`form-input${faltan.company ? " form-input-error" : ""}`}
               disabled={connecting}
               aria-invalid={!!faltan.company}
@@ -2686,7 +2740,7 @@ export default function Page() {
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
             <label className="mono form-mini-label">
               <DocIcon /> Descripción del puesto
-              <InfoTip text="Pegá el aviso o el rol al que aplicás: responsabilidades, requisitos, seniority. Cuanto más completo, mejores las respuestas." />
+              <InfoTip text="Descripción del puesto para el que estás entrevistando. Le da contexto adicional a la IA." />
             </label>
             <textarea
               value={role}
@@ -2694,7 +2748,7 @@ export default function Page() {
                 setRole(e.target.value);
                 if (faltan.role) setFaltan((f) => ({ ...f, role: false }));
               }}
-              placeholder="Pegá la descripción del puesto: responsabilidades, requisitos, seniority."
+              placeholder="Software Engineer versed in Python, SQL, and AWS..."
               className={`form-textarea form-textarea-sm${faltan.role ? " form-input-error" : ""}`}
               disabled={connecting}
               aria-invalid={!!faltan.role}
@@ -2732,7 +2786,7 @@ export default function Page() {
                 }}
               />
               <span>Respuesta automática</span>
-              <InfoTip text="El Loro responde solo apenas detecta que el entrevistador terminó una pregunta, sin que tengas que tocar 'Responder'." />
+              <InfoTip text="Cuando está activado, la IA detecta automáticamente cuándo se hace una pregunta y la responde. Si no, apretás el botón Responder a mano." />
             </label>
             <label className="check-row">
               <input
@@ -2744,7 +2798,7 @@ export default function Page() {
                 }}
               />
               <span>Guardar transcript</span>
-              <InfoTip text="Si lo apagás, esta sesión no queda en 'Sesiones de llamada' una vez que la cierres. Igual vas a poder ver tu informe al terminar." />
+              <InfoTip text="Guarda una transcripción de la llamada en tu panel. Tenés que cumplir con las leyes de transcripción que apliquen — en muchas jurisdicciones se requiere el consentimiento de todas las partes grabadas." />
             </label>
           </div>
         </div>
@@ -3015,17 +3069,29 @@ export default function Page() {
                   placeholder="Escribí un mensaje…"
                   aria-label="Mensaje manual para el Loro"
                 />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    // Se limpia el value para que elegir DOS VECES el mismo
+                    // archivo vuelva a disparar el change.
+                    e.target.value = "";
+                    if (!file) return;
+                    subirImagen(file, manualMsg);
+                    setManualMsg("");
+                  }}
+                />
                 <button
                   type="button"
                   className="manual-shot"
-                  title="Adjuntar una captura de la pantalla a este mensaje"
-                  aria-label="Adjuntar captura de pantalla al mensaje"
-                  onClick={() => {
-                    preguntarManual({ texto: manualMsg, conCaptura: true });
-                    setManualMsg("");
-                  }}
+                  title="Subir una imagen de tu computadora y adjuntarla a este mensaje"
+                  aria-label="Subir una imagen desde la computadora"
+                  onClick={() => fileRef.current?.click()}
                 >
-                  <ShotIcon />
+                  <ImageIcon />
                 </button>
                 <button type="submit" className="manual-send" disabled={!manualMsg.trim()}>
                   Enviar

@@ -354,7 +354,14 @@ function InfoTip({ text }: { text: string }) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
   return (
-    <span className="info-tip" ref={ref}>
+    // Se abre al pasar el mouse (como la referencia) y también al hacer clic,
+    // que es lo único que existe en touch.
+    <span
+      className="info-tip"
+      ref={ref}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
         className="info-tip-btn"
@@ -362,6 +369,8 @@ function InfoTip({ text }: { text: string }) {
           e.preventDefault();
           setOpen((o) => !o);
         }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
         aria-label="Ayuda"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1739,7 +1748,7 @@ export default function SimuladorPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label className="mono form-mini-label">
                 <BriefcaseIcon /> Empresa
-                <InfoTip text="La empresa que simulará la entrevista. Ayuda a personalizar las preguntas y el fit." />
+                <InfoTip text="Ingresá el nombre de la empresa donde estás entrevistando. Ayuda a que la IA dé sugerencias y respuestas relevantes." />
               </label>
               <input
                 value={company}
@@ -1747,7 +1756,7 @@ export default function SimuladorPage() {
                   setCompany(e.target.value);
                   if (faltan.company) setFaltan((f) => ({ ...f, company: false }));
                 }}
-                placeholder="Ej: Mercado Libre"
+                placeholder="MercadoLibre..."
                 className={`form-input${faltan.company ? " form-input-error" : ""}`}
                 aria-invalid={!!faltan.company}
                 aria-describedby={faltan.company ? "falta-empresa" : undefined}
@@ -1762,7 +1771,7 @@ export default function SimuladorPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
               <label className="mono form-mini-label">
                 <DocIcon /> Descripción del puesto
-                <InfoTip text="Descripción del rol para el que te simularás. Ayuda a definir las preguntas técnicas o de comportamiento." />
+                <InfoTip text="Descripción del puesto para el que estás entrevistando. Le da contexto adicional a la IA." />
               </label>
               <textarea
                 value={role}
@@ -1770,7 +1779,7 @@ export default function SimuladorPage() {
                   setRole(e.target.value);
                   if (faltan.role) setFaltan((f) => ({ ...f, role: false }));
                 }}
-                placeholder="Pegá la descripción del puesto, seniority, requisitos o tecnologías."
+                placeholder="Software Engineer versed in Python, SQL, and AWS..."
                 className={`form-textarea form-textarea-sm${faltan.role ? " form-input-error" : ""}`}
                 aria-invalid={!!faltan.role}
                 aria-describedby={faltan.role ? "falta-puesto" : undefined}
