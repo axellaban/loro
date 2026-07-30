@@ -158,7 +158,7 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
     >
       <path
         d={`M${p0[0]} ${p0[1]}C${LAUREL_STEM[1][0]} ${LAUREL_STEM[1][1]} ${LAUREL_STEM[2][0]} ${LAUREL_STEM[2][1]} ${p3[0]} ${p3[1]}${LAUREL_CURL}`}
-        stroke="#047857"
+        stroke="#4d7c0f"
         strokeWidth="2.2"
         strokeLinecap="round"
         fill="none"
@@ -167,12 +167,12 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
       {pairs.map((l, i) => (
         <g key={i}>
           <g transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${l.scale})`}>
-            <path d={LEAF_D} fill="#10b981" stroke="#047857" strokeWidth="0.4" />
-            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#047857" strokeWidth="0.4" opacity="0.6" />
+            <path d={LEAF_D} fill="#a3e635" stroke="#4d7c0f" strokeWidth="0.4" />
+            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#4d7c0f" strokeWidth="0.4" opacity="0.6" />
           </g>
           <g transform={`translate(${l.x} ${l.y}) rotate(${l.rot2}) scale(${l.scale})`}>
-            <path d={LEAF_D} fill="#10b981" stroke="#047857" strokeWidth="0.4" />
-            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#047857" strokeWidth="0.4" opacity="0.6" />
+            <path d={LEAF_D} fill="#a3e635" stroke="#4d7c0f" strokeWidth="0.4" />
+            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#4d7c0f" strokeWidth="0.4" opacity="0.6" />
           </g>
         </g>
       ))}
@@ -200,9 +200,8 @@ function StatsCounter() {
   const [bump, setBump] = useState(0);
 
   // Mismo resaltado a mano (rough-notation) que "asistente de IA / en tiempo
-  // real" arriba, ahora sobre "CON ÉXITO". Se resalta solo esa frase corta
-  // (no las tres líneas enteras): así entra siempre en un renglón y
-  // rough-notation no tiene que calcular un resaltado multilínea.
+  // real" arriba, ahora sobre "SUPERADAS CON ÉXITO" — en un solo renglón
+  // (con el contenedor más ancho, igual al del título de arriba, entra bien).
   const hlRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     let cancelled = false;
@@ -261,21 +260,34 @@ function StatsCounter() {
     setN(start);
     persist(start);
 
+    // Espera hasta el próximo "evento" con distribución exponencial (la
+    // misma que describe llegadas independientes al azar, tipo "cada tanto
+    // termina una entrevista en algún lado"): la mayoría de las esperas son
+    // cortas, pero de vez en cuando hay una pausa más larga y a veces dos
+    // eventos casi seguidos — así se nota vivo en vez de metronómico.
+    const nextDelay = () => -STAT_MS_PER_TICK * Math.log(1 - Math.random() * 0.98);
+    // Tamaño del salto: casi siempre 1, a veces 2, rara vez 3 (como cuando
+    // varias entrevistas terminan casi juntas).
+    const nextStep = () => {
+      const r = Math.random();
+      if (r < 0.62) return 1;
+      if (r < 0.92) return 2;
+      return 3;
+    };
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       if (cancelled) return;
-      const step = Math.random() < 0.7 ? 1 : 2; // de a 1, a veces de a 2
       setN((prev) => {
-        const next = prev + step;
+        const next = prev + nextStep();
         persist(next);
         return next;
       });
       setBump((b) => b + 1);
-      // Ritmo variable (70%-130% del promedio) para que no se note mecánico.
-      timer = setTimeout(tick, STAT_MS_PER_TICK * (0.7 + Math.random() * 0.6));
+      timer = setTimeout(tick, nextDelay());
     };
-    timer = setTimeout(tick, STAT_MS_PER_TICK * (0.7 + Math.random() * 0.6));
+    timer = setTimeout(tick, nextDelay());
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -289,9 +301,8 @@ function StatsCounter() {
           +{n.toLocaleString("en-US")}
         </span>
         <span className="hub-stats-h">ENTREVISTAS</span>
-        <span className="hub-stats-h">SUPERADAS</span>
         <span ref={hlRef} className="hub-stats-h hub-stats-hl">
-          CON ÉXITO
+          SUPERADAS CON ÉXITO
         </span>
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>

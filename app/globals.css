@@ -2258,7 +2258,10 @@ input {
 /* ===================== Contador "entrevistas superadas" (estilo Binance) ===================== */
 .hub-stats {
   width: 100%;
-  max-width: 560px;
+  /* Mismo ancho que el título de arriba (.hub-main): con el título al mismo
+     tamaño, necesita el mismo lugar para que "SUPERADAS CON ÉXITO" entre en
+     un renglón. */
+  max-width: 48rem;
   margin: 0 auto 0;
   /* Sin línea divisoria: solo aire antes de que arranque esta sección. */
   padding-top: clamp(48px, 9vh, 96px);
@@ -2367,7 +2370,7 @@ input {
 .hub-stats-mini-num {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #34d399;
+  color: var(--loro-lime);
   white-space: nowrap;
 }
 
