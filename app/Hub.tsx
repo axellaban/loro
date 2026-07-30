@@ -91,6 +91,43 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
   );
 }
 
+// Rama de laurel dorada, como la que flanquea los "No.1" de Binance. Es una
+// sola mitad; el lado derecho es la misma rama espejada con CSS.
+function Laurel({ mirrored }: { mirrored?: boolean }) {
+  return (
+    <svg
+      width="26"
+      height="60"
+      viewBox="0 0 26 60"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      className="hub-laurel"
+      style={mirrored ? { transform: "scaleX(-1)" } : undefined}
+    >
+      <path
+        d="M22 2C16 10 13 18 12.5 30C13 42 16 50 22 58"
+        stroke="#fbbf24"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      {[6, 14, 22, 30, 38, 46, 54].map((y, i) => (
+        <ellipse
+          key={y}
+          cx={i % 2 === 0 ? 9 : 7}
+          cy={y}
+          rx="7"
+          ry="3.4"
+          fill="#fbbf24"
+          transform={`rotate(${i % 2 === 0 ? -28 : 28} ${i % 2 === 0 ? 9 : 7} ${y})`}
+          opacity={0.55 + (i % 2) * 0.25}
+        />
+      ))}
+    </svg>
+  );
+}
+
 // ----- Contador de "entrevistas superadas" (estilo Binance) -----
 // Es cosmético, no un conteo real: no hay backend detrás. La sensación de
 // "vivo" sale de dos cosas: arranca en un número base y sube solito cada
@@ -154,24 +191,30 @@ function StatsCounter() {
 
   return (
     <div className="hub-stats">
-      <div className="hub-stats-num" key={bump}>
-        +{n.toLocaleString("en-US")}
-      </div>
-      <div className="hub-stats-label">
-        ENTREVISTAS
-        <br />
-        SUPERADAS CON ÉXITO
+      <div className="hub-stats-headline">
+        <span className="hub-stats-num" key={bump}>
+          +{n.toLocaleString("en-US")}
+        </span>
+        <span className="hub-stats-h">ENTREVISTAS</span>
+        <span className="hub-stats-h">SUPERADAS CON ÉXITO</span>
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
       <div className="hub-stats-mini">
         <div className="hub-stats-mini-item">
-          <span className="hub-stats-mini-num">&lt; 1 segundo</span>
-          <span className="hub-stats-mini-label">de tiempo de respuesta</span>
+          <Laurel />
+          <div className="hub-stats-mini-text">
+            <span className="hub-stats-mini-num">&lt; 1 segundo</span>
+            <span className="hub-stats-mini-label">de tiempo de respuesta</span>
+          </div>
+          <Laurel mirrored />
         </div>
-        <span className="hub-stats-divider" aria-hidden="true" />
         <div className="hub-stats-mini-item">
-          <span className="hub-stats-mini-num">0</span>
-          <span className="hub-stats-mini-label">Estrés frente a los reclutadores</span>
+          <Laurel />
+          <div className="hub-stats-mini-text">
+            <span className="hub-stats-mini-num">0</span>
+            <span className="hub-stats-mini-label">Estrés frente a los reclutadores</span>
+          </div>
+          <Laurel mirrored />
         </div>
       </div>
     </div>

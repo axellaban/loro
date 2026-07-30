@@ -2243,9 +2243,9 @@ input {
 /* ===================== Contador "entrevistas superadas" (estilo Binance) ===================== */
 .hub-stats {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   margin: 8px auto 0;
-  padding-top: clamp(24px, 4vh, 40px);
+  padding-top: clamp(28px, 4vh, 44px);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
@@ -2253,13 +2253,27 @@ input {
   text-align: center;
 }
 
-.hub-stats-num {
-  font-size: clamp(2rem, 8vw, 3.4rem);
+/* El número y las dos líneas de abajo son UN solo titular, todos del mismo
+   tamaño y peso (como "325,690,761 / USERS / TRUST US" en la referencia):
+   el número se distingue solo por el color dorado, no por ser más grande. */
+.hub-stats-headline {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.08;
+}
+
+.hub-stats-num,
+.hub-stats-h {
+  font-size: clamp(1.5rem, 6.4vw, 2.35rem);
   font-weight: 900;
   letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hub-stats-num {
   color: #fbbf24;
   text-shadow: 0 0 30px rgba(251, 191, 36, 0.35);
-  line-height: 1.05;
   animation: hubStatPop 0.4s ease-out;
 }
 @keyframes hubStatPop {
@@ -2273,32 +2287,37 @@ input {
   }
 }
 
-.hub-stats-label {
-  margin-top: 4px;
-  font-size: clamp(0.95rem, 2.6vw, 1.15rem);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.hub-stats-h {
   color: #fff;
-  line-height: 1.3;
 }
 
 .hub-stats-tag {
-  margin: 14px 0 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  margin: 16px 0 0;
+  font-size: clamp(0.95rem, 2.6vw, 1.1rem);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .hub-stats-mini {
-  margin-top: 20px;
+  margin-top: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: clamp(24px, 6vw, 56px);
+  flex-wrap: wrap;
 }
 
 .hub-stats-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hub-laurel {
+  flex-shrink: 0;
+}
+
+.hub-stats-mini-text {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2306,24 +2325,18 @@ input {
 }
 
 .hub-stats-mini-num {
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: #fbbf24;
+  white-space: nowrap;
 }
 
 .hub-stats-mini-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.65);
-  max-width: 130px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 140px;
   line-height: 1.25;
-}
-
-.hub-stats-divider {
-  width: 1px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.15);
-  flex-shrink: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
