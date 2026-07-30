@@ -1925,7 +1925,10 @@ input {
   width: 100%;
   font-family: Arial, Helvetica, sans-serif;
   display: flex;
-  align-items: center;
+  /* Ya no centra verticalmente TODO (hero + contador): eso haría que el
+     contador, al sumar altura, corriera el hero de su lugar. El hero se
+     centra solo, adentro, en su propio bloque de pantalla completa. */
+  align-items: flex-start;
   justify-content: center;
   padding: 24px;
   position: relative;
@@ -1940,6 +1943,18 @@ input {
   align-items: center;
   text-align: center;
   z-index: 1;
+}
+
+/* Pantalla completa para el logo + título + pastillas, centrado como
+   siempre estuvo. El contador nuevo va DESPUÉS de este bloque, así que
+   queda fuera de este alto: solo aparece si la persona hace scroll. */
+.hub-hero {
+  width: 100%;
+  min-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .hub-brand {
@@ -2028,12 +2043,6 @@ input {
 }
 
 @media (max-width: 640px) {
-  /* Con todo el contenido nuevo, en mobile el logo quedaba pegado arriba de
-     todo: necesita aire antes de arrancar. */
-  .hub-brand {
-    margin-top: clamp(20px, 6vh, 56px);
-  }
-
   .hub-doors-pills {
     flex-direction: row !important; /* Siempre horizontal en mobile */
     justify-content: space-around;

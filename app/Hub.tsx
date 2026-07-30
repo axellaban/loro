@@ -91,52 +91,65 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
   );
 }
 
-// Rama de laurel dorada, como la que flanquea los "No.1" de Binance: UNA sola
-// curva en forma de paréntesis, con las hojas ensartadas a lo largo de esa
-// curva y apuntando siempre hacia afuera (radial al centro del arco) — no un
-// tallo con hojas de a pares como en la versión anterior, que no se parecía
-// en nada a la referencia.
-const LAUREL_R = 27;
-const LAUREL_CX = 48;
-const LAUREL_CY = 40;
-const LAUREL_ANGLE_START = 262; // grados, convención matemática (0=derecha, 90=arriba)
-const LAUREL_ANGLE_END = 98;
-const LAUREL_COUNT = 15;
+// Rama de laurel dorada, tal cual la referencia nueva: UNA sola rama que se
+// curva de abajo hacia arriba (con un pequeño rulo en la punta), con hojas de
+// a PARES a los costados del tallo —no ensartadas radialmente sobre un arco
+// como en la versión anterior—.
+const LAUREL_STEM: [number, number][] = [
+  [58, 148],
+  [8, 108],
+  [14, 52],
+  [46, 8],
+];
+// Rulo de la punta: un pequeño hook que se curva sobre sí mismo, como en la
+// referencia.
+const LAUREL_CURL = "C58 4 66 8 62 16C59 22 51 21 47 15";
 
-function laurelPoint(t: number) {
-  const deg = LAUREL_ANGLE_START + (LAUREL_ANGLE_END - LAUREL_ANGLE_START) * t;
-  const rad = (deg * Math.PI) / 180;
-  // Punto sobre el arco (dónde se prende la hoja) y dirección radial hacia
-  // afuera desde ahí, en pantalla (y crece hacia abajo).
-  const baseX = LAUREL_CX + LAUREL_R * Math.cos(rad);
-  const baseY = LAUREL_CY - LAUREL_R * Math.sin(rad);
-  const dx = Math.cos(rad);
-  const dy = -Math.sin(rad);
-  // Ángulo de rotación SVG (sentido horario desde "arriba") que apunta la
-  // hoja hacia afuera, en la misma dirección radial del punto.
-  const rot = (Math.atan2(dx, -dy) * 180) / Math.PI;
-  return { baseX, baseY, rot };
+function bezierPoint(pts: [number, number][], t: number) {
+  const [p0, p1, p2, p3] = pts;
+  const mt = 1 - t;
+  const x = mt ** 3 * p0[0] + 3 * mt ** 2 * t * p1[0] + 3 * mt * t ** 2 * p2[0] + t ** 3 * p3[0];
+  const y = mt ** 3 * p0[1] + 3 * mt ** 2 * t * p1[1] + 3 * mt * t ** 2 * p2[1] + t ** 3 * p3[1];
+  const dx = 3 * mt ** 2 * (p1[0] - p0[0]) + 6 * mt * t * (p2[0] - p1[0]) + 3 * t ** 2 * (p3[0] - p2[0]);
+  const dy = 3 * mt ** 2 * (p1[1] - p0[1]) + 6 * mt * t * (p2[1] - p1[1]) + 3 * t ** 2 * (p3[1] - p2[1]);
+  return { x, y, dx, dy };
 }
 
-// Hoja real (no una almendra simétrica): base redondeada donde se prende al
-// tallo, afinándose hasta una punta bien marcada, con su vena central — como
-// la referencia, no como óvalos girados.
+// Hoja real (base redondeada donde se prende al tallo, afinándose hasta una
+// punta marcada, con su vena central).
 const LEAF_D = "M0 0C3.4 -1.6 4 -6 2.6 -10.5C1.7 -13.4 0.6 -15 0 -16C-0.6 -15 -1.7 -13.4 -2.6 -10.5C-4 -6 -3.4 -1.6 0 0Z";
+const LEAF_PAIR_COUNT = 9;
 
 function Laurel({ mirrored }: { mirrored?: boolean }) {
-  const start = laurelPoint(0);
-  const end = laurelPoint(1);
-  const leaves = Array.from({ length: LAUREL_COUNT }, (_, i) => {
-    const t = i / (LAUREL_COUNT - 1);
-    const edge = Math.min(t, 1 - t) * 2.2; // 0 en las puntas, tope 1 en el medio
-    const scale = 0.6 + 0.4 * Math.min(edge, 1);
-    return { ...laurelPoint(t), scale };
+  const [p0] = LAUREL_STEM;
+  const p3 = LAUREL_STEM[3];
+  const pairs = Array.from({ length: LEAF_PAIR_COUNT }, (_, i) => {
+    // Arrancan un poco después de la base y terminan antes de la punta: ahí
+    // las hojas quedan más sueltas, como en la referencia.
+    const t = 0.08 + (i / (LEAF_PAIR_COUNT - 1)) * 0.82;
+    const { x, y, dx, dy } = bezierPoint(LAUREL_STEM, t);
+    const len = Math.hypot(dx, dy) || 1;
+    const tanX = dx / len;
+    const tanY = dy / len;
+    // Normal (perpendicular al tallo) — cada hoja del par usa un lado.
+    const norX = -tanY;
+    const norY = tanX;
+    // Las hojas no salen perpendiculares puras: se inclinan un poco hacia la
+    // punta, como crecen de verdad.
+    const dirX = norX * 0.85 + tanX * 0.4;
+    const dirY = norY * 0.85 + tanY * 0.4;
+    const rot = (Math.atan2(dirX, -dirY) * 180) / Math.PI;
+    const dirX2 = -norX * 0.85 + tanX * 0.4;
+    const dirY2 = -norY * 0.85 + tanY * 0.4;
+    const rot2 = (Math.atan2(dirX2, -dirY2) * 180) / Math.PI;
+    const scale = 0.55 + 0.55 * Math.sin(Math.PI * Math.min(t / 0.85, 1));
+    return { x, y, rot, rot2, scale };
   });
   return (
     <svg
-      width="42"
-      height="46"
-      viewBox="0 0 90 90"
+      width="34"
+      height="58"
+      viewBox="0 0 72 158"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
@@ -144,17 +157,23 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
       style={mirrored ? { transform: "scaleX(-1)" } : undefined}
     >
       <path
-        d={`M${start.baseX} ${start.baseY} A${LAUREL_R} ${LAUREL_R} 0 0 1 ${end.baseX} ${end.baseY}`}
+        d={`M${p0[0]} ${p0[1]}C${LAUREL_STEM[1][0]} ${LAUREL_STEM[1][1]} ${LAUREL_STEM[2][0]} ${LAUREL_STEM[2][1]} ${p3[0]} ${p3[1]}${LAUREL_CURL}`}
         stroke="#b8790a"
-        strokeWidth="1.3"
+        strokeWidth="2.2"
         strokeLinecap="round"
         fill="none"
-        opacity="0.75"
+        opacity="0.8"
       />
-      {leaves.map((l, i) => (
-        <g key={i} transform={`translate(${l.baseX} ${l.baseY}) rotate(${l.rot}) scale(${l.scale})`}>
-          <path d={LEAF_D} fill="#fbbf24" stroke="#b8790a" strokeWidth="0.35" />
-          <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#b8790a" strokeWidth="0.35" opacity="0.6" />
+      {pairs.map((l, i) => (
+        <g key={i}>
+          <g transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${l.scale})`}>
+            <path d={LEAF_D} fill="#fbbf24" stroke="#b8790a" strokeWidth="0.4" />
+            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#b8790a" strokeWidth="0.4" opacity="0.6" />
+          </g>
+          <g transform={`translate(${l.x} ${l.y}) rotate(${l.rot2}) scale(${l.scale})`}>
+            <path d={LEAF_D} fill="#fbbf24" stroke="#b8790a" strokeWidth="0.4" />
+            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#b8790a" strokeWidth="0.4" opacity="0.6" />
+          </g>
         </g>
       ))}
     </svg>
@@ -307,53 +326,60 @@ export default function Hub() {
   return (
     <div className="hub">
       <main className="hub-main">
-        <Link href="/" aria-label="Ir al inicio" className="hub-brand" style={{ textDecoration: "none" }}>
-          <ParrotSvg size={28} />
-          <span className="hub-brand-text">Loreado</span>
-          <IaFlag w={29} />
-        </Link>
+        {/* El hero (logo + título + pastillas) ocupa la pantalla completa y
+            se centra en ella, exactamente como antes de agregar el contador:
+            eso NO puede cambiar. El contador va DESPUÉS, fuera de este
+            bloque, así que solo lo ve quien hace scroll — no le come nada
+            de aire al hero. */}
+        <div className="hub-hero">
+          <Link href="/" aria-label="Ir al inicio" className="hub-brand" style={{ textDecoration: "none" }}>
+            <ParrotSvg size={28} />
+            <span className="hub-brand-text">Loreado</span>
+            <IaFlag w={29} />
+          </Link>
 
-        <h1 className="hub-h1">
-          <span key={wordIdx} className="hub-h1-swap">
-            {HERO_WORDS[wordIdx]}
-          </span>{" "}
-          todas las
-          <br />
-          entrevistas con el
-          <br />
-          <span ref={hlRef} className="hub-h1-hl">
-            asistente de IA
+          <h1 className="hub-h1">
+            <span key={wordIdx} className="hub-h1-swap">
+              {HERO_WORDS[wordIdx]}
+            </span>{" "}
+            todas las
             <br />
-            en tiempo real
-          </span>
-        </h1>
+            entrevistas con el
+            <br />
+            <span ref={hlRef} className="hub-h1-hl">
+              asistente de IA
+              <br />
+              en tiempo real
+            </span>
+          </h1>
 
-        <div className="hub-doors-pills">
-          <Link
-            href="/simulador"
-            className="hub-option-btn hub-option-blue"
-            onClick={() => track("hub_practice_click")}
-          >
-            <span className="hub-glow-blue" />
-            <div className="hub-pill-wrapper">
-              <MatrixPill3D type="blue" />
-            </div>
-            <span className="hub-option-label hub-label-blue">Simulador</span>
-            <span className="hub-option-sub">Simulacro Sprint (5 preguntas) con IA y feedback al instante.</span>
-          </Link>
+          <div className="hub-doors-pills">
+            <Link
+              href="/simulador"
+              className="hub-option-btn hub-option-blue"
+              onClick={() => track("hub_practice_click")}
+            >
+              <span className="hub-glow-blue" />
+              <div className="hub-pill-wrapper">
+                <MatrixPill3D type="blue" />
+              </div>
+              <span className="hub-option-label hub-label-blue">Simulador</span>
+              <span className="hub-option-sub">Simulacro Sprint (5 preguntas) con IA y feedback al instante.</span>
+            </Link>
 
-          <Link
-            href="/app?ref=copiloto"
-            className="hub-option-btn hub-option-red"
-            onClick={() => track("hub_copilot_click")}
-          >
-            <span className="hub-glow-red" />
-            <div className="hub-pill-wrapper">
-              <MatrixPill3D type="red" />
-            </div>
-            <span className="hub-option-label hub-label-red">Copiloto</span>
-            <span className="hub-option-sub">Te sopla las respuestas exactas. 100% indetectable en vivo.</span>
-          </Link>
+            <Link
+              href="/app?ref=copiloto"
+              className="hub-option-btn hub-option-red"
+              onClick={() => track("hub_copilot_click")}
+            >
+              <span className="hub-glow-red" />
+              <div className="hub-pill-wrapper">
+                <MatrixPill3D type="red" />
+              </div>
+              <span className="hub-option-label hub-label-red">Copiloto</span>
+              <span className="hub-option-sub">Te sopla las respuestas exactas. 100% indetectable en vivo.</span>
+            </Link>
+          </div>
         </div>
 
         <StatsCounter />
