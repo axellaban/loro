@@ -13,21 +13,47 @@ const HERO_WORDS = ["Loreá", "crackeá", "hackeá", "pasá"];
  * Resaltador dibujado a mano (rough-notation), el efecto del sitio A13I.
  * Devuelve el ref que hay que colgar del <span> a resaltar.
  *
- * IMPORTANTE: rough-notation mide el ELEMENTO, no el texto. Si el span es un
- * flex item (que por default se estira al ancho del contenedor) el resaltado
- * sale mucho más ancho que las letras. Por eso el span tiene que ser INLINE
- * dentro de un bloque de texto normal — como en el <h1> del hero, que es
- * donde este efecto siempre se vio bien.
+ * Dos cosas que hay que respetar o el resaltado sale corrido:
+ *
+ * 1. rough-notation mide el ELEMENTO, no el texto. Si el span es un flex item
+ *    (que por default se estira al ancho del contenedor) el resaltado sale
+ *    mucho más ancho que las letras. El span tiene que ser INLINE dentro de un
+ *    bloque de texto normal, como en el <h1> del hero.
+ *
+ * 2. El trazo se dibuja UNA vez, con coordenadas fijas del momento en que se
+ *    dibujó. Si después el texto se mueve, el trazo se queda donde estaba. Y
+ *    acá se mueve: el hero usa 100dvh, que en Safari mobile cambia de alto
+ *    cuando se colapsa la barra de URL al scrollear. Por eso se vigila la
+ *    geometría real del span y se redibuja cuando cambia de verdad (no en
+ *    cada scroll: solo si la posición o el tamaño cambiaron).
  */
 function useHandHighlight() {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     let cancelled = false;
     let annotation: { show: () => void; remove: () => void } | null = null;
-    let onResize: (() => void) | null = null;
+    let cleanupWatchers: (() => void) | null = null;
+
     void import("rough-notation").then(({ annotate }) => {
       if (cancelled || !ref.current) return;
-      const make = (animate: boolean) => {
+
+      // Firma de la geometría en coordenadas de DOCUMENTO (no de viewport):
+      // así el scroll por sí solo no cuenta como movimiento, pero un cambio
+      // real de layout sí.
+      const geom = () => {
+        const el = ref.current;
+        if (!el) return "";
+        const r = el.getBoundingClientRect();
+        return [
+          Math.round(r.width),
+          Math.round(r.height),
+          Math.round(r.left + window.scrollX),
+          Math.round(r.top + window.scrollY),
+        ].join("|");
+      };
+
+      let last = "";
+      const draw = (animate: boolean) => {
         const el = ref.current;
         if (!el) return;
         annotation?.remove();
@@ -40,16 +66,45 @@ function useHandHighlight() {
           iterations: 2,
         });
         annotation.show();
+        last = geom();
       };
-      const t = setTimeout(() => !cancelled && make(true), 500);
-      onResize = () => make(false);
-      window.addEventListener("resize", onResize);
-      if (cancelled) clearTimeout(t);
+
+      let raf = 0;
+      const sync = () => {
+        raf = 0;
+        if (cancelled) return;
+        // Solo redibuja si el texto se movió o cambió de tamaño de verdad.
+        if (geom() !== last) draw(false);
+      };
+      const onGeom = () => {
+        if (raf) return;
+        raf = requestAnimationFrame(sync);
+      };
+
+      const t = setTimeout(() => !cancelled && draw(true), 500);
+
+      const ro = new ResizeObserver(onGeom);
+      ro.observe(document.documentElement);
+      if (ref.current) ro.observe(ref.current);
+      window.addEventListener("resize", onGeom);
+      window.addEventListener("scroll", onGeom, { passive: true });
+      // Las webfonts cambian el ancho del texto al terminar de cargar.
+      void document.fonts?.ready.then(onGeom).catch(() => {});
+
+      cleanupWatchers = () => {
+        clearTimeout(t);
+        if (raf) cancelAnimationFrame(raf);
+        ro.disconnect();
+        window.removeEventListener("resize", onGeom);
+        window.removeEventListener("scroll", onGeom);
+      };
+      if (cancelled) cleanupWatchers();
     });
+
     return () => {
       cancelled = true;
       annotation?.remove();
-      if (onResize) window.removeEventListener("resize", onResize);
+      cleanupWatchers?.();
     };
   }, []);
   return ref;
