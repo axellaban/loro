@@ -22,6 +22,7 @@ export type FunnelEvent =
   | "lang_changed"
   | "answer_size_changed"
   | "auto_answer_toggled"
+  | "save_transcript_toggled"
   | "session_saved"
   | "app_email_submit"
   | "session_card_opened"
@@ -30,6 +31,8 @@ export type FunnelEvent =
   | "mode_changed"
   // Captura de pestaña: si el micrófono propio quedó afuera y cambios de tab.
   | "mic_denied_on_tab"
+  | "mic_connected"
+  | "mic_disconnected"
   | "tab_switched"
   | "paywall_shown"
   | "capacity_closed_shown"

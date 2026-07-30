@@ -617,7 +617,13 @@ input {
   line-height: 1.45;
 }
 
-.answer-card-text {
+/* .md.answer-card-text (no solo .answer-card-text): el componente Markdown
+   siempre agrega su propia clase "md" al mismo div, y esa regla define
+   font-size: 1rem más abajo en la hoja. Con la misma especificidad (una sola
+   clase cada una), gana la que aparece último en el archivo — que sin este
+   combinador es "md", no esta — y el control de tamaño del menú de sesión
+   queda sin efecto pase lo que pase se elija ahí. */
+.md.answer-card-text {
   /* Lo controla el menú de sesión (tres puntitos → Tamaño del texto). */
   font-size: var(--answer-size, 16.5px);
   line-height: 1.72;
@@ -1003,6 +1009,23 @@ input {
   padding-left: 4px;
 }
 
+/* Tu línea (mic), a la derecha y con otro color: de un vistazo se distingue
+   de lo que dijo el entrevistador sin tener que leer la etiqueta. */
+.t-line-me {
+  align-items: flex-end;
+}
+.t-line-me .t-bubble {
+  background: var(--loro-green);
+  color: #fff;
+}
+.t-line-me .t-interim {
+  color: rgba(255, 255, 255, 0.75);
+}
+.t-line-me .t-meta {
+  padding-left: 0;
+  padding-right: 4px;
+}
+
 /* Barra de acciones bajo la llamada. */
 .live-toolbar {
   display: flex;
@@ -1029,6 +1052,17 @@ input {
 }
 .tb-btn:hover {
   background: #f7f8fa;
+}
+.tb-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.tb-mic-on {
+  background: #fdecec;
+  border-color: #f7c9c9;
+}
+.tb-mic-on:hover {
+  background: #fbe0e0;
 }
 .tb-rec {
   width: 10px;
@@ -4129,6 +4163,11 @@ a.btn-action {
   overflow-wrap: anywhere;
 }
 .cs-bubble-meta { font-size: 0.82rem; color: var(--ink-faint); padding-left: 4px; }
+
+/* Tu línea (mic), a la derecha y en verde: igual que en la sesión en vivo. */
+.cs-bubble-wrap-me { align-items: flex-end; }
+.cs-bubble-wrap-me .cs-bubble { background: var(--loro-green); color: #fff; }
+.cs-bubble-wrap-me .cs-bubble-meta { padding-left: 0; padding-right: 4px; }
 
 .cs-qa {
   position: relative;

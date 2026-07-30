@@ -18,8 +18,12 @@ export type CallSession = {
   modelId: string;
   lang: "es" | "en";
   mode: "mic" | "tab";
-  /** Lo que dijo el entrevistador, línea por línea. */
-  lines: { text: string; ts: number }[];
+  /**
+   * Lo que se dijo, línea por línea. `speaker` falta en sesiones viejas
+   * guardadas antes de distinguir quién habla: se tratan como entrevistador,
+   * que es lo único que existía entonces.
+   */
+  lines: { text: string; ts: number; speaker?: "interviewer" | "me" }[];
   /** Cada pregunta detectada con la respuesta que generó el copiloto. */
   qa: QaPair[];
   /** Notas generadas a pedido (no se generan solas: cuestan tokens). */
@@ -119,7 +123,7 @@ export function sessionToText(s: CallSession): string {
   // Se intercalan por tiempo para que la IA lea la conversación en el orden en
   // que pasó, no primero todo el transcript y después todas las respuestas.
   const events: { ts: number; text: string }[] = [
-    ...s.lines.map((l) => ({ ts: l.ts, text: `Entrevistador: ${l.text}` })),
+    ...s.lines.map((l) => ({ ts: l.ts, text: `${l.speaker === "me" ? "Vos" : "Entrevistador"}: ${l.text}` })),
     ...s.qa.map((p) => ({ ts: p.ts, text: `Pregunta detectada: ${p.q}\nRespuesta sugerida: ${p.a}` })),
   ].sort((a, b) => a.ts - b.ts);
 
