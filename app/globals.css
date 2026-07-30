@@ -2382,6 +2382,33 @@ input {
   line-height: 1.25;
 }
 
+/* En mobile los dos mini-stats tienen que quedar SIEMPRE uno al lado del
+   otro, como en la referencia — nunca uno arriba y el otro abajo. Sin este
+   achique no entran los dos en una fila angosta y el segundo caía a una
+   fila propia. */
+@media (max-width: 480px) {
+  .hub-stats-mini {
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .hub-stats-mini-item {
+    gap: 4px;
+    min-width: 0;
+  }
+  .hub-laurel {
+    width: 24px;
+    height: 21px;
+  }
+  .hub-stats-mini-num {
+    font-size: 0.95rem;
+  }
+  .hub-stats-mini-label {
+    font-size: 0.62rem;
+    max-width: 92px;
+    line-height: 1.2;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hub-stats-num {
     animation: none;
