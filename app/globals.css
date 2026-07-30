@@ -2372,6 +2372,33 @@ input {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  cursor: pointer;
+  /* En touch, el navegador no espera 300ms para ver si es doble-tap ni
+     dispara el resaltado gris nativo: el propio feedback de acá lo reemplaza. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease;
+}
+
+/* Feedback al tocar: se achica un toque y se prende un glow lima breve —
+   la misma lógica de "presioná y algo responde" que un botón nativo. */
+.hub-stats-mini-item-pressed {
+  transform: scale(0.94);
+  background: rgba(163, 230, 53, 0.08);
+}
+.hub-stats-mini-item-pressed .hub-laurel {
+  filter: drop-shadow(0 0 6px rgba(163, 230, 53, 0.65));
+}
+.hub-stats-mini-item-pressed .hub-stats-mini-num {
+  filter: drop-shadow(0 0 8px rgba(163, 230, 53, 0.55));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-stats-mini-item {
+    transition: none;
+  }
 }
 
 .hub-laurel {
@@ -2385,11 +2412,18 @@ input {
   gap: 2px;
 }
 
+/* Degradado en vez de color plano, como el dorado de la referencia: un lima
+   más claro arriba, el lima de marca en el medio y uno más oscuro abajo —
+   le da el mismo aire "metálico con brillo" sin salirse de la paleta. */
 .hub-stats-mini-num {
   font-size: 1.35rem;
   font-weight: 800;
-  color: var(--loro-lime);
   white-space: nowrap;
+  background: linear-gradient(180deg, #e3ffb0 0%, var(--loro-lime) 45%, #65a30d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .hub-stats-mini-label {
@@ -2407,26 +2441,28 @@ input {
 @media (max-width: 480px) {
   .hub-stats-mini {
     flex-wrap: nowrap;
-    gap: 12px;
+    gap: 6px;
   }
   .hub-stats-mini-item {
-    gap: 6px;
+    gap: 4px;
+    padding: 6px 2px;
     min-width: 0;
   }
-  /* Achicado lo justo para que entren los dos en una fila (el ancho de
-     laurel + texto es lo que decide si entra o no), pero NO el texto: la
-     letra queda casi igual que en desktop. */
+  /* El laurel queda proporcionalmente MÁS grande frente al texto, como en la
+     referencia: para que entren los dos bloques en una fila angosta sin
+     wrappear, el texto se achica un poco más que el laurel (que es lo que
+     debía crecer). */
   .hub-laurel {
-    width: 30px;
-    height: 26px;
+    width: 34px;
+    height: 30px;
   }
   .hub-stats-mini-num {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
   }
   .hub-stats-mini-label {
-    font-size: 0.72rem;
-    max-width: 100px;
-    line-height: 1.25;
+    font-size: 0.66rem;
+    max-width: 82px;
+    line-height: 1.2;
   }
 }
 

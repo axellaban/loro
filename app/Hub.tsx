@@ -180,6 +180,30 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
   );
 }
 
+// Un mini-stat (laurel + número + etiqueta), con feedback táctil al tocarlo:
+// se usan Pointer Events en vez de :active porque en iOS Safari :active no
+// dispara en un <div> común sin un handler de click/touch enganchado — con
+// pointerdown/up/leave el efecto anda igual en mouse, touch y stylus.
+function MiniStat({ value, label }: { value: string; label: string }) {
+  const [pressed, setPressed] = useState(false);
+  return (
+    <div
+      className={`hub-stats-mini-item${pressed ? " hub-stats-mini-item-pressed" : ""}`}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+    >
+      <Laurel />
+      <div className="hub-stats-mini-text">
+        <span className="hub-stats-mini-num">{value}</span>
+        <span className="hub-stats-mini-label">{label}</span>
+      </div>
+      <Laurel mirrored />
+    </div>
+  );
+}
+
 // ----- Contador de "entrevistas superadas" (estilo Binance) -----
 // Es cosmético, no un conteo real: no hay backend detrás. La sensación de
 // "vivo" sale de dos cosas: arranca en un número base y sube solito cada
@@ -269,22 +293,8 @@ function StatsCounter() {
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
       <div className="hub-stats-mini">
-        <div className="hub-stats-mini-item">
-          <Laurel />
-          <div className="hub-stats-mini-text">
-            <span className="hub-stats-mini-num">&lt; 1 segundo</span>
-            <span className="hub-stats-mini-label">de tiempo de respuesta</span>
-          </div>
-          <Laurel mirrored />
-        </div>
-        <div className="hub-stats-mini-item">
-          <Laurel />
-          <div className="hub-stats-mini-text">
-            <span className="hub-stats-mini-num">0</span>
-            <span className="hub-stats-mini-label">Estrés frente a los reclutadores</span>
-          </div>
-          <Laurel mirrored />
-        </div>
+        <MiniStat value="< 1 segundo" label="de tiempo de respuesta" />
+        <MiniStat value="0" label="Estrés frente a los reclutadores" />
       </div>
     </div>
   );
