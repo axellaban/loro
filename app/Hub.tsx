@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ParrotSvg } from "./lib/parrot";
 import { IaFlag } from "./lib/BrandLogo";
 import { track } from "./lib/track";
@@ -199,42 +199,6 @@ function StatsCounter() {
   const [n, setN] = useState(STAT_BASE);
   const [bump, setBump] = useState(0);
 
-  // Mismo resaltado a mano (rough-notation) que "asistente de IA / en tiempo
-  // real" arriba, ahora sobre "SUPERADAS CON ÉXITO" — en un solo renglón
-  // (con el contenedor más ancho, igual al del título de arriba, entra bien).
-  const hlRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    let cancelled = false;
-    let annotation: { show: () => void; remove: () => void } | null = null;
-    let onResize: (() => void) | null = null;
-    void import("rough-notation").then(({ annotate }) => {
-      if (cancelled || !hlRef.current) return;
-      const make = (animate: boolean) => {
-        const el = hlRef.current;
-        if (!el) return;
-        annotation?.remove();
-        annotation = annotate(el, {
-          type: "highlight",
-          color: "rgba(163,230,53,0.5)",
-          multiline: true,
-          padding: 2,
-          animationDuration: animate ? 900 : 0,
-          iterations: 2,
-        });
-        annotation.show();
-      };
-      const t = setTimeout(() => !cancelled && make(true), 500);
-      onResize = () => make(false);
-      window.addEventListener("resize", onResize);
-      if (cancelled) clearTimeout(t);
-    });
-    return () => {
-      cancelled = true;
-      annotation?.remove();
-      if (onResize) window.removeEventListener("resize", onResize);
-    };
-  }, []);
-
   useEffect(() => {
     const persist = (v: number) => {
       try {
@@ -301,9 +265,7 @@ function StatsCounter() {
           +{n.toLocaleString("en-US")}
         </span>
         <span className="hub-stats-h">ENTREVISTAS</span>
-        <span ref={hlRef} className="hub-stats-h hub-stats-hl">
-          SUPERADAS CON ÉXITO
-        </span>
+        <span className="hub-stats-h hub-stats-hl">SUPERADAS CON ÉXITO</span>
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
       <div className="hub-stats-mini">
@@ -338,42 +300,6 @@ export default function Hub() {
     return () => clearInterval(id);
   }, []);
 
-  // Resaltado dibujado a mano (rough-notation), el mismo efecto del sitio A13I,
-  // sobre "asistente de IA / en tiempo real". Se dibuja al montar y se recalcula
-  // en resize (el SVG se posiciona según el layout).
-  const hlRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    let cancelled = false;
-    let annotation: { show: () => void; remove: () => void } | null = null;
-    let onResize: (() => void) | null = null;
-    void import("rough-notation").then(({ annotate }) => {
-      if (cancelled || !hlRef.current) return;
-      const make = (animate: boolean) => {
-        const el = hlRef.current;
-        if (!el) return;
-        annotation?.remove();
-        annotation = annotate(el, {
-          type: "highlight",
-          color: "rgba(163,230,53,0.5)",
-          multiline: true,
-          padding: 2,
-          animationDuration: animate ? 900 : 0,
-          iterations: 2,
-        });
-        annotation.show();
-      };
-      const t = setTimeout(() => !cancelled && make(true), 500);
-      onResize = () => make(false);
-      window.addEventListener("resize", onResize);
-      if (cancelled) clearTimeout(t);
-    });
-    return () => {
-      cancelled = true;
-      annotation?.remove();
-      if (onResize) window.removeEventListener("resize", onResize);
-    };
-  }, []);
-
   return (
     <div className="hub">
       <main className="hub-main">
@@ -397,7 +323,7 @@ export default function Hub() {
             <br />
             entrevistas con el
             <br />
-            <span ref={hlRef} className="hub-h1-hl">
+            <span className="hub-h1-hl">
               asistente de IA
               <br />
               en tiempo real

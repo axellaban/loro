@@ -2009,8 +2009,18 @@ input {
   animation: loroGlow 5s linear infinite, hubWordIn 0.45s ease-out;
 }
 /* Frase con resaltado dibujado a mano (rough-notation monta un SVG detrás). */
+/* Resaltado con CSS puro, no medido con JS (antes era rough-notation): con
+   texto que puede envolver a más de una línea según el ancho de pantalla,
+   la librería medía mal en Safari real (el resaltado quedaba mucho más ancho
+   que el texto) aunque en Chrome se viera bien. box-decoration-break:clone
+   hace que el navegador mismo dibuje el fondo pegado a cada línea, así que
+   no puede desalinearse nunca, en ningún navegador. */
 .hub-h1-hl {
-  position: relative;
+  background: rgba(163, 230, 53, 0.5);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0.02em 0.12em;
+  border-radius: 3px;
 }
 @keyframes hubWordIn {
   from {
@@ -2331,7 +2341,11 @@ input {
   color: #fff;
 }
 .hub-stats-hl {
-  position: relative;
+  background: rgba(163, 230, 53, 0.5);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0.02em 0.12em;
+  border-radius: 3px;
 }
 
 .hub-stats-tag {
