@@ -404,7 +404,7 @@ function StatsCounter() {
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
       <div className="hub-stats-mini">
         <MiniStat value="< 1 segundo" label="de tiempo de respuesta" />
-        <MiniStat value="0" label="Estrés frente a los reclutadores" />
+        <MiniStat value="0 estrés" label="frente a los reclutadores" />
       </div>
     </div>
   );
