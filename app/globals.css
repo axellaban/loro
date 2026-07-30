@@ -2279,11 +2279,12 @@ input {
 
 .hub-stats-num,
 .hub-stats-h {
-  font-size: clamp(1.5rem, 6.4vw, 2.35rem);
+  /* Mismo tamaño que el título de arriba (.hub-h1): es el mismo titular. */
+  font-size: clamp(1.35rem, 7.9vw, 4.1rem);
   font-weight: 900;
   letter-spacing: -0.02em;
   text-transform: uppercase;
-  white-space: nowrap;
+  line-height: 1.15;
 }
 
 /* Mismo efecto degradado animado que la primera palabra del título de
@@ -2362,7 +2363,7 @@ input {
 .hub-stats-mini-num {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #fbbf24;
+  color: #34d399;
   white-space: nowrap;
 }
 

@@ -158,7 +158,7 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
     >
       <path
         d={`M${p0[0]} ${p0[1]}C${LAUREL_STEM[1][0]} ${LAUREL_STEM[1][1]} ${LAUREL_STEM[2][0]} ${LAUREL_STEM[2][1]} ${p3[0]} ${p3[1]}${LAUREL_CURL}`}
-        stroke="#b8790a"
+        stroke="#047857"
         strokeWidth="2.2"
         strokeLinecap="round"
         fill="none"
@@ -167,12 +167,12 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
       {pairs.map((l, i) => (
         <g key={i}>
           <g transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${l.scale})`}>
-            <path d={LEAF_D} fill="#fbbf24" stroke="#b8790a" strokeWidth="0.4" />
-            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#b8790a" strokeWidth="0.4" opacity="0.6" />
+            <path d={LEAF_D} fill="#10b981" stroke="#047857" strokeWidth="0.4" />
+            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#047857" strokeWidth="0.4" opacity="0.6" />
           </g>
           <g transform={`translate(${l.x} ${l.y}) rotate(${l.rot2}) scale(${l.scale})`}>
-            <path d={LEAF_D} fill="#fbbf24" stroke="#b8790a" strokeWidth="0.4" />
-            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#b8790a" strokeWidth="0.4" opacity="0.6" />
+            <path d={LEAF_D} fill="#10b981" stroke="#047857" strokeWidth="0.4" />
+            <line x1="0" y1="-1.5" x2="0" y2="-14" stroke="#047857" strokeWidth="0.4" opacity="0.6" />
           </g>
         </g>
       ))}
@@ -200,7 +200,9 @@ function StatsCounter() {
   const [bump, setBump] = useState(0);
 
   // Mismo resaltado a mano (rough-notation) que "asistente de IA / en tiempo
-  // real" arriba, ahora sobre "SUPERADAS CON ÉXITO".
+  // real" arriba, ahora sobre "CON ÉXITO". Se resalta solo esa frase corta
+  // (no las tres líneas enteras): así entra siempre en un renglón y
+  // rough-notation no tiene que calcular un resaltado multilínea.
   const hlRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     let cancelled = false;
@@ -287,8 +289,9 @@ function StatsCounter() {
           +{n.toLocaleString("en-US")}
         </span>
         <span className="hub-stats-h">ENTREVISTAS</span>
+        <span className="hub-stats-h">SUPERADAS</span>
         <span ref={hlRef} className="hub-stats-h hub-stats-hl">
-          SUPERADAS CON ÉXITO
+          CON ÉXITO
         </span>
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
