@@ -1465,9 +1465,19 @@ export default function SimuladorPage() {
     } catch (err: any) {
       cleanupMedia();
       const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
+      // "Requested device not found" (NotFoundError) NO es un problema de
+      // permiso del sitio: el navegador no encontró ningún micrófono, algo
+      // muy común en Brave/Chrome cuando el sistema operativo tiene el
+      // permiso de micrófono desactivado para ESE navegador puntual (en Mac:
+      // Preferencias del Sistema → Privacidad y seguridad → Micrófono). El
+      // mensaje crudo del navegador no dice nada de esto, así que se
+      // reemplaza por uno accionable.
+      const sinDispositivo = err?.name === "NotFoundError" || err?.name === "OverconstrainedError";
       setError(
         denied
           ? "Necesitamos el micrófono para la entrevista. Activá el permiso desde el candado 🔒 en la barra del navegador y volvé a intentar."
+          : sinDispositivo
+          ? "Tu navegador no encontró ningún micrófono. Revisá que la compu tenga uno conectado, que el sistema operativo le dé permiso de micrófono a este navegador (en Mac: Preferencias del Sistema → Privacidad y seguridad → Micrófono) y, si usás Brave, que los Shields (el ícono del león) no estén en modo agresivo para este sitio."
           : err?.message || "No se pudo iniciar el simulador. Revisá los permisos de micrófono."
       );
       setPhaseBoth("setup");

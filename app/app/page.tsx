@@ -1302,19 +1302,21 @@ export default function Page() {
   }, [view]);
 
   // ---------- Detección de mobile / Safari ----------
-  // "Pestaña" (captura de audio vía getDisplayMedia) no tiene sentido en dos
+  // "Pestaña" (captura de audio vía getDisplayMedia) no tiene sentido en tres
   // casos: en mobile (iOS y Android) no hay pestañas de Meet/Zoom que
-  // compartir desde el propio celular; y en Safari —incluso de escritorio,
-  // en Mac— getDisplayMedia no soporta capturar audio (solo video), así que
-  // ahí "Pestaña" siempre termina en el error de "no se compartió audio". En
-  // ambos casos se usa directo micrófono.
+  // compartir desde el propio celular; en Safari —incluso de escritorio, en
+  // Mac— getDisplayMedia no soporta capturar audio (solo video); y en
+  // Firefox pasa lo mismo: nunca implementó la captura de audio de pestaña,
+  // solo la de video. En los tres casos "Pestaña" termina siempre en el
+  // error de "no se compartió audio", así que se usa directo micrófono.
   const [noTabCapture, setNoTabCapture] = useState(false);
   useEffect(() => {
     const ua = navigator.userAgent || "";
     const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const mobile = iOS || /Android|Mobi/.test(ua);
     const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(ua);
-    const noTab = mobile || isSafari;
+    const isFirefox = /firefox|fxios/i.test(ua);
+    const noTab = mobile || isSafari || isFirefox;
     setNoTabCapture(noTab);
     // En desktop con soporte de captura de pestaña, "Pestaña" es el modo
     // correcto (audio digital directo de Meet/Zoom); "Micrófono" queda como
@@ -1707,13 +1709,20 @@ export default function Page() {
       // hay ambigüedad: es siempre el entrevistador.
       const startS = typeof msg.start === "number" ? msg.start : 0;
       const durS = typeof msg.duration === "number" ? msg.duration : 0;
+      // El margen tiene que cubrir la latencia real entre "el mic detectó tu
+      // voz" (reloj local) y "Deepgram marcó el inicio de este tramo" (red +
+      // su propio procesamiento). Con 300ms alcanzaba casi siempre, pero el
+      // arranque de una frase corta —lo primero que decís apenas conectás el
+      // mic, antes de que la red se estabilice— podía quedar justo afuera: se
+      // etiquetaba como entrevistador y el siguiente tramo (ya bien
+      // clasificado) parecía una repetición.
       const speaker: Speaker =
         micOnRef.current &&
         rangesOverlap(
           streamStartAtRef.current + startS * 1000,
           streamStartAtRef.current + (startS + durS) * 1000,
           micActiveRangesRef.current,
-          300
+          700
         )
           ? "me"
           : "interviewer";
@@ -1943,6 +1952,13 @@ export default function Page() {
         ctx.createMediaStreamSource(mic).connect(worklet);
         startMicVad(mic, ctx);
       }
+      // Se marca también el ref, sincrónico: `onDgMessage` lo lee en cada
+      // mensaje de Deepgram y no puede esperar al próximo render (el efecto
+      // que espeja el estado al ref corre un tick después). Sin esto, algo
+      // dicho en esa ventana angosta cae SIEMPRE del lado del entrevistador,
+      // que es exactamente lo que puede pasar si hablás apenas conectás el
+      // mic.
+      micOnRef.current = true;
       setMicOn(true);
       track("mic_connected");
     } catch {
@@ -1957,6 +1973,7 @@ export default function Page() {
     stopMicVad();
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
+    micOnRef.current = false;
     setMicOn(false);
     track("mic_disconnected");
   }, [stopMicVad]);
@@ -2181,7 +2198,17 @@ export default function Page() {
         return;
       }
       track("session_error", { error: err?.name || "unknown" });
-      setError(err?.message || "Error al iniciar.");
+      // "Requested device not found" (NotFoundError) NO es falta de permiso
+      // del sitio: el navegador no encontró micrófono, algo común en Brave/
+      // Chrome/Edge cuando el sistema operativo le tiene el permiso de
+      // micrófono desactivado a ESE navegador puntual. El mensaje crudo del
+      // navegador no dice nada de esto.
+      const sinDispositivo = err?.name === "NotFoundError" || err?.name === "OverconstrainedError";
+      setError(
+        sinDispositivo
+          ? "Tu navegador no encontró ningún micrófono. Revisá que la compu tenga uno conectado, que el sistema operativo le dé permiso de micrófono a este navegador (en Mac: Preferencias del Sistema → Privacidad y seguridad → Micrófono) y, si usás Brave, que los Shields no estén en modo agresivo para este sitio."
+          : err?.message || "Error al iniciar."
+      );
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
