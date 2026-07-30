@@ -2337,7 +2337,11 @@ input {
 .hub-stats-mini {
   margin-top: 28px;
   display: flex;
-  align-items: center;
+  /* flex-start (no center): así el NÚMERO de los dos mini-stats queda a la
+     misma altura, aunque una etiqueta ocupe más líneas que la otra —
+     centrando el bloque entero, el número del texto más largo quedaba más
+     arriba que el del texto corto y perdían el paralelismo de la referencia. */
+  align-items: flex-start;
   justify-content: center;
   gap: clamp(24px, 6vw, 56px);
   flex-wrap: wrap;
