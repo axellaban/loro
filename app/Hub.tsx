@@ -91,6 +91,93 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
   );
 }
 
+// ----- Contador de "entrevistas superadas" (estilo Binance) -----
+// Es cosmético, no un conteo real: no hay backend detrás. La sensación de
+// "vivo" sale de dos cosas: arranca en un número base y sube solito cada
+// tanto mientras la pestaña está abierta, Y lo último que mostró queda en
+// localStorage con su hora, así que si volvés más tarde el número "se puso al
+// día" con el tiempo que pasó (con un tope, para que no salte a algo absurdo
+// si volvés después de mucho).
+const STAT_KEY = "loreado:statCounter:v1";
+const STAT_BASE = 4467;
+const STAT_MS_PER_TICK = 50_000; // ritmo promedio de una "entrevista" más
+const STAT_CATCHUP_CAP = 400;
+
+function StatsCounter() {
+  const [n, setN] = useState(STAT_BASE);
+  const [bump, setBump] = useState(0);
+
+  useEffect(() => {
+    const persist = (v: number) => {
+      try {
+        localStorage.setItem(STAT_KEY, JSON.stringify({ value: v, ts: Date.now() }));
+      } catch {}
+    };
+
+    let stored = STAT_BASE;
+    let lastTs = Date.now();
+    try {
+      const raw = localStorage.getItem(STAT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.value === "number" && typeof parsed.ts === "number") {
+          stored = parsed.value;
+          lastTs = parsed.ts;
+        }
+      }
+    } catch {}
+
+    const elapsedTicks = Math.floor((Date.now() - lastTs) / STAT_MS_PER_TICK);
+    const start = Math.max(STAT_BASE, stored + Math.min(elapsedTicks, STAT_CATCHUP_CAP));
+    setN(start);
+    persist(start);
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      if (cancelled) return;
+      setN((prev) => {
+        const next = prev + 1;
+        persist(next);
+        return next;
+      });
+      setBump((b) => b + 1);
+      // Ritmo variable (70%-130% del promedio) para que no se note mecánico.
+      timer = setTimeout(tick, STAT_MS_PER_TICK * (0.7 + Math.random() * 0.6));
+    };
+    timer = setTimeout(tick, STAT_MS_PER_TICK * (0.7 + Math.random() * 0.6));
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return (
+    <div className="hub-stats">
+      <div className="hub-stats-num" key={bump}>
+        +{n.toLocaleString("en-US")}
+      </div>
+      <div className="hub-stats-label">
+        ENTREVISTAS
+        <br />
+        SUPERADAS CON ÉXITO
+      </div>
+      <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
+      <div className="hub-stats-mini">
+        <div className="hub-stats-mini-item">
+          <span className="hub-stats-mini-num">&lt; 1 segundo</span>
+          <span className="hub-stats-mini-label">de tiempo de respuesta</span>
+        </div>
+        <span className="hub-stats-divider" aria-hidden="true" />
+        <div className="hub-stats-mini-item">
+          <span className="hub-stats-mini-num">0</span>
+          <span className="hub-stats-mini-label">Estrés frente a los reclutadores</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Hub minimal (Luhmann): un solo mensaje y dos puertas.
 export default function Hub() {
   const [wordIdx, setWordIdx] = useState(0);
@@ -188,6 +275,8 @@ export default function Hub() {
             <span className="hub-option-sub">Te sopla las respuestas exactas. 100% indetectable en vivo.</span>
           </Link>
         </div>
+
+        <StatsCounter />
       </main>
     </div>
   );
