@@ -144,6 +144,53 @@ input {
   flex-shrink: 0;
 }
 
+/* Checkboxes de "Comportamiento" (Respuesta automática / Guardar transcript),
+   estilo Parakeet: cuadrado propio en vez del checkbox nativo del navegador,
+   que varía demasiado entre sistemas. */
+.behavior-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
+.check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+.check-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  position: relative;
+}
+.check-row input[type="checkbox"]:checked {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.check-row input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4.5px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
 /* Tooltip de ayuda (ⓘ) */
 .info-tip {
   position: relative;

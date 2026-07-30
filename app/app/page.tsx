@@ -2599,6 +2599,36 @@ export default function Page() {
             className="form-textarea"
             disabled={connecting}
           />
+
+          <label className="mono form-label" style={{ marginTop: 4 }}>
+            Comportamiento
+          </label>
+          <div className="behavior-row">
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={autoAnswer}
+                onChange={(e) => {
+                  setAutoAnswer(e.target.checked);
+                  track("auto_answer_toggled", { on: e.target.checked });
+                }}
+              />
+              <span>Respuesta automática</span>
+              <InfoTip text="El Loro responde solo apenas detecta que el entrevistador terminó una pregunta, sin que tengas que tocar 'Responder'." />
+            </label>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={saveTranscript}
+                onChange={(e) => {
+                  setSaveTranscript(e.target.checked);
+                  track("save_transcript_toggled", { on: e.target.checked });
+                }}
+              />
+              <span>Guardar transcript</span>
+              <InfoTip text="Si lo apagás, esta sesión no queda en 'Sesiones de llamada' una vez que la cierres. Igual vas a poder ver tu informe al terminar." />
+            </label>
+          </div>
         </div>
       )}
 
