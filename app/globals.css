@@ -2277,6 +2277,10 @@ input {
 .hub-stats-headline {
   display: flex;
   flex-direction: column;
+  /* Sin esto cada línea (flex item) se estira al ancho del contenedor por
+     default ("stretch"), y el resaltado a mano —que se dibuja detrás de TODO
+     el ancho del span— quedaba mucho más ancho que el texto real. */
+  align-items: center;
   line-height: 1.08;
 }
 
@@ -2389,23 +2393,26 @@ input {
 @media (max-width: 480px) {
   .hub-stats-mini {
     flex-wrap: nowrap;
-    gap: 10px;
+    gap: 12px;
   }
   .hub-stats-mini-item {
-    gap: 4px;
+    gap: 6px;
     min-width: 0;
   }
+  /* Achicado lo justo para que entren los dos en una fila (el ancho de
+     laurel + texto es lo que decide si entra o no), pero NO el texto: la
+     letra queda casi igual que en desktop. */
   .hub-laurel {
-    width: 24px;
-    height: 21px;
+    width: 30px;
+    height: 26px;
   }
   .hub-stats-mini-num {
-    font-size: 0.95rem;
+    font-size: 1.15rem;
   }
   .hub-stats-mini-label {
-    font-size: 0.62rem;
-    max-width: 92px;
-    line-height: 1.2;
+    font-size: 0.72rem;
+    max-width: 100px;
+    line-height: 1.25;
   }
 }
 
