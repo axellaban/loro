@@ -1,13 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ParrotSvg } from "./lib/parrot";
 import { IaFlag } from "./lib/BrandLogo";
 import { track } from "./lib/track";
 
 // Palabras que rotan en la 1ra palabra del título (efecto swap).
 const HERO_WORDS = ["Loreá", "crackeá", "hackeá", "pasá"];
+
+/**
+ * Resaltador dibujado a mano (rough-notation), el efecto del sitio A13I.
+ * Devuelve el ref que hay que colgar del <span> a resaltar.
+ *
+ * IMPORTANTE: rough-notation mide el ELEMENTO, no el texto. Si el span es un
+ * flex item (que por default se estira al ancho del contenedor) el resaltado
+ * sale mucho más ancho que las letras. Por eso el span tiene que ser INLINE
+ * dentro de un bloque de texto normal — como en el <h1> del hero, que es
+ * donde este efecto siempre se vio bien.
+ */
+function useHandHighlight() {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let annotation: { show: () => void; remove: () => void } | null = null;
+    let onResize: (() => void) | null = null;
+    void import("rough-notation").then(({ annotate }) => {
+      if (cancelled || !ref.current) return;
+      const make = (animate: boolean) => {
+        const el = ref.current;
+        if (!el) return;
+        annotation?.remove();
+        annotation = annotate(el, {
+          type: "highlight",
+          color: "rgba(163,230,53,0.5)",
+          multiline: true,
+          padding: 2,
+          animationDuration: animate ? 900 : 0,
+          iterations: 2,
+        });
+        annotation.show();
+      };
+      const t = setTimeout(() => !cancelled && make(true), 500);
+      onResize = () => make(false);
+      window.addEventListener("resize", onResize);
+      if (cancelled) clearTimeout(t);
+    });
+    return () => {
+      cancelled = true;
+      annotation?.remove();
+      if (onResize) window.removeEventListener("resize", onResize);
+    };
+  }, []);
+  return ref;
+}
 
 // Cápsula 3D realista idéntica a la imagen de referencia Matrix
 function MatrixPill3D({ type }: { type: "blue" | "red" }) {
@@ -147,8 +193,8 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
   });
   return (
     <svg
-      width="34"
-      height="58"
+      width="44"
+      height="75"
       viewBox="0 0 72 158"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -222,6 +268,7 @@ const STAT_CATCHUP_CAP = 300;
 function StatsCounter() {
   const [n, setN] = useState(STAT_BASE);
   const [bump, setBump] = useState(0);
+  const hlRef = useHandHighlight();
 
   useEffect(() => {
     const persist = (v: number) => {
@@ -284,12 +331,20 @@ function StatsCounter() {
 
   return (
     <div className="hub-stats">
+      {/* Bloque de texto normal con <br>, NO un flex column de spans: el
+          resaltado a mano mide el elemento, y un flex item se estira al ancho
+          del contenedor (por eso antes salía mucho más ancho que las letras).
+          Así queda igual que el <h1> del hero, donde el efecto siempre anduvo. */}
       <div className="hub-stats-headline">
         <span className="hub-stats-num" key={bump}>
           +{n.toLocaleString("en-US")}
         </span>
-        <span className="hub-stats-h">ENTREVISTAS</span>
-        <span className="hub-stats-h hub-stats-hl">SUPERADAS CON ÉXITO</span>
+        <br />
+        ENTREVISTAS
+        <br />
+        <span ref={hlRef} className="hub-stats-hl">
+          SUPERADAS CON ÉXITO
+        </span>
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
       <div className="hub-stats-mini">
@@ -309,6 +364,8 @@ export default function Hub() {
     }, 2200);
     return () => clearInterval(id);
   }, []);
+
+  const hlRef = useHandHighlight();
 
   return (
     <div className="hub">
@@ -333,7 +390,7 @@ export default function Hub() {
             <br />
             entrevistas con el
             <br />
-            <span className="hub-h1-hl">
+            <span ref={hlRef} className="hub-h1-hl">
               asistente de IA
               <br />
               en tiempo real

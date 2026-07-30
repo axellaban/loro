@@ -2009,18 +2009,8 @@ input {
   animation: loroGlow 5s linear infinite, hubWordIn 0.45s ease-out;
 }
 /* Frase con resaltado dibujado a mano (rough-notation monta un SVG detrás). */
-/* Resaltado con CSS puro, no medido con JS (antes era rough-notation): con
-   texto que puede envolver a más de una línea según el ancho de pantalla,
-   la librería medía mal en Safari real (el resaltado quedaba mucho más ancho
-   que el texto) aunque en Chrome se viera bien. box-decoration-break:clone
-   hace que el navegador mismo dibuje el fondo pegado a cada línea, así que
-   no puede desalinearse nunca, en ningún navegador. */
 .hub-h1-hl {
-  background: rgba(163, 230, 53, 0.5);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  padding: 0.02em 0.12em;
-  border-radius: 3px;
+  position: relative;
 }
 @keyframes hubWordIn {
   from {
@@ -2284,24 +2274,17 @@ input {
 /* El número y las dos líneas de abajo son UN solo titular, todos del mismo
    tamaño y peso (como "325,690,761 / USERS / TRUST US" en la referencia):
    el número se distingue solo por el color dorado, no por ser más grande. */
+/* Bloque de texto normal (no flex): las líneas se separan con <br> y los
+   tramos resaltados son spans INLINE, que es lo único que el resaltador a
+   mano mide bien. Mismo tamaño y peso que el título del hero. */
 .hub-stats-headline {
-  display: flex;
-  flex-direction: column;
-  /* Sin esto cada línea (flex item) se estira al ancho del contenedor por
-     default ("stretch"), y el resaltado a mano —que se dibuja detrás de TODO
-     el ancho del span— quedaba mucho más ancho que el texto real. */
-  align-items: center;
-  line-height: 1.08;
-}
-
-.hub-stats-num,
-.hub-stats-h {
-  /* Mismo tamaño que el título de arriba (.hub-h1): es el mismo titular. */
   font-size: clamp(1.35rem, 7.9vw, 4.1rem);
   font-weight: 900;
   letter-spacing: -0.02em;
   text-transform: uppercase;
   line-height: 1.15;
+  color: #fff;
+  text-align: center;
 }
 
 /* Mismo efecto degradado animado que la primera palabra del título de
@@ -2337,15 +2320,8 @@ input {
   }
 }
 
-.hub-stats-h {
-  color: #fff;
-}
 .hub-stats-hl {
-  background: rgba(163, 230, 53, 0.5);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  padding: 0.02em 0.12em;
-  border-radius: 3px;
+  position: relative;
 }
 
 .hub-stats-tag {
@@ -2453,15 +2429,15 @@ input {
      wrappear, el texto se achica un poco más que el laurel (que es lo que
      debía crecer). */
   .hub-laurel {
-    width: 34px;
-    height: 30px;
+    width: 46px;
+    height: 40px;
   }
   .hub-stats-mini-num {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
   .hub-stats-mini-label {
-    font-size: 0.66rem;
-    max-width: 82px;
+    font-size: 0.63rem;
+    max-width: 76px;
     line-height: 1.2;
   }
 }
