@@ -2397,7 +2397,7 @@ input {
    más claro arriba, el lima de marca en el medio y uno más oscuro abajo —
    le da el mismo aire "metálico con brillo" sin salirse de la paleta. */
 .hub-stats-mini-num {
-  font-size: 1.35rem;
+  font-size: 1.6rem;
   font-weight: 800;
   white-space: nowrap;
   background: linear-gradient(180deg, #e3ffb0 0%, var(--loro-lime) 45%, #65a30d 100%);
@@ -2416,11 +2416,11 @@ input {
 }
 
 .hub-stats-mini-label {
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.7);
-  max-width: 140px;
-  line-height: 1.25;
+  max-width: 165px;
+  line-height: 1.3;
 }
 
 /* En mobile los dos mini-stats tienen que quedar SIEMPRE uno al lado del
@@ -2437,21 +2437,23 @@ input {
     padding: 6px 2px;
     min-width: 0;
   }
-  /* El laurel queda proporcionalmente MÁS grande frente al texto, como en la
-     referencia: para que entren los dos bloques en una fila angosta sin
-     wrappear, el texto se achica un poco más que el laurel (que es lo que
-     debía crecer). */
+  /* Todo en vw (no en px fijos): los dos bloques tienen que entrar en UNA
+     fila, y el ancho disponible cambia mucho entre un iPhone SE (320px) y un
+     Pro Max. Con medidas fijas, abajo de 375px la fila se pasaba del
+     contenedor y quedaba recortada por el overflow:hidden del hub.
+     Ancho y alto del laurel van en la proporción del viewBox para no
+     desperdiciar ancho (el SVG encaja el dibujo por la altura). */
   .hub-laurel {
-    width: 46px;
-    height: 40px;
+    width: clamp(20px, 6.4vw, 27px);
+    height: clamp(44px, 14vw, 59px);
   }
   .hub-stats-mini-num {
-    font-size: 1rem;
+    font-size: clamp(0.85rem, 3.4vw, 1.15rem);
   }
   .hub-stats-mini-label {
-    font-size: 0.63rem;
-    max-width: 76px;
-    line-height: 1.2;
+    font-size: clamp(0.6rem, 2.3vw, 0.7rem);
+    max-width: clamp(74px, 24vw, 94px);
+    line-height: 1.25;
   }
 }
 

@@ -221,6 +221,9 @@ function bezierPoint(pts: [number, number][], t: number) {
 const LEAF_D = "M0 0C3.4 -1.6 4 -6 2.6 -10.5C1.7 -13.4 0.6 -15 0 -16C-0.6 -15 -1.7 -13.4 -2.6 -10.5C-4 -6 -3.4 -1.6 0 0Z";
 const LEAF_PAIR_COUNT = 9;
 
+// El alto/ancho de la caja respetan el ratio del viewBox (72/158 ≈ 0.456). Si
+// no, el SVG encaja el dibujo por la altura y el sobrante de ancho queda vacío
+// — así se perdían ~10px de ancho por laurel (28px en mobile) al pedo.
 function Laurel({ mirrored }: { mirrored?: boolean }) {
   const [p0] = LAUREL_STEM;
   const p3 = LAUREL_STEM[3];
@@ -249,7 +252,7 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
   return (
     <svg
       width="44"
-      height="75"
+      height="96"
       viewBox="0 0 72 158"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
