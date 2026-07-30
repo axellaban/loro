@@ -2286,10 +2286,27 @@ input {
   white-space: nowrap;
 }
 
+/* Mismo efecto degradado animado que la primera palabra del título de
+   arriba (.hub-h1-swap): así el número queda con el mismo estilo. */
 .hub-stats-num {
-  color: #fbbf24;
-  text-shadow: 0 0 30px rgba(251, 191, 36, 0.35);
-  animation: hubStatPop 0.4s ease-out;
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    #10b981,
+    #34d399,
+    #a3e635,
+    #fbbf24,
+    #f59e0b,
+    #fb7185,
+    #22d3ee,
+    #10b981
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: loroGlow 5s linear infinite, hubStatPop 0.4s ease-out;
 }
 @keyframes hubStatPop {
   from {
@@ -2304,6 +2321,9 @@ input {
 
 .hub-stats-h {
   color: #fff;
+}
+.hub-stats-hl {
+  position: relative;
 }
 
 .hub-stats-tag {

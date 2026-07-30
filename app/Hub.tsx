@@ -199,6 +199,41 @@ function StatsCounter() {
   const [n, setN] = useState(STAT_BASE);
   const [bump, setBump] = useState(0);
 
+  // Mismo resaltado a mano (rough-notation) que "asistente de IA / en tiempo
+  // real" arriba, ahora sobre "SUPERADAS CON ÉXITO".
+  const hlRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let annotation: { show: () => void; remove: () => void } | null = null;
+    let onResize: (() => void) | null = null;
+    void import("rough-notation").then(({ annotate }) => {
+      if (cancelled || !hlRef.current) return;
+      const make = (animate: boolean) => {
+        const el = hlRef.current;
+        if (!el) return;
+        annotation?.remove();
+        annotation = annotate(el, {
+          type: "highlight",
+          color: "rgba(163,230,53,0.5)",
+          multiline: true,
+          padding: 2,
+          animationDuration: animate ? 900 : 0,
+          iterations: 2,
+        });
+        annotation.show();
+      };
+      const t = setTimeout(() => !cancelled && make(true), 500);
+      onResize = () => make(false);
+      window.addEventListener("resize", onResize);
+      if (cancelled) clearTimeout(t);
+    });
+    return () => {
+      cancelled = true;
+      annotation?.remove();
+      if (onResize) window.removeEventListener("resize", onResize);
+    };
+  }, []);
+
   useEffect(() => {
     const persist = (v: number) => {
       try {
@@ -252,7 +287,9 @@ function StatsCounter() {
           +{n.toLocaleString("en-US")}
         </span>
         <span className="hub-stats-h">ENTREVISTAS</span>
-        <span className="hub-stats-h">SUPERADAS CON ÉXITO</span>
+        <span ref={hlRef} className="hub-stats-h hub-stats-hl">
+          SUPERADAS CON ÉXITO
+        </span>
       </div>
       <p className="hub-stats-tag">#1 Copiloto de Entrevistas con IA de América Latina.</p>
       <div className="hub-stats-mini">
