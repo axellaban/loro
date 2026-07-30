@@ -91,14 +91,53 @@ function MatrixPill3D({ type }: { type: "blue" | "red" }) {
   );
 }
 
-// Rama de laurel dorada, como la que flanquea los "No.1" de Binance. Es una
-// sola mitad; el lado derecho es la misma rama espejada con CSS.
+// Rama de laurel dorada, como la que flanquea los "No.1" de Binance: UNA sola
+// curva en forma de paréntesis, con las hojas ensartadas a lo largo de esa
+// curva y apuntando siempre hacia afuera (radial al centro del arco) — no un
+// tallo con hojas de a pares como en la versión anterior, que no se parecía
+// en nada a la referencia.
+const LAUREL_R = 28;
+const LAUREL_CX = 50;
+const LAUREL_CY = 40;
+const LAUREL_ANGLE_START = 255; // grados, convención matemática (0=derecha, 90=arriba)
+const LAUREL_ANGLE_END = 105;
+const LAUREL_COUNT = 11;
+
+function laurelPoint(t: number) {
+  const deg = LAUREL_ANGLE_START + (LAUREL_ANGLE_END - LAUREL_ANGLE_START) * t;
+  const rad = (deg * Math.PI) / 180;
+  // Dirección radial hacia afuera, en pantalla (y crece hacia abajo).
+  const dx = Math.cos(rad);
+  const dy = -Math.sin(rad);
+  // La hoja se ancla con la BASE sobre el arco (no el centro): así solo
+  // sobresale hacia afuera, como una hoja real prendida de la rama, en vez de
+  // quedar centrada a mitad de camino hacia adentro.
+  const baseX = LAUREL_CX + LAUREL_R * Math.cos(rad);
+  const baseY = LAUREL_CY - LAUREL_R * Math.sin(rad);
+  // Ángulo de rotación SVG (sentido horario desde "arriba") que apunta la
+  // hoja hacia afuera, en la misma dirección radial del punto.
+  const rot = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  return { baseX, baseY, dx, dy, rot };
+}
+
 function Laurel({ mirrored }: { mirrored?: boolean }) {
+  const start = laurelPoint(0);
+  const end = laurelPoint(1);
+  const leaves = Array.from({ length: LAUREL_COUNT }, (_, i) => {
+    const t = i / (LAUREL_COUNT - 1);
+    const edge = Math.min(t, 1 - t) * 2; // 0 en las puntas, 1 en el medio
+    const scale = 0.55 + 0.45 * edge;
+    const p = laurelPoint(t);
+    // La base de la hoja (su punta interna, a 9 unidades del centro de la
+    // plantilla) queda pegada al arco; el resto se proyecta hacia afuera.
+    const offset = 9 * scale;
+    return { x: p.baseX + p.dx * offset, y: p.baseY + p.dy * offset, rot: p.rot, scale };
+  });
   return (
     <svg
-      width="26"
-      height="60"
-      viewBox="0 0 26 60"
+      width="44"
+      height="39"
+      viewBox="0 0 90 80"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
@@ -106,22 +145,21 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
       style={mirrored ? { transform: "scaleX(-1)" } : undefined}
     >
       <path
-        d="M22 2C16 10 13 18 12.5 30C13 42 16 50 22 58"
-        stroke="#fbbf24"
-        strokeWidth="1.6"
+        d={`M${start.baseX} ${start.baseY} A${LAUREL_R} ${LAUREL_R} 0 0 1 ${end.baseX} ${end.baseY}`}
+        stroke="#c8860a"
+        strokeWidth="1.4"
         strokeLinecap="round"
-        opacity="0.9"
+        fill="none"
+        opacity="0.7"
       />
-      {[6, 14, 22, 30, 38, 46, 54].map((y, i) => (
-        <ellipse
-          key={y}
-          cx={i % 2 === 0 ? 9 : 7}
-          cy={y}
-          rx="7"
-          ry="3.4"
+      {leaves.map((l, i) => (
+        <path
+          key={i}
+          d="M0 -9C1.7 -6.5 2.6 -3 2.6 0C2.6 3 1.7 6.5 0 9C-1.7 6.5 -2.6 3 -2.6 0C-2.6 -3 -1.7 -6.5 0 -9Z"
           fill="#fbbf24"
-          transform={`rotate(${i % 2 === 0 ? -28 : 28} ${i % 2 === 0 ? 9 : 7} ${y})`}
-          opacity={0.55 + (i % 2) * 0.25}
+          stroke="#b8790a"
+          strokeWidth="0.4"
+          transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${l.scale})`}
         />
       ))}
     </svg>
@@ -137,8 +175,11 @@ function Laurel({ mirrored }: { mirrored?: boolean }) {
 // si volvés después de mucho).
 const STAT_KEY = "loreado:statCounter:v1";
 const STAT_BASE = 4467;
-const STAT_MS_PER_TICK = 50_000; // ritmo promedio de una "entrevista" más
-const STAT_CATCHUP_CAP = 400;
+// Tiene que VERSE subir mientras alguien mira la página (de a 1, de a 2, cada
+// pocos segundos), no una vez cada rato — si no, en una visita normal nunca
+// se lo ve moverse y pierde todo el efecto de "contador vivo".
+const STAT_MS_PER_TICK = 2_200;
+const STAT_CATCHUP_CAP = 300;
 
 function StatsCounter() {
   const [n, setN] = useState(STAT_BASE);
@@ -173,8 +214,9 @@ function StatsCounter() {
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       if (cancelled) return;
+      const step = Math.random() < 0.7 ? 1 : 2; // de a 1, a veces de a 2
       setN((prev) => {
-        const next = prev + 1;
+        const next = prev + step;
         persist(next);
         return next;
       });
