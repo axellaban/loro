@@ -1049,6 +1049,9 @@ function ConectarPaso({
 }
 
 const LS_KEY = "copiloto:context:v1";
+/** Versión de los toggles guardados. Subirla descarta los valores viejos y
+    vuelve a los defaults, sin tocar empresa/puesto/perfil ni el modelo. */
+const PREFS_V = 2;
 
 // ---------- Reparto de la sesión en vivo ----------
 // Cuánto se lleva la columna de la llamada, en % del ancho. Se arrastra el
@@ -1121,6 +1124,61 @@ const PLANES: Record<PassPlan, Plan> = {
     wa: `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`,
   },
 };
+
+/**
+ * Achica una imagen a 1280px de ancho y la codifica en JPEG, devolviendo el
+ * base64 sin el prefijo `data:`.
+ *
+ * Todo lo que se manda al modelo pasa por acá, venga de la pantalla compartida
+ * o de un archivo del disco. Sin esto una captura de un monitor moderno se va a
+ * varios MB, y en base64 crece un tercio más: el request se pasa del límite de
+ * body de Vercel y vuelve un FUNCTION_PAYLOAD_TOO_LARGE. Achicada, el modelo
+ * lee el texto de la pantalla igual.
+ */
+const IMG_MAX_W = 1280;
+function aJpegChico(
+  fuente: CanvasImageSource,
+  anchoNativo: number,
+  altoNativo: number
+): { data: string; mime: string } | null {
+  if (!anchoNativo || !altoNativo) return null;
+  const escala = Math.min(1, IMG_MAX_W / anchoNativo);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(anchoNativo * escala);
+  canvas.height = Math.round(altoNativo * escala);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  // Fondo blanco: el JPEG no tiene transparencia, y sin esto un PNG con alfa
+  // (un recorte, un diagrama) queda sobre negro y se vuelve ilegible.
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(fuente, 0, 0, canvas.width, canvas.height);
+  const url = canvas.toDataURL("image/jpeg", 0.72);
+  const coma = url.indexOf(",");
+  if (coma < 0) return null;
+  return { data: url.slice(coma + 1), mime: "image/jpeg" };
+}
+
+/** Decodifica un archivo de imagen. `createImageBitmap` es el camino rápido;
+    el `<img>` es el respaldo para los navegadores que no lo tienen. */
+async function decodificarImagen(file: File): Promise<CanvasImageSource & { width: number; height: number }> {
+  if (typeof createImageBitmap === "function") {
+    return await createImageBitmap(file);
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    return await new Promise((ok, err) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => err(new Error("no se pudo decodificar"));
+      img.src = url;
+    });
+  } finally {
+    // Se libera después de que el canvas ya dibujó: revocarla antes deja el
+    // <img> sin datos en algunos navegadores.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
 
 // ---------- Endpointing semántico ----------
 export default function Page() {
@@ -1412,15 +1470,32 @@ export default function Page() {
       if (saved.answerSize && ANSWER_SIZES.some((s) => s.id === saved.answerSize)) {
         setAnswerSize(saved.answerSize);
       }
-      if (typeof saved.autoAnswer === "boolean") setAutoAnswer(saved.autoAnswer);
-      if (typeof saved.saveTranscript === "boolean") setSaveTranscript(saved.saveTranscript);
+      // Los dos toggles de comportamiento solo se restauran si los guardó una
+      // versión que ya tenía los defaults de hoy (transcripción sí, respuesta
+      // automática no). Una versión anterior los guardaba al revés apenas se
+      // abría la app —sin que nadie los tocara—, y eso quedaba pegado para
+      // siempre: quien entró en esa época veía los defaults invertidos.
+      if (saved.prefs >= PREFS_V) {
+        if (typeof saved.autoAnswer === "boolean") setAutoAnswer(saved.autoAnswer);
+        if (typeof saved.saveTranscript === "boolean") setSaveTranscript(saved.saveTranscript);
+      }
     } catch {}
   }, []);
   useEffect(() => {
     try {
       localStorage.setItem(
         LS_KEY,
-        JSON.stringify({ company, role, profile, modelId, lang, answerSize, autoAnswer, saveTranscript })
+        JSON.stringify({
+          company,
+          role,
+          profile,
+          modelId,
+          lang,
+          answerSize,
+          autoAnswer,
+          saveTranscript,
+          prefs: PREFS_V,
+        })
       );
     } catch {}
   }, [company, role, profile, modelId, lang, answerSize, autoAnswer, saveTranscript]);
@@ -1562,18 +1637,7 @@ export default function Page() {
   const capturarPantalla = useCallback((): { data: string; mime: string } | null => {
     const v = shareVideoRef.current;
     if (!v || !v.videoWidth || !v.videoHeight) return null;
-    const maxW = 1280;
-    const escala = Math.min(1, maxW / v.videoWidth);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(v.videoWidth * escala);
-    canvas.height = Math.round(v.videoHeight * escala);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-    const url = canvas.toDataURL("image/jpeg", 0.72);
-    const coma = url.indexOf(",");
-    if (coma < 0) return null;
-    return { data: url.slice(coma + 1), mime: "image/jpeg" };
+    return aJpegChico(v, v.videoWidth, v.videoHeight);
   }, []);
 
   /**
@@ -1625,28 +1689,31 @@ export default function Page() {
    * un archivo (un enunciado en PDF exportado a imagen, un diagrama, etc.).
    */
   const subirImagen = useCallback(
-    (file: File, texto: string) => {
+    async (file: File, texto: string) => {
       if (!file.type.startsWith("image/")) {
         setError("El archivo tiene que ser una imagen (PNG, JPG o WebP).");
         return;
       }
-      // 8 MB: arriba de eso el base64 no entra cómodo en el body del request.
-      if (file.size > 8 * 1024 * 1024) {
-        setError("La imagen pesa más de 8 MB. Probá con una más liviana.");
+      // Tope generoso: no es el límite del request (la imagen se achica antes
+      // de mandarla), solo evita quedarse decodificando un archivo enorme.
+      if (file.size > 40 * 1024 * 1024) {
+        setError("La imagen pesa más de 40 MB. Probá con una más liviana.");
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const url = String(reader.result || "");
-        const coma = url.indexOf(",");
-        if (coma < 0) {
-          setError("No se pudo leer la imagen.");
+      try {
+        const bitmap = await decodificarImagen(file);
+        // Se achica igual que la captura de pantalla: mandar el archivo tal
+        // como salió del disco es lo que hacía reventar el request.
+        const imagen = aJpegChico(bitmap, bitmap.width, bitmap.height);
+        if (typeof (bitmap as ImageBitmap).close === "function") (bitmap as ImageBitmap).close();
+        if (!imagen) {
+          setError("No se pudo procesar la imagen.");
           return;
         }
-        preguntarManual({ texto, imagen: { data: url.slice(coma + 1), mime: file.type } });
-      };
-      reader.onerror = () => setError("No se pudo leer la imagen.");
-      reader.readAsDataURL(file);
+        preguntarManual({ texto, imagen });
+      } catch {
+        setError("No se pudo leer la imagen. Probá con un PNG o un JPG.");
+      }
     },
     [preguntarManual]
   );
