@@ -1113,14 +1113,14 @@ const PLANES: Record<PassPlan, Plan> = {
   week: {
     titulo: "Pase Rey Loro Ilimitado (7 días)",
     precio: PASS_WEEK_PRICE,
-    mercadoPago: "https://mpago.la/17qBami",
+    mercadoPago: "https://mpago.la/1MWT5P9",
     binance: { url: "https://app.binance.com/uni-qr/XARJMtuK", qr: "/binance-qr-semanal.png" },
     wa: `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`,
   },
   year: {
     titulo: "Pase de 12 meses",
     precio: PASS_YEAR_PRICE,
-    mercadoPago: "https://mpago.la/1W9PQTG",
+    mercadoPago: "https://mpago.la/2zYVxoM",
     wa: `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`,
   },
 };

@@ -309,12 +309,15 @@ function MiniStat({ value, label }: { value: string; label: string }) {
 }
 
 // ----- Contador de "entrevistas superadas" (estilo Binance) -----
-// Es cosmético, no un conteo real: no hay backend detrás. La sensación de
-// "vivo" sale de dos cosas: arranca en un número base y sube solito cada
-// tanto mientras la pestaña está abierta, Y lo último que mostró queda en
-// localStorage con su hora, así que si volvés más tarde el número "se puso al
-// día" con el tiempo que pasó (con un tope, para que no salte a algo absurdo
-// si volvés después de mucho).
+//
+// El número sigue las PAGEVIEWS HISTÓRICAS reales del sitio: /api/stats las
+// consulta en PostHog (que ya las captura) y el contador va detrás de ese
+// valor. El 4.467 queda como piso, así que lo que se muestra es
+// "piso + visitas de verdad" y nunca baja.
+//
+// Si /api/stats no está disponible (falta la API key de PostHog, o se cayó),
+// se cae al modo cosmético de antes: sube solo cada tanto. La portada nunca
+// depende de que analytics ande.
 const STAT_KEY = "loreado:statCounter:v1";
 const STAT_BASE = 4467;
 // Tiene que VERSE subir mientras alguien mira la página (de a 1, de a 2, cada
@@ -322,6 +325,14 @@ const STAT_BASE = 4467;
 // se lo ve moverse y pierde todo el efecto de "contador vivo".
 const STAT_MS_PER_TICK = 2_200;
 const STAT_CATCHUP_CAP = 300;
+/** Cada cuánto se vuelve a preguntar el total real mientras la pestaña está
+    abierta. El endpoint está cacheado en el CDN, así que sale barato. */
+const STAT_POLL_MS = 60_000;
+/** Diferencia a partir de la cual no se anima de a uno: si el número real está
+    MUY por encima (primera carga, o alguien que vuelve después de meses),
+    animar 3.000 pasos tardaría una eternidad. Se salta casi todo y se deja
+    solo la cola para que se vea moverse. */
+const STAT_SALTO_MAX = 40;
 
 function StatsCounter() {
   const [n, setN] = useState(STAT_BASE);
@@ -353,6 +364,26 @@ function StatsCounter() {
     setN(start);
     persist(start);
 
+    let cancelled = false;
+    // Total real a alcanzar. `null` = todavía no llegó (o no hay analytics):
+    // hasta que llegue, el contador se comporta como el cosmético de antes.
+    let objetivo: number | null = null;
+
+    const pedirTotal = async () => {
+      try {
+        const r = await fetch("/api/stats", { cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (cancelled || !j?.disponible || typeof j.pageviews !== "number") return;
+        // El 4.467 es el piso: lo real se suma arriba, nunca reemplaza.
+        objetivo = STAT_BASE + j.pageviews;
+      } catch {
+        // Sin datos reales se sigue en modo cosmético, sin romper nada.
+      }
+    };
+    pedirTotal();
+    const poll = setInterval(pedirTotal, STAT_POLL_MS);
+
     // Espera hasta el próximo "evento" con distribución exponencial (la
     // misma que describe llegadas independientes al azar, tipo "cada tanto
     // termina una entrevista en algún lado"): la mayoría de las esperas son
@@ -368,12 +399,22 @@ function StatsCounter() {
       return 3;
     };
 
-    let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       if (cancelled) return;
       setN((prev) => {
-        const next = prev + nextStep();
+        let next: number;
+        if (objetivo === null) {
+          // Sin dato real: se inventa el movimiento, como antes.
+          next = prev + nextStep();
+        } else if (prev >= objetivo) {
+          // Ya alcanzó lo real. No se inventa nada de más: se espera a que la
+          // próxima consulta traiga visitas nuevas.
+          return prev;
+        } else {
+          const falta = objetivo - prev;
+          next = falta > STAT_SALTO_MAX ? objetivo - STAT_SALTO_MAX : prev + Math.min(nextStep(), falta);
+        }
         persist(next);
         return next;
       });
@@ -384,6 +425,7 @@ function StatsCounter() {
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      clearInterval(poll);
     };
   }, []);
 
