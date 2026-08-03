@@ -1,5 +1,8 @@
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 import { fmtPassExpiry, normalizePassInput, verifyPass } from "../../lib/pass";
+import { sesionDeRequest } from "../../lib/session";
+import { reclamar } from "../../lib/passStore";
+import * as kv from "../../lib/kv";
 
 export const runtime = "edge";
 /**
@@ -46,6 +49,10 @@ export async function GET() {
       // El error de pegado más común: un espacio o un salto de línea que se
       // cuela al copiar y rompe TODAS las firmas en silencio.
       sinEspaciosAlrededor: secret === secret.trim(),
+      // ¿Los pases siguen a la cuenta entre dispositivos? Necesita Upstash.
+      // Sin esto no se rompe nada, pero cada pase queda atado a su navegador.
+      pasesEntreDispositivos: kv.disponible(),
+      avisoAlmacenamiento: kv.motivoNoDisponible() || undefined,
       ayuda:
         "Compará 'huella' con la del secreto que firmó tus pases. Si no coinciden, el valor en Vercel es otro.",
       commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "desconocido",
@@ -105,11 +112,30 @@ export async function POST(req: Request) {
 
   const r = await verifyPass(token, secret);
   if (r.ok) {
+    // Si quien canjea entró con Google, el pase queda atado a esa cuenta: a
+    // partir de acá le sigue a cualquier dispositivo donde entre, y deja de
+    // servirle a quien reenvíe el código.
+    //
+    // Sin sesión no se ata nada y todo funciona como siempre. Es deliberado:
+    // el login es opcional, y quien ya tenía su pase andando no se puede
+    // quedar afuera por un cambio que no pidió.
+    const sesion = await sesionDeRequest(req);
+    if (sesion) {
+      const rec = await reclamar(sesion.sub, token, r.claims.expiresAt);
+      if (!rec.ok) {
+        return Response.json(
+          { ok: false, error: rec.motivo, reason: "claimed" },
+          { status: 403, headers: SIN_CACHE }
+        );
+      }
+    }
     return Response.json({
       ok: true,
       email: r.claims.email,
       expiresAt: r.claims.expiresAt,
       plan: r.claims.plan,
+      // Para que la UI pueda decir "te va a seguir en tus otros dispositivos".
+      atadoACuenta: Boolean(sesion),
     });
   }
 

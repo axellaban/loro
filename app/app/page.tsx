@@ -11,6 +11,7 @@ import CallSessions from "./CallSessions";
 import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 import { rememberEmail, savedEmail } from "../lib/email";
 import { usePass, storedPassToken, type ActivePass } from "../lib/passClient";
+import { useAuth, BotonGoogle } from "../lib/authClient";
 import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
 import { Markdown } from "../lib/Markdown";
 
@@ -1287,7 +1288,31 @@ export default function Page() {
     activate: activatePass,
     celebrate,
     endCelebration,
+    adoptar: adoptarPase,
+    olvidarSiEsDeCuenta,
   } = usePass();
+  /**
+   * Entrar con Google. Lo único que cambia para quien no lo usa es que aparece
+   * un botón más: el pase pegado a mano sigue funcionando igual.
+   *
+   * `adoptarPase` es el punto de todo esto: cuando alguien que ya pagó entra
+   * desde un dispositivo nuevo, el servidor le devuelve su pase junto con la
+   * sesión y acá se instala solo, sin que tenga que buscar el código.
+   */
+  const auth = useAuth(adoptarPase);
+  /**
+   * Con el login, PostHog deja de ver un navegador anónimo y pasa a ver a una
+   * persona: las sesiones del celular y las de la compu se juntan bajo el mismo
+   * email en vez de contar como dos desconocidos.
+   */
+  const cuentaVista = useRef("");
+  useEffect(() => {
+    const sub = auth.cuenta?.sub;
+    if (!sub || cuentaVista.current === sub) return;
+    cuentaVista.current = sub;
+    identify(auth.cuenta!.email, { email: auth.cuenta!.email });
+    track("login_google");
+  }, [auth.cuenta]);
   const passRef = useRef<typeof pass>(null);
   useEffect(() => {
     passRef.current = pass;
@@ -3312,9 +3337,23 @@ export default function Page() {
             solo; esto es la red por si alguien copió solo el código. */}
         {showSetup &&
           (pass ? (
-            <p className="pass-active">
-              👑 Pase Rey Loro activo — {pass.email} · vence {fmtPassExpiry(pass.expiresAt)}
-            </p>
+            <>
+              <p className="pass-active">
+                👑 Pase Rey Loro activo — {pass.email} · vence {fmtPassExpiry(pass.expiresAt)}
+              </p>
+              {/* El momento exacto en que ofrecer el login: ya pagó, el pase
+                  anda, y lo único que le falta es que le siga al celular. Antes
+                  de esto no tiene nada que ganar entrando. */}
+              {auth.configurado && !auth.cuenta && auth.listoGoogle && (
+                <div className="pass-cuenta">
+                  <p className="pass-cuenta-txt">
+                    Entrá con Google y tu pase te sigue al celular y a cualquier otra compu.
+                  </p>
+                  <BotonGoogle listo={auth.listoGoogle} />
+                  {auth.error && <p className="paywall-error">{auth.error}</p>}
+                </div>
+              )}
+            </>
           ) : passOpen ? (
             <form
               className="pass-form"
@@ -3356,8 +3395,39 @@ export default function Page() {
                   el formulario está cerrado, así que si no, abrir el link
                   parece "no hacer nada" y no hay pista de por qué. */}
               {passError && <p className="paywall-error">{passError}</p>}
+              {/* Acá es donde el login gana su lugar: alguien que ya pagó abre
+                  la app en el celular, no tiene el código a mano, y entrando
+                  con Google lo recupera sin buscar nada. */}
+              {auth.configurado && !auth.cuenta && auth.listoGoogle && !auth.checking && (
+                <div className="pass-cuenta">
+                  <p className="pass-cuenta-txt">¿Ya tenés pase en otro dispositivo?</p>
+                  <BotonGoogle listo={auth.listoGoogle} />
+                  {auth.error && <p className="paywall-error">{auth.error}</p>}
+                </div>
+              )}
             </>
           ))}
+        {/* Quién está adentro. Solo cuando entró: para el resto de la gente el
+            login no existe y la pantalla queda igual que siempre. */}
+        {showSetup && auth.cuenta && (
+          <p className="cuenta-chip">
+            {auth.cuenta.foto && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={auth.cuenta.foto} alt="" className="cuenta-foto" />
+            )}
+            <span className="cuenta-mail">{auth.cuenta.email}</span>
+            <button
+              type="button"
+              className="cs-link-btn"
+              onClick={async () => {
+                await auth.salir();
+                olvidarSiEsDeCuenta();
+              }}
+            >
+              Salir
+            </button>
+          </p>
+        )}
       </footer>
       )}
 

@@ -52,6 +52,10 @@ export type FunnelEvent =
   | "pass_week_click"
   | "pass_year_click"
   | "pass_activated"
+  // Login con Google y el pase que viaja con la cuenta.
+  | "login_google"
+  | "logout"
+  | "pass_from_account"
   // Paso de pago: qué medio elige cada quien y quién vuelve con comprobante.
   | "pay_mp_week"
   | "pay_mp_year"

@@ -38,13 +38,17 @@ export const PLAN_DAYS: Record<PassPlan, number> = { week: 7, year: 365 };
 
 // ---------- base64url (sin Buffer, para que ande en edge) ----------
 
-function b64urlEncode(bytes: Uint8Array): string {
+// Exportados: los usa también lib/google.ts para desarmar el JWT que devuelve
+// Google, que viene en el mismo formato. Es la única implementación de
+// base64url del proyecto a propósito — duplicarla es la clase de detalle que
+// se arregla en un lado y se olvida en el otro.
+export function b64urlEncode(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function b64urlDecode(s: string): Uint8Array {
+export function b64urlDecode(s: string): Uint8Array {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
   const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
   const out = new Uint8Array(bin.length);
@@ -54,7 +58,8 @@ function b64urlDecode(s: string): Uint8Array {
 
 // ---------- Firma ----------
 
-async function sign(payload: string, secret: string): Promise<string> {
+/** HMAC-SHA256 en base64url, completo. Lo usa también la cookie de sesión. */
+export async function hmac(payload: string, secret: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -64,14 +69,18 @@ async function sign(payload: string, secret: string): Promise<string> {
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
-  return b64urlEncode(new Uint8Array(sig)).slice(0, SIG_LEN);
+  return b64urlEncode(new Uint8Array(sig));
+}
+
+async function sign(payload: string, secret: string): Promise<string> {
+  return (await hmac(payload, secret)).slice(0, SIG_LEN);
 }
 
 /**
  * Comparación de tiempo constante. Contra un atacante remoto la diferencia de
  * timing es ruido, pero cuesta cuatro líneas y saca la duda de encima.
  */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);

@@ -13,6 +13,17 @@ import { PASS_QUERY, normalizePassInput, type PassPlan } from "./pass";
 const PASS_KEY = "loreado:pass:v1";
 
 /**
+ * De dónde salió el pase que está guardado: lo pegó la persona en ESTE
+ * navegador ("local") o se lo trajo su cuenta de Google al entrar ("cuenta").
+ *
+ * Importa para una sola cosa, y es al salir: un pase que llegó con la cuenta
+ * se va con ella. Si no, en una computadora compartida el siguiente que la usa
+ * se queda con el pase del anterior — que es justo lo que vinimos a evitar. El
+ * pase pegado a mano se queda, porque ese lo puso quien está sentado ahí.
+ */
+const ORIGEN_KEY = "loreado:pass:origen:v1";
+
+/**
  * Qué pase llegó por link en ESTA carga de página.
  *
  * Vive fuera del componente porque el efecto puede correr dos veces (React lo
@@ -76,13 +87,19 @@ export function usePass() {
   const [celebrate, setCelebrate] = useState(false);
 
   const apply = useCallback(
-    (token: string, res: { pass?: ActivePass; error?: string }, festejar = false) => {
+    (
+      token: string,
+      res: { pass?: ActivePass; error?: string },
+      festejar = false,
+      origen: "local" | "cuenta" = "local"
+    ) => {
       if (res.pass) {
         setPass(res.pass);
         setError("");
         if (festejar) setCelebrate(true);
         try {
           localStorage.setItem(PASS_KEY, token);
+          localStorage.setItem(ORIGEN_KEY, origen);
         } catch {}
         return true;
       }
@@ -92,6 +109,32 @@ export function usePass() {
     },
     []
   );
+
+  /**
+   * El pase que trajo la cuenta al entrar con Google. Ya viene verificado por
+   * el servidor —es el mismo que emitió /api/auth—, así que no se revalida:
+   * sería un viaje de red de más para preguntar lo que acabamos de responder.
+   */
+  const adoptar = useCallback(
+    (traido: ActivePass & { token: string }) => {
+      const yaTenia = storedPassToken();
+      apply(traido.token, { pass: traido }, !yaTenia, "cuenta");
+    },
+    [apply]
+  );
+
+  /**
+   * Al salir de la cuenta: se va el pase que vino con ella, se queda el que
+   * pegó a mano quien está usando esta computadora.
+   */
+  const olvidarSiEsDeCuenta = useCallback(() => {
+    try {
+      if (localStorage.getItem(ORIGEN_KEY) !== "cuenta") return;
+      localStorage.removeItem(PASS_KEY);
+      localStorage.removeItem(ORIGEN_KEY);
+    } catch {}
+    setPass(null);
+  }, []);
 
   // Al cargar: primero el pase del link (?pase=…), si no el guardado.
   useEffect(() => {
@@ -132,6 +175,7 @@ export function usePass() {
         // recupera volviendo a abrir el link, que es lo que la persona tiene.
         try {
           localStorage.removeItem(PASS_KEY);
+          localStorage.removeItem(ORIGEN_KEY);
         } catch {}
       }
       // Se festeja solo si el pase vino del link en esta carga: entrar por
@@ -157,5 +201,14 @@ export function usePass() {
 
   const endCelebration = useCallback(() => setCelebrate(false), []);
 
-  return { pass, checking, error, activate, celebrate, endCelebration };
+  return {
+    pass,
+    checking,
+    error,
+    activate,
+    celebrate,
+    endCelebration,
+    adoptar,
+    olvidarSiEsDeCuenta,
+  };
 }
