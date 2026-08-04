@@ -26,10 +26,22 @@ export const metadata: Metadata = {
   authors: [{ name: "Loreado.IA" }],
   creator: "Loreado.IA",
   publisher: "Loreado.IA",
-  // La prueba de propiedad del sitio para Search Console NO va acá: se sirve
-  // como archivo suelto en public/googleb0debdc4dd8b6742.html. Es el método que
-  // emitió Google para este dominio, y su token es distinto del de la etiqueta
-  // meta — por eso el de la etiqueta nunca verificó.
+  /**
+   * Prueba de propiedad del sitio para Search Console.
+   *
+   * Quedan los DOS métodos activos a la vez, que es legítimo y no se pisan:
+   * esta etiqueta, y el archivo public/googleb0debdc4dd8b6742.html. Google
+   * emite un token distinto por método, así que tener los dos evita otra vuelta
+   * de "no verifica" si uno de ellos falla.
+   *
+   * (El token anterior no funcionaba porque salía del método DNS, que para un
+   * subdominio de vercel.app no se puede usar: el DNS es de Vercel.)
+   */
+  verification: {
+    google:
+      process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+      "BhvMPeashaFO53vczv8gZhDYxPUdmNVad9vzpxr2A08",
+  },
   formatDetection: { telephone: false, email: false, address: false },
   robots: {
     index: true,
