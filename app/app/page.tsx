@@ -3328,108 +3328,101 @@ export default function Page() {
             </button>
           </div>
         )}
-        {showSetup && savedCount > 0 && (
-          <button type="button" className="cs-link-btn" onClick={() => setView("sessions")}>
-            Ver mis sesiones ({savedCount}) →
-          </button>
-        )}
-        {/* Canje manual del pase. Lo normal es entrar por el link, que lo canjea
-            solo; esto es la red por si alguien copió solo el código. */}
-        {showSetup &&
-          (pass ? (
-            <>
-              <p className="pass-active">
-                {/* Sin el email: cuando hay sesión ya aparece abajo, en el chip
-                    de la cuenta, y repetirlo dos veces en la misma esquina de
-                    la pantalla es ruido. Sigue estando en el tooltip del badge
-                    del header para cuando haga falta saber de quién es. */}
-                👑 Pase Rey Loro activo — vence {fmtPassExpiry(pass.expiresAt)}
-              </p>
-              {/* El momento exacto en que ofrecer el login: ya pagó, el pase
-                  anda, y lo único que le falta es que le siga al celular. Antes
-                  de esto no tiene nada que ganar entrando. */}
-              {auth.configurado && !auth.cuenta && auth.listoGoogle && (
-                <div className="pass-cuenta">
-                  <BotonGoogle listo={auth.listoGoogle} />
-                  {auth.error && <p className="paywall-error">{auth.error}</p>}
-                </div>
-              )}
-            </>
-          ) : passOpen ? (
-            <form
-              className="pass-form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setPassBusy(true);
-                const ok = await activatePass(passInput);
-                setPassBusy(false);
-                if (ok) {
-                  setPassInput("");
-                  setPassOpen(false);
-                  track("pass_activated");
-                }
-              }}
-            >
-              <input
-                className="form-input"
-                value={passInput}
-                onChange={(e) => setPassInput(e.target.value)}
-                placeholder="Pegá tu código o el link del pase"
-                aria-label="Código o link de tu pase"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="btn-action btn-primary btn-answer"
-                disabled={!passInput.trim() || passBusy}
-              >
-                <span className="btn-answer-inner">{passBusy ? "Validando…" : "Activar"}</span>
+        {/* Todo lo secundario del pie en UNA sola fila que envuelve.
+            Antes eran tres bloques apilados —el link de sesiones, la caja verde
+            del pase y el botón de Google—, cada uno de ancho completo y con su
+            propio padding. Sumaban más alto que el formulario mismo y empujaban
+            hacia arriba lo único que importa acá: cargar el contexto y arrancar.
+            Ahora es una línea de metadatos: se lee de un vistazo y no compite. */}
+        {showSetup && (
+          <div className="setup-meta">
+            {savedCount > 0 && (
+              <button type="button" className="meta-link" onClick={() => setView("sessions")}>
+                Ver mis sesiones ({savedCount}) →
               </button>
-              {passError && <p className="paywall-error">{passError}</p>}
-            </form>
-          ) : (
-            <>
-              <button type="button" className="cs-link-btn" onClick={() => setPassOpen(true)}>
-                ¿Ya sos Loro?
-              </button>
-              {/* Si el pase del link no validó, el error tiene que verse acá:
-                  el formulario está cerrado, así que si no, abrir el link
-                  parece "no hacer nada" y no hay pista de por qué. */}
-              {passError && <p className="paywall-error">{passError}</p>}
-              {/* Acá es donde el login gana su lugar: alguien que ya pagó abre
-                  la app en el celular, no tiene el código a mano, y entrando
-                  con Google lo recupera sin buscar nada. */}
-              {auth.configurado && !auth.cuenta && auth.listoGoogle && !auth.checking && (
-                <div className="pass-cuenta">
-                  {/* Sin texto: el botón viene justo debajo de "¿Ya sos Loro?",
-                      que ya hace la pregunta. Explicarlo de nuevo era repetir. */}
-                  <BotonGoogle listo={auth.listoGoogle} />
-                  {auth.error && <p className="paywall-error">{auth.error}</p>}
-                </div>
-              )}
-            </>
-          ))}
-        {/* Quién está adentro. Solo cuando entró: para el resto de la gente el
-            login no existe y la pantalla queda igual que siempre. */}
-        {showSetup && auth.cuenta && (
-          <p className="cuenta-chip">
-            {auth.cuenta.foto && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={auth.cuenta.foto} alt="" className="cuenta-foto" />
             )}
-            <span className="cuenta-mail">{auth.cuenta.email}</span>
-            <button
-              type="button"
-              className="cs-link-btn"
-              onClick={async () => {
-                await auth.salir();
-                olvidarSiEsDeCuenta();
-              }}
-            >
-              Salir
-            </button>
-          </p>
+
+            {pass ? (
+              // El email vuelve, pero en el tooltip: ocupa cero y sigue estando
+              // para cuando alguien necesite saber de quién es el pase.
+              <span className="meta-pase" title={`Pase de ${pass.email}`}>
+                👑 Pase activo · vence {fmtPassExpiry(pass.expiresAt)}
+              </span>
+            ) : (
+              !passOpen && (
+                <button type="button" className="meta-link" onClick={() => setPassOpen(true)}>
+                  ¿Ya sos Loro?
+                </button>
+              )
+            )}
+
+            {auth.cuenta ? (
+              <span className="meta-cuenta">
+                {auth.cuenta.foto && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={auth.cuenta.foto} alt="" className="meta-foto" />
+                )}
+                <span className="meta-mail">{auth.cuenta.email}</span>
+                <button
+                  type="button"
+                  className="meta-link"
+                  onClick={async () => {
+                    await auth.salir();
+                    olvidarSiEsDeCuenta();
+                  }}
+                >
+                  Salir
+                </button>
+              </span>
+            ) : (
+              auth.configurado &&
+              auth.listoGoogle &&
+              !auth.checking && <BotonGoogle listo={auth.listoGoogle} />
+            )}
+          </div>
         )}
+
+        {/* El canje manual sale de la fila: necesita ancho completo y solo
+            aparece cuando alguien lo pide. Lo normal es entrar por el link, que
+            lo canjea solo; esto es la red por si copió únicamente el código. */}
+        {showSetup && !pass && passOpen && (
+          <form
+            className="pass-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPassBusy(true);
+              const ok = await activatePass(passInput);
+              setPassBusy(false);
+              if (ok) {
+                setPassInput("");
+                setPassOpen(false);
+                track("pass_activated");
+              }
+            }}
+          >
+            <input
+              className="form-input"
+              value={passInput}
+              onChange={(e) => setPassInput(e.target.value)}
+              placeholder="Pegá tu código o el link del pase"
+              aria-label="Código o link de tu pase"
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="btn-action btn-primary btn-answer"
+              disabled={!passInput.trim() || passBusy}
+            >
+              <span className="btn-answer-inner">{passBusy ? "Validando…" : "Activar"}</span>
+            </button>
+          </form>
+        )}
+
+        {/* Los errores, abajo de todo y en una sola línea. El del pase tiene que
+            verse aunque el formulario esté cerrado: si no, abrir un link que no
+            valida parece "no hacer nada" y no hay pista de por qué. */}
+        {showSetup && !pass && passError && <p className="paywall-error">{passError}</p>}
+        {showSetup && auth.error && <p className="paywall-error">{auth.error}</p>}
       </footer>
       )}
 

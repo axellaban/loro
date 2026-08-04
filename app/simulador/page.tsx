@@ -2048,7 +2048,7 @@ export default function SimuladorPage() {
               <div className="sim-loading-spinner" />
               <h2 className="mono" style={{ fontSize: 16, fontWeight: 700 }}>Generando reporte de feedback…</h2>
               <p className="tagline" style={{ maxWidth: 360 }}>
-                El Loro de IA está evaluando tus respuestas en base a la señal, fit cultural y claridad de
+                Tu Loro de IA está evaluando tus respuestas, el fit cultural y claridad de
                 comunicación. Esto demora unos segundos.
               </p>
             </div>
