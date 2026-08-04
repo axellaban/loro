@@ -3339,7 +3339,11 @@ export default function Page() {
           (pass ? (
             <>
               <p className="pass-active">
-                👑 Pase Rey Loro activo — {pass.email} · vence {fmtPassExpiry(pass.expiresAt)}
+                {/* Sin el email: cuando hay sesión ya aparece abajo, en el chip
+                    de la cuenta, y repetirlo dos veces en la misma esquina de
+                    la pantalla es ruido. Sigue estando en el tooltip del badge
+                    del header para cuando haga falta saber de quién es. */}
+                👑 Pase Rey Loro activo — vence {fmtPassExpiry(pass.expiresAt)}
               </p>
               {/* El momento exacto en que ofrecer el login: ya pagó, el pase
                   anda, y lo único que le falta es que le siga al celular. Antes
@@ -3400,7 +3404,8 @@ export default function Page() {
                   con Google lo recupera sin buscar nada. */}
               {auth.configurado && !auth.cuenta && auth.listoGoogle && !auth.checking && (
                 <div className="pass-cuenta">
-                  <p className="pass-cuenta-txt">¿Ya tenés pase en otro dispositivo?</p>
+                  {/* Sin texto: el botón viene justo debajo de "¿Ya sos Loro?",
+                      que ya hace la pregunta. Explicarlo de nuevo era repetir. */}
                   <BotonGoogle listo={auth.listoGoogle} />
                   {auth.error && <p className="paywall-error">{auth.error}</p>}
                 </div>
