@@ -26,20 +26,10 @@ export const metadata: Metadata = {
   authors: [{ name: "Loreado.IA" }],
   creator: "Loreado.IA",
   publisher: "Loreado.IA",
-  /**
-   * Prueba de que el sitio es nuestro, para Google Search Console.
-   *
-   * Va por etiqueta y no por registro TXT porque el dominio es un subdominio
-   * de vercel.app: el DNS es de Vercel y no se le pueden agregar registros. El
-   * contenido del sitio, en cambio, sí lo controlamos, y a Google le alcanza
-   * con eso. Se puede pisar por env para el día que el sitio viva en un
-   * dominio propio con su propio código.
-   */
-  verification: {
-    google:
-      process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
-      "eMR9dfkc49T1jQnxF6h8dzo4kSsXZqSXEhn8gQfxerw",
-  },
+  // La prueba de propiedad del sitio para Search Console NO va acá: se sirve
+  // como archivo suelto en public/googleb0debdc4dd8b6742.html. Es el método que
+  // emitió Google para este dominio, y su token es distinto del de la etiqueta
+  // meta — por eso el de la etiqueta nunca verificó.
   formatDetection: { telephone: false, email: false, address: false },
   robots: {
     index: true,
