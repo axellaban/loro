@@ -4852,3 +4852,76 @@ a.btn-action {
   line-height: 1.45;
   color: var(--ink-dim);
 }
+
+/* ---- Páginas legales (privacidad y condiciones) ----
+   Texto largo para leer, no una pantalla de app: medida corta, buen interlineado
+   y jerarquía clara. Google las exige para el login, pero además son las dos
+   páginas donde alguien decide si confía o no. */
+.legal {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.legal h1 {
+  font-size: clamp(28px, 6vw, 40px);
+  line-height: 1.15;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+.legal h2 {
+  font-size: 20px;
+  margin: 38px 0 10px;
+  letter-spacing: -0.01em;
+  color: var(--loro-green-deep);
+}
+.legal p,
+.legal ul {
+  margin: 0 0 14px;
+}
+.legal ul {
+  padding-left: 22px;
+}
+.legal li {
+  margin-bottom: 8px;
+}
+.legal a {
+  color: var(--loro-green-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.legal a:hover {
+  color: var(--loro-green-deep);
+}
+.legal-fecha {
+  color: var(--ink-faint);
+  font-size: 13.5px;
+  margin: 0 0 28px;
+}
+/* La entrada: un poco más grande, porque es lo único que mucha gente va a leer. */
+.legal-intro {
+  font-size: 17.5px;
+  color: var(--ink-dim);
+  border-left: 3px solid var(--loro-green);
+  padding-left: 14px;
+  margin-bottom: 30px;
+}
+.legal-volver {
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+.legal-volver a {
+  color: var(--ink-dim);
+  text-decoration: none;
+}
+.legal-volver a:hover {
+  color: var(--ink);
+}
+.legal-volver-fin {
+  margin-top: 44px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
