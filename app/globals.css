@@ -1612,7 +1612,7 @@ input {
 .google-btn {
   display: flex;
   justify-content: center;
-  min-height: 40px;
+  min-height: 32px;
   color-scheme: light;
 }
 
@@ -4924,4 +4924,22 @@ a.btn-action {
   margin-top: 44px;
   padding-top: 22px;
   border-top: 1px solid var(--line);
+}
+
+/* Separador "o" entre los dos caminos para desbloquear el informe: el campo de
+   email y el botón de Google. Una línea a cada lado del texto. */
+.paywall-o {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.paywall-o::before,
+.paywall-o::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
 }

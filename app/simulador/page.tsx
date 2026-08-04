@@ -6,6 +6,7 @@ import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 import { BrandLogo } from "../lib/BrandLogo";
 import { rememberEmail, savedEmail } from "../lib/email";
+import { useAuth, BotonGoogle } from "../lib/authClient";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
 
 type Line = { id: number; text: string; final: boolean };
@@ -1613,6 +1614,29 @@ export default function SimuladorPage() {
     }
   }, [email]);
 
+  /**
+   * El otro camino para desbloquear el informe: entrar con Google.
+   *
+   * Convive con el campo de email, no lo reemplaza. Escribir un email es menos
+   * fricción que elegir una cuenta y aceptar una pantalla, así que sacar el
+   * campo costaría conversión; pero quien entra con Google deja un email
+   * verificado de verdad y se ahorra tipear. Cada quien elige.
+   *
+   * No hace falta mandar nada a la lista: /api/auth ya registra el email al
+   * entrar, y ahí está la marca que evita duplicados.
+   */
+  const auth = useAuth();
+  const cuentaVista = useRef("");
+  useEffect(() => {
+    const em = auth.cuenta?.email;
+    if (!em || cuentaVista.current === em) return;
+    cuentaVista.current = em;
+    rememberEmail(em);
+    identify(em, { email: em });
+    track("sim_google_unlock");
+    setEmailGatePassed(true);
+  }, [auth.cuenta]);
+
   const inInterview = phase !== "setup" && phase !== "feedback";
   const connecting = phase === "connecting";
 
@@ -2073,6 +2097,15 @@ export default function SimuladorPage() {
                         {emailSending ? "Enviando…" : "Ver mi Resultado Ahora"}
                       </button>
                       {emailError && <div className="paywall-error">{emailError}</div>}
+                      {auth.configurado && auth.listoGoogle && (
+                        <>
+                          <div className="paywall-o">
+                            <span>o</span>
+                          </div>
+                          <BotonGoogle listo={auth.listoGoogle} />
+                          {auth.error && <div className="paywall-error">{auth.error}</div>}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

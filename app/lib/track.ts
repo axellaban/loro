@@ -75,6 +75,8 @@ export type FunnelEvent =
   | "sim_cross_sell_click"
   | "sim_share_whatsapp"
   | "sim_email_submit"
+  // Informe desbloqueado entrando con Google en vez de tipear el email.
+  | "sim_google_unlock"
   | "hub_practice_click"
   | "hub_copilot_click";
 

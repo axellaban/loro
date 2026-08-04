@@ -3350,9 +3350,6 @@ export default function Page() {
                   de esto no tiene nada que ganar entrando. */}
               {auth.configurado && !auth.cuenta && auth.listoGoogle && (
                 <div className="pass-cuenta">
-                  <p className="pass-cuenta-txt">
-                    Entrá con Google y tu pase te sigue al celular y a cualquier otra compu.
-                  </p>
                   <BotonGoogle listo={auth.listoGoogle} />
                   {auth.error && <p className="paywall-error">{auth.error}</p>}
                 </div>

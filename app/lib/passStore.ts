@@ -71,6 +71,23 @@ export async function reclamar(
   return { ok: true };
 }
 
+/**
+ * Marca que a esta cuenta ya se le registró el email en el Google Form, y dice
+ * si es la primera vez.
+ *
+ * Sin esto, cada vez que la persona entra desde un dispositivo nuevo —o
+ * simplemente vuelve después de limpiar las cookies— se manda otra fila al
+ * formulario, y la lista se llena del mismo email repetido. Usa SET NX para
+ * que dos pestañas abiertas a la vez no cuenten como dos.
+ *
+ * Si no hay base, devuelve false: preferimos no registrar a registrar de más.
+ */
+export async function marcarRegistrado(sub: string): Promise<boolean> {
+  if (!kv.disponible() || !sub) return false;
+  // Un año: si alguien vuelve después de tanto, registrarlo de nuevo no molesta.
+  return kv.setIfAbsent(`registrado:${sub}`, "1", 365 * 24 * 60 * 60);
+}
+
 /** Suelta el pase de una cuenta. Para cuando alguien pierde el acceso y hay que reasignarlo. */
 export async function liberar(sub: string, token: string): Promise<void> {
   if (!kv.disponible()) return;

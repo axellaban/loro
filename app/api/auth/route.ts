@@ -10,7 +10,8 @@
 
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 import { verificarIdToken } from "../../lib/google";
-import { pasePorCuenta } from "../../lib/passStore";
+import { marcarRegistrado, pasePorCuenta } from "../../lib/passStore";
+import { registrarEmail } from "../../lib/gform";
 import { verifyPass } from "../../lib/pass";
 import * as kv from "../../lib/kv";
 import {
@@ -140,6 +141,17 @@ export async function POST(req: Request) {
       },
       { status: 500, headers: SIN_CACHE }
     );
+  }
+
+  // Quien entra con Google queda en la misma lista que la gente de la waitlist
+  // y la que desbloquea un informe. Solo la primera vez: sin la marca, cada
+  // dispositivo nuevo sumaría otra fila con el mismo email.
+  //
+  // No se espera el resultado ni se corta el login si falla. El formulario es
+  // marketing; que Google Forms esté lento no puede demorar —ni impedir— que
+  // alguien entre a la app.
+  if (await marcarRegistrado(v.user.sub)) {
+    registrarEmail(v.user.email).catch(() => {});
   }
 
   return Response.json(

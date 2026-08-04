@@ -188,8 +188,11 @@ export function BotonGoogle({
       window.google.accounts.id.renderButton(ref.current, {
         type: "standard",
         theme: "filled_black",
-        size: "large",
-        text: "continue_with",
+        // "medium" en vez de "large": es un botón secundario —la acción
+        // principal de esa pantalla es arrancar la sesión—, y en "large"
+        // competía con ella.
+        size: "medium",
+        text: "signin_with",
         shape: "pill",
         logo_alignment: "left",
         locale: "es",
