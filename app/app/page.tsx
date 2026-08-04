@@ -3338,7 +3338,7 @@ export default function Page() {
           <div className="setup-meta">
             {savedCount > 0 && (
               <button type="button" className="meta-link" onClick={() => setView("sessions")}>
-                Ver mis sesiones ({savedCount}) →
+                Ver mis sesiones →
               </button>
             )}
 
