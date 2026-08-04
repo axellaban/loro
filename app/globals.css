@@ -5046,3 +5046,5 @@ a.btn-action {
   white-space: pre;
   pointer-events: none;
 }
+/* El panel de sesión va arriba, para no taparse con el del avatar. */
+.sim-debug-sesion { bottom: auto; top: 8px; left: 8px; color: #7dd3fc; }

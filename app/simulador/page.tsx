@@ -664,6 +664,14 @@ export default function SimuladorPage() {
   const postTtsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAtRef = useRef(0);
   const wakeLockRef = useRef<any>(null);
+  /**
+   * Contadores para el panel de ?debug=1. Son refs y no estado a propósito:
+   * se tocan miles de veces por minuto y un re-render por paquete de audio
+   * cambiaría justamente el comportamiento que se quiere observar.
+   */
+  const pcmEnviadosRef = useRef(0);
+  const dgRecibidosRef = useRef(0);
+  const dgUltimoRef = useRef(0);
 
   const selectedModel = MODELS.find((m) => m.id === modelId) || MODELS[0];
 
@@ -871,6 +879,8 @@ export default function SimuladorPage() {
     } catch {
       return;
     }
+    dgRecibidosRef.current++;
+    dgUltimoRef.current = Date.now();
 
     if (msg.type === "UtteranceEnd") {
       // Deepgram marca 1s de silencio. Solo cerramos ya si la frase sonó
@@ -1457,7 +1467,10 @@ export default function SimuladorPage() {
         const ph = phaseRef.current;
         if (ph !== "listening" && ph !== "confirming") return;
         const w = wsRef.current;
-        if (w && w.readyState === WebSocket.OPEN) w.send(e.data);
+        if (w && w.readyState === WebSocket.OPEN) {
+          w.send(e.data);
+          pcmEnviadosRef.current++;
+        }
       };
       source.connect(worklet);
 
@@ -1916,6 +1929,14 @@ export default function SimuladorPage() {
             <section className="sim-room-left">
               <div className="sim-stage">
                 <Avatar state={avatarState} analyser={analyser} micAnalyser={micAnalyser} />
+                <DiagnosticoSesion
+                  phase={phase}
+                  wsRef={wsRef}
+                  pcm={pcmEnviadosRef}
+                  dg={dgRecibidosRef}
+                  dgUltimo={dgUltimoRef}
+                  respuesta={currentAnswerRef}
+                />
 
                 <span className={`sim-stage-badge ${connecting ? "sim-stage-badge-connecting" : ""}`}>
                   <span className="sim-stage-badge-dot" aria-hidden="true" />
@@ -2271,4 +2292,72 @@ export default function SimuladorPage() {
       )}
     </main>
   );
+}
+
+/**
+ * Estado de la escucha, en pantalla, detrás de ?debug=1.
+ *
+ * Existe porque hay un bug —la sala deja de escuchar a partir de la segunda
+ * respuesta— que no se puede reproducir sin hacer una entrevista completa con
+ * micrófono, y leyendo el código no aparece. Responde las cuatro preguntas que
+ * separan las causas posibles: en qué fase está, si el socket de Deepgram sigue
+ * abierto, si el micrófono está mandando audio, y si Deepgram está contestando.
+ *
+ * Sin el parámetro no se ve, así que para cualquier visitante la sala queda
+ * igual que siempre.
+ */
+function DiagnosticoSesion({
+  phase,
+  wsRef,
+  pcm,
+  dg,
+  dgUltimo,
+  respuesta,
+}: {
+  phase: Phase;
+  wsRef: React.RefObject<WebSocket | null>;
+  pcm: React.RefObject<number>;
+  dg: React.RefObject<number>;
+  dgUltimo: React.RefObject<number>;
+  respuesta: React.RefObject<string>;
+}) {
+  const [on, setOn] = useState(false);
+  const [txt, setTxt] = useState("");
+  // Se mira el ritmo, no el total: "cuántos paquetes por segundo" dice si el
+  // micrófono está fluyendo AHORA, que es lo que importa. Un acumulado grande
+  // puede venir todo del primer turno.
+  const previo = useRef({ pcm: 0, dg: 0, t: Date.now() });
+
+  useEffect(() => {
+    try {
+      setOn(new URLSearchParams(window.location.search).get("debug") === "1");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!on) return;
+    const id = setInterval(() => {
+      const ahora = Date.now();
+      const dt = (ahora - previo.current.t) / 1000 || 1;
+      const pps = ((pcm.current || 0) - previo.current.pcm) / dt;
+      const dps = ((dg.current || 0) - previo.current.dg) / dt;
+      previo.current = { pcm: pcm.current || 0, dg: dg.current || 0, t: ahora };
+      const ws = wsRef.current;
+      const estados = ["conectando", "ABIERTO", "cerrando", "CERRADO"];
+      const ultimo = dgUltimo.current
+        ? `${((ahora - dgUltimo.current) / 1000).toFixed(1)}s`
+        : "nunca";
+      setTxt(
+        `fase: ${phase}\n` +
+          `socket: ${ws ? estados[ws.readyState] : "sin socket"}\n` +
+          `mic → deepgram: ${pps.toFixed(0)}/s (total ${pcm.current})\n` +
+          `deepgram → app: ${dps.toFixed(1)}/s (último hace ${ultimo})\n` +
+          `respuesta: ${(respuesta.current || "").length} caracteres`
+      );
+    }, 500);
+    return () => clearInterval(id);
+  }, [on, phase, wsRef, pcm, dg, dgUltimo, respuesta]);
+
+  if (!on) return null;
+  return <pre className="sim-avatar-debug sim-debug-sesion">{txt}</pre>;
 }

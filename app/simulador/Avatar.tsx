@@ -40,7 +40,7 @@ const SOURCES = {
   mobile: { talks: ["/loro-interviewer.mp4"], idle: "/loro-idle.mp4" },
   desktop: {
     talks: ["/lora-talk-1-wide.mp4", "/lora-talk-2-wide.mp4", "/lora-talk-3-wide.mp4"],
-    idle: "/lora-idle-wide.mp4",
+    idle: "/lora-idle-wide-v2.mp4",
   },
 };
 
