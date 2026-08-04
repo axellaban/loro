@@ -1628,14 +1628,18 @@ export default function SimuladorPage() {
   const auth = useAuth();
   const cuentaVista = useRef("");
   useEffect(() => {
-    const em = auth.cuenta?.email;
+    // Solo si tocó el botón en ESTA visita. Tener la sesión de Google puesta no
+    // equivale a haber elegido dejar el email: con `auth.cuenta` a secas,
+    // cualquiera que estuviera logueado se salteaba el informe con solo abrir
+    // la página, y de paso se guardaba su email para toda la app.
+    const em = auth.entradaNueva ? auth.cuenta?.email : "";
     if (!em || cuentaVista.current === em) return;
     cuentaVista.current = em;
     rememberEmail(em);
     identify(em, { email: em });
     track("sim_google_unlock");
     setEmailGatePassed(true);
-  }, [auth.cuenta]);
+  }, [auth.cuenta, auth.entradaNueva]);
 
   const inInterview = phase !== "setup" && phase !== "feedback";
   const connecting = phase === "connecting";

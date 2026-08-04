@@ -102,14 +102,19 @@ export default function Avatar({
     const idle = idleRef.current;
     idle?.play().catch(() => {});
     if (speaking) {
-      talk?.play().catch(() => {
-        if (talk.currentTime === 0) failVideo();
-      });
+      talk
+        ?.play()
+        .then(() => console.info("[loro] el clip de habla arrancó"))
+        .catch((e) => {
+          console.warn("[loro] el clip de habla NO pudo arrancar:", e?.name || e);
+          if (talk.currentTime === 0) failVideo();
+        });
       return;
     }
     const timer = setTimeout(() => talk?.pause(), FADE_MS + 150);
     return () => clearTimeout(timer);
   }, [speaking, videoFailed, talkSrc, idleSrc]);
+
 
   // El anillo late con la voz real del usuario. Solo en `listening`: así no
   // reacciona al TTS del propio loro filtrándose por el micrófono (eco).
@@ -134,6 +139,22 @@ export default function Avatar({
   }, [state, micAnalyser]);
 
   const showVideo = montado && !videoFailed && videoReady;
+
+  /**
+   * Rastro en la consola de por qué el loro muestra lo que muestra.
+   *
+   * Va a producción a propósito: el avatar se rompió en desktop de una forma
+   * que no se puede reproducir sin una entrevista real con audio, y dos
+   * hipótesis razonables ya fallaron. Con esta línea alcanza con abrir la
+   * consola para separar los tres casos posibles: que nunca llegue el estado
+   * "speaking", que el video no cargue, o que cargue y no se vea.
+   */
+  useEffect(() => {
+    console.info(
+      `[loro] estado=${state} pantalla=${isDesktop ? "desktop" : "mobile"} ` +
+        `videoListo=${videoReady} videoFalló=${videoFailed} seVe=${showVideo} clip=${idleSrc}`
+    );
+  }, [state, isDesktop, videoReady, videoFailed, showVideo, idleSrc]);
 
   return (
     <div

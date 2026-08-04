@@ -64,6 +64,15 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
   const [checking, setChecking] = useState(Boolean(clientId));
   const [error, setError] = useState("");
   const [listoGoogle, setListoGoogle] = useState(false);
+  /**
+   * ¿Entró RECIÉN, en esta visita, o ya venía con la sesión puesta?
+   *
+   * La diferencia importa donde entrar con Google reemplaza a dejar el email:
+   * ahí lo que vale es el acto de elegirlo, no el hecho de tener una cookie.
+   * Sin esta distinción, alguien logueado se salteaba el pedido de email con
+   * solo abrir la pantalla, sin haber tocado nada. (Pasó.)
+   */
+  const [entradaNueva, setEntradaNueva] = useState(false);
 
   // La última versión del callback, para que el `initialize` de Google (que
   // corre una sola vez) no se quede con una copia vieja.
@@ -107,6 +116,7 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
         setCuenta(j.sesion);
+        setEntradaNueva(true);
         if (j.pase?.token) alEntrarRef.current?.(j.pase);
         return true;
       }
@@ -152,6 +162,7 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
       await fetch("/api/auth", { method: "DELETE" });
     } catch {}
     setCuenta(null);
+    setEntradaNueva(false);
     setError("");
     try {
       window.google?.accounts?.id?.disableAutoSelect?.();
@@ -164,6 +175,7 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
     cuenta,
     checking,
     error,
+    entradaNueva,
     salir,
   };
 }
@@ -171,59 +183,51 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
 /**
  * El botón de Google, en su versión de solo logo.
  *
- * Es el botón OFICIAL igual —`type: "icon"` es una variante que provee la
- * propia librería—, no un ícono dibujado por nosotros. Importa: la marca de
- * Google tiene reglas de uso y su botón trae gratis el manejo de sesiones,
- * el idioma y la accesibilidad.
+ * Es el botón que provee la propia librería, no uno dibujado por nosotros: la
+ * marca de Google tiene reglas de uso y su botón trae resueltos el manejo de
+ * sesiones, el idioma y la accesibilidad.
  *
- * En solo-ícono porque en los dos lugares donde aparece es una alternativa
- * secundaria, con su propio texto al lado ("O entrá con"): un botón con la
- * leyenda adentro repetía esa misma frase dos veces y ocupaba el triple.
+ * Se probó la variante de solo logo (`type: "icon"`), que es más linda y más
+ * chica, pero en producción salía el círculo vacío, sin la G. La causa está en
+ * el reset global de globals.css: `* { margin: 0; padding: 0 }` alcanza al HTML
+ * que Google inyecta —no está aislado en un shadow DOM—, y el botón de solo
+ * ícono depende de ese padding interno para colocar el logo. El estándar tiene
+ * suficiente estructura propia como para sobrevivirlo.
  */
-export function BotonGoogle({
-  listo,
-  variante = "icono",
-}: {
-  listo: boolean;
-  variante?: "icono" | "estandar";
-}) {
+export function BotonGoogle({ listo }: { listo: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const dibujado = useRef(false);
 
   useEffect(() => {
     if (!listo || dibujado.current || !ref.current) return;
     try {
-      window.google.accounts.id.renderButton(
-        ref.current,
-        variante === "icono"
-          ? { type: "icon", shape: "circle", theme: "outline", size: "large" }
-          : {
-              type: "standard",
-              theme: "filled_black",
-              size: "medium",
-              text: "signin_with",
-              shape: "pill",
-              logo_alignment: "left",
-              locale: "es",
-            }
-      );
+      window.google.accounts.id.renderButton(ref.current, {
+        type: "standard",
+        theme: "outline",
+        size: "medium",
+        text: "signin_with",
+        shape: "pill",
+        logo_alignment: "left",
+        locale: "es",
+      });
       dibujado.current = true;
     } catch {
       // no-op: sin botón, la app sigue andando sin login.
     }
-  }, [listo, variante]);
+  }, [listo]);
 
-  return <div ref={ref} className={`google-btn google-btn-${variante}`} />;
+  return <div ref={ref} className="google-btn" />;
 }
 
 /**
- * "O entrá con" + el logo. Es el bloque completo tal como se usa en los dos
- * lugares: así la frase y el botón no se pueden desincronizar.
+ * El botón, con el "o" que lo separa de la otra opción. Sin la frase "entrá
+ * con": el propio botón ya dice "Iniciar sesión con Google" y repetirlo al
+ * lado era decir dos veces lo mismo.
  */
 export function EntrarConGoogle({ listo, className = "" }: { listo: boolean; className?: string }) {
   return (
     <div className={`entrar-google ${className}`}>
-      <span className="entrar-google-txt">O entrá con</span>
+      <span className="entrar-google-txt">o</span>
       <BotonGoogle listo={listo} />
     </div>
   );

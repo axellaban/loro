@@ -283,11 +283,14 @@ function PanelDesbloqueo({ onListo }: { onListo: () => void }) {
   // Entrar con Google desbloquea igual: el email que devuelve está verificado,
   // así que vale más que uno tipeado, y es un click contra escribirlo entero.
   useEffect(() => {
-    if (auth.cuenta?.email) {
+    // Solo si entró recién: llegar acá con la sesión ya puesta no desbloquea
+    // nada. Tener una cookie no es lo mismo que haber elegido dejar el email.
+    if (auth.entradaNueva && auth.cuenta?.email) {
       rememberEmail(auth.cuenta.email);
+      identify(auth.cuenta.email, { email: auth.cuenta.email });
       onListo();
     }
-  }, [auth.cuenta, onListo]);
+  }, [auth.cuenta, auth.entradaNueva, onListo]);
 
   const enviar = async () => {
     const em = email.trim();
