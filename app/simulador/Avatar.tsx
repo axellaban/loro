@@ -21,12 +21,27 @@ import { createLevelReader } from "./tts";
 
 export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 
-// Un par de clips por viewport:
-//  - mobile: loro vertical (9/16) a pantalla completa.
-//  - desktop: loro horizontal (16/9) que llena el stage ancho sin recorte.
+/**
+ * Clips por viewport:
+ *  - mobile: loro vertical (9/16) a pantalla completa.
+ *  - desktop: la Lora entrevistadora horizontal (16/9), que llena el stage
+ *    ancho sin recorte.
+ *
+ * En desktop hay TRES clips de habla y se van turnando: uno por pregunta, y
+ * cuando se acaban vuelve a empezar. Con un solo clip repitiéndose toda la
+ * entrevista, para la tercera pregunta ya se reconoce el gesto y el efecto de
+ * "hay alguien del otro lado" se cae.
+ *
+ * El de espera es siempre el mismo: se recortó del primer clip de habla, del
+ * tramo más quieto con el pico cerrado, en boomerang (ida y vuelta) para que
+ * el bucle no tenga costura.
+ */
 const SOURCES = {
-  mobile: { talk: "/loro-interviewer.mp4", idle: "/loro-idle.mp4" },
-  desktop: { talk: "/loro-interviewer-wide.mp4", idle: "/loro-idle-wide.mp4" },
+  mobile: { talks: ["/loro-interviewer.mp4"], idle: "/loro-idle.mp4" },
+  desktop: {
+    talks: ["/lora-talk-1-wide.mp4", "/lora-talk-2-wide.mp4", "/lora-talk-3-wide.mp4"],
+    idle: "/lora-idle-wide.mp4",
+  },
 };
 
 // Debe coincidir con la transición de `.sim-avatar-video` en globals.css.
@@ -76,8 +91,26 @@ export default function Avatar({
   }, []);
 
   const montado = isDesktop !== null;
-  const { talk: talkSrc, idle: idleSrc } = isDesktop ? SOURCES.desktop : SOURCES.mobile;
+  const { talks, idle: idleSrc } = isDesktop ? SOURCES.desktop : SOURCES.mobile;
+
+  /**
+   * Cuál de los clips de habla toca. Avanza al TERMINAR cada turno, no al
+   * empezar el siguiente: así el clip que viene tiene toda la pausa —mientras
+   * la persona responde— para descargarse, y cuando le toca hablar ya está
+   * listo. Al revés habría que esperarlo justo cuando hace falta.
+   */
+  const [talkIdx, setTalkIdx] = useState(0);
+  const talkSrc = talks[talkIdx % talks.length];
   const speaking = state === "speaking";
+
+  // Pasar al siguiente clip cuando se termina de hablar.
+  const hablabaAntes = useRef(false);
+  useEffect(() => {
+    if (hablabaAntes.current && !speaking && talks.length > 1) {
+      setTalkIdx((i) => (i + 1) % talks.length);
+    }
+    hablabaAntes.current = speaking;
+  }, [speaking, talks.length]);
 
   // Al cambiar de fuente (cruce de breakpoint) los <video> se remontan por la
   // key, pero `videoReady` es del componente: sin este reset se mostraría el
