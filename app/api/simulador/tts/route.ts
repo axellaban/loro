@@ -46,6 +46,59 @@ async function requestSpeech(apiKey: string, model: string, text: string, lang: 
   });
 }
 
+/**
+ * ¿Anda la voz del entrevistador?
+ *
+ * Cuando el TTS falla, el simulador no muestra ningún error: cae a un camino
+ * degradado que escribe la pregunta entera de golpe y deja al loro en el clip
+ * de espera. Visto desde afuera parece un problema del video, y por ese
+ * desvío se pierde mucho tiempo. (Pasó.)
+ *
+ * Este GET pide una palabra a OpenAI y cuenta qué contestó. Nunca devuelve la
+ * clave ni nada derivado de ella.
+ */
+export async function GET() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const sinCache = { "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8" };
+  if (!apiKey) {
+    return Response.json(
+      {
+        vozConfigurada: false,
+        ayuda:
+          "Falta OPENAI_API_KEY en este deploy. Cargala en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
+      },
+      { headers: sinCache }
+    );
+  }
+
+  const probar = async (modelo: string) => {
+    try {
+      const r = await requestSpeech(apiKey, modelo, "hola", "es");
+      if (r.ok) return { modelo, ok: true, bytes: (await r.arrayBuffer()).byteLength };
+      return { modelo, ok: false, status: r.status, detalle: (await r.text().catch(() => "")).slice(0, 300) };
+    } catch (e: any) {
+      return { modelo, ok: false, detalle: `no se pudo llegar a OpenAI: ${e?.message || e}` };
+    }
+  };
+
+  const principal = await probar(TTS_MODEL);
+  // El fallback solo se prueba si el principal falló, para no gastar de gusto.
+  const respaldo = principal.ok ? undefined : await probar(TTS_MODEL_FALLBACK);
+
+  return Response.json(
+    {
+      vozConfigurada: true,
+      principal,
+      respaldo,
+      // Lo que de verdad importa: si los dos fallan, el loro no habla y la
+      // pregunta aparece de golpe.
+      hayVoz: principal.ok || Boolean(respaldo?.ok),
+      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "desconocido",
+    },
+    { headers: sinCache }
+  );
+}
+
 export async function POST(req: Request) {
   if (capacityClosed()) {
     return Response.json(
