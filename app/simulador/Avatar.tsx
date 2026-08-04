@@ -39,8 +39,12 @@ export type AvatarState = "idle" | "thinking" | "speaking" | "listening";
 const SOURCES = {
   mobile: { talks: ["/loro-interviewer.mp4"], idle: "/loro-idle.mp4" },
   desktop: {
-    talks: ["/lora-talk-1-wide.mp4", "/lora-talk-2-wide.mp4", "/lora-talk-3-wide.mp4"],
-    idle: "/lora-idle-wide-v5.mp4",
+    // El orden no es el de los archivos: el clip 1 termina con la Lora
+    // sacándose los anteojos, así que va último. Puesto antes, la siguiente
+    // pregunta la mostraba con los anteojos otra vez puestos y el salto se
+    // notaba.
+    talks: ["/lora-talk-2-wide.mp4", "/lora-talk-3-wide.mp4", "/lora-talk-1-wide.mp4"],
+    idle: "/lora-idle-wide-v6.mp4",
   },
 };
 
