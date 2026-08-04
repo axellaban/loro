@@ -192,6 +192,19 @@ export default function Avatar({
             muted
             playsInline
             loop
+            /**
+             * Arranca solo, aunque todavía no se vea (está en opacidad 0).
+             *
+             * Antes solo tenía `preload="auto"`, que es una sugerencia: Chrome
+             * le baja la prioridad a un video que nunca se reprodujo, así que
+             * este clip —2,6 MB contra los 183 KB del de espera— recién salía a
+             * bajarse cuando el loro empezaba a hablar. Si tardaba más que el
+             * turno, no se lo veía moverse nunca y quedaba a la vista el de
+             * espera. Reproducirlo desde el arranque lo deja decodificado y
+             * listo; el efecto de abajo lo pausa después del cross-fade, y
+             * retomarlo ya no cuesta nada.
+             */
+            autoPlay
             preload="auto"
             onCanPlay={() => setVideoReady(true)}
             onError={failVideo}
