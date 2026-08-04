@@ -70,7 +70,10 @@ async function clavePublica(kid: string): Promise<JsonWebKey | null> {
  * se ven todos igual.
  */
 export async function verificarIdToken(idToken: string): Promise<GoogleResult> {
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  // Se recorta: un espacio o un salto de línea al pegar el valor en Vercel
+  // rompe la comparación de abajo en silencio, y desde afuera se ve idéntico a
+  // "el Client ID es otro". Es el mismo cuidado que ya se tiene con PASS_SECRET.
+  const clientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "").trim();
   if (!clientId) {
     return {
       ok: false,

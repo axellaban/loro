@@ -61,12 +61,24 @@ export async function GET(req: Request) {
     // Sin sesión la respuesta igual sirve de diagnóstico: si el login no
     // aparece en la app, acá se ve si es porque falta configurarlo o porque
     // simplemente no entró nadie todavía.
+    const crudo = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+    const clientId = crudo.trim();
     return Response.json(
       {
         sesion: null,
-        loginConfigurado: Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID),
+        loginConfigurado: Boolean(clientId),
+        // El Client ID va entero y a propósito: NO es un secreto (viaja
+        // inlineado en el JavaScript que baja cualquier visitante). Está acá
+        // porque "Google dice invalid_client" no se puede diagnosticar sin
+        // poder comparar, carácter por carácter, el valor que tiene este deploy
+        // contra el que figura en la consola de Google. Sin esto, la única
+        // salida es adivinar.
+        clientId: clientId || undefined,
+        // Los dos accidentes de pegado que dan exactamente el mismo error.
+        sinEspaciosAlrededor: crudo === clientId,
+        formaValida: /^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/.test(clientId),
         pasesEntreDispositivos: kv.disponible(),
-        ayuda: !process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        ayuda: !clientId
           ? "Falta NEXT_PUBLIC_GOOGLE_CLIENT_ID en este deploy. Cargalo en Vercel y REDEPLOYÁ."
           : kv.motivoNoDisponible() || undefined,
         commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "desconocido",

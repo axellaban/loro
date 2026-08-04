@@ -54,7 +54,10 @@ export type Auth = ReturnType<typeof useAuth>;
  *   pase existe. Es el momento en que el pase "viaja" al dispositivo nuevo.
  */
 export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => void) {
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  // Recortado por lo mismo que en el servidor: un espacio invisible pegado al
+  // valor en Vercel hace que Google conteste "invalid_client", que es un error
+  // que no se parece en nada a su causa.
+  const clientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "").trim();
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
   // `checking` mientras se pregunta por la sesión: sin esto el botón de entrar
   // parpadea en la cara de alguien que ya está adentro.
