@@ -1646,9 +1646,27 @@ input {
   min-height: 32px;
   color-scheme: light;
 }
-/* En la fila del pie el botón va un punto más chico todavía: ahí es un ítem
-   más de contexto, no una llamada a la acción. */
-.setup-meta .google-btn { transform: scale(0.92); transform-origin: center; }
+/* "O entrá con" + el logo de Google, en línea. El texto va afuera del botón
+   para que el logo quede limpio, como en la referencia. */
+.entrar-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.entrar-google-txt {
+  color: var(--ink-dim);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+/* En el paywall del simulador el bloque va centrado y con aire arriba. */
+.entrar-google-centro {
+  justify-content: center;
+  width: 100%;
+  margin-top: 6px;
+}
+/* El logo suelto: Google lo dibuja en un iframe circular de 40px, que al lado
+   de una línea de texto de 12px queda desproporcionado. */
+.google-btn-icono { transform: scale(0.8); transform-origin: center; }
 
 
 /* ---- Menú de sesión (los tres puntitos del header, estilo Parakeet) ---- */
@@ -4939,20 +4957,76 @@ a.btn-action {
   border-top: 1px solid var(--line);
 }
 
-/* Separador "o" entre los dos caminos para desbloquear el informe: el campo de
-   email y el botón de Google. Una línea a cada lado del texto. */
-.paywall-o {
+
+/* ---- Muro del análisis en la ficha de sesión ----
+   Quien se salteó el pedido de email llegaba a la transcripción y nada más.
+   Estos dos bloques nombran lo que falta antes de pedir nada. */
+.cs-lock-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 2px 0;
-  color: var(--ink-faint);
-  font-size: 12px;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--loro-green);
+  border-radius: 10px;
+  background: var(--panel);
 }
-.paywall-o::before,
-.paywall-o::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--line);
+.cs-lock-banner p {
+  margin: 0;
+  flex: 1 1 240px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+.cs-lock-banner strong { color: var(--ink); }
+.cs-lock-banner .cs-dark-btn { flex: none; }
+
+/* El muro no es un "estado vacío" centrado: es una oferta que se lee de
+   arriba abajo, así que va alineada a la izquierda y el formulario ocupa todo
+   el ancho de la columna en vez de quedar flotando en el medio. */
+.cs-desbloqueo {
+  align-items: flex-start;
+  text-align: left;
+  max-width: 460px;
+  margin: 0 auto;
+}
+.cs-desbloqueo p { max-width: none; }
+.cs-desbloqueo-lista {
+  margin: 10px 0 16px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+.cs-desbloqueo-lista li {
+  display: flex;
+  gap: 8px;
+}
+.cs-desbloqueo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.cs-desbloqueo-form .entrar-google-centro { margin-top: 2px; }
+
+/* Los dos botones del pie de cada ficha. El pie ahora envuelve: si los dos no
+   entran al lado del estado, bajan juntos a su propia línea en vez de
+   apretarse encima del texto. */
+.cs-card-foot { flex-wrap: wrap; }
+.cs-card-btns {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.cs-card-cta { white-space: nowrap; }
+@media (max-width: 480px) {
+  .cs-card-btns { width: 100%; margin-left: 0; }
+  .cs-card-btns > * { flex: 1; }
 }

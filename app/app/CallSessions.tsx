@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "../lib/Markdown";
 import { MODELS } from "../lib/models";
 import { ProviderIcon } from "../lib/ProviderIcon";
-import { track } from "../lib/track";
+import { track, identify } from "../lib/track";
+import { rememberEmail, savedEmail } from "../lib/email";
+import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import {
   fmtCardDate,
   fmtClock,
@@ -244,11 +246,112 @@ function SessionCard({
             {fmtDuration(s.durationMs)} <span className="cs-dot-sep">·</span> Sesión gratis
           </span>
         </div>
-        <button type="button" className="cs-outline-btn" onClick={() => onOpen("transcript")}>
-          Ver transcripción
-        </button>
+        {/* Dos salidas, no una. Antes el único botón era "Ver transcripción" y
+            los chips también hablaban solo de eso: quien no había pasado por el
+            informe no tenía forma de enterarse de que el análisis existía. */}
+        <div className="cs-card-btns">
+          <button type="button" className="cs-outline-btn" onClick={() => onOpen("transcript")}>
+            Transcripción
+          </button>
+          <button type="button" className="cs-dark-btn cs-card-cta" onClick={() => onOpen("notes")}>
+            {s.notes ? "Ver notas IA" : "Ver análisis"}
+          </button>
+        </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * El muro del análisis, dentro de la ficha de la sesión.
+ *
+ * Existe por un caso concreto que apareció en producción: alguien termina la
+ * entrevista, se salta la pantalla que pide el email, y más tarde entra por
+ * "Ver mis sesiones". Ahí se encontraba con la transcripción y nada más —sin
+ * ninguna señal de que el análisis existe—, así que ni sabía que se lo estaba
+ * perdiendo ni cómo conseguirlo.
+ *
+ * Se nombra lo que falta antes de pedir nada: el que lee decide con la lista a
+ * la vista, no a ciegas.
+ */
+function PanelDesbloqueo({ onListo }: { onListo: () => void }) {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const auth = useAuth();
+
+  // Entrar con Google desbloquea igual: el email que devuelve está verificado,
+  // así que vale más que uno tipeado, y es un click contra escribirlo entero.
+  useEffect(() => {
+    if (auth.cuenta?.email) {
+      rememberEmail(auth.cuenta.email);
+      onListo();
+    }
+  }, [auth.cuenta, onListo]);
+
+  const enviar = async () => {
+    const em = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setError("Poné un email válido.");
+      return;
+    }
+    setEnviando(true);
+    setError("");
+    try {
+      const r = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: em }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) {
+        rememberEmail(em);
+        identify(em, { email: em });
+        track("app_email_submit");
+        onListo();
+      } else {
+        setError(j.error || "No se pudo enviar. Probá de nuevo.");
+      }
+    } catch {
+      setError("Error de red. Probá de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="cs-empty cs-desbloqueo">
+      <h4>Te falta la mitad de esta sesión 🦜</h4>
+      <p>Ya tenés la transcripción. Lo que todavía no viste:</p>
+      <ul className="cs-desbloqueo-lista">
+        <li><span aria-hidden="true">🎯</span> Key Takeaways y Red Flags: qué hiciste bien y dónde la pifiaste.</li>
+        <li><span aria-hidden="true">💬</span> Chat con la IA para repreguntar cómo responder mejor.</li>
+      </ul>
+      <div className="cs-desbloqueo-form">
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          className="form-input"
+          placeholder="tu@email.com"
+          aria-label="Tu email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (error) setError("");
+          }}
+          onKeyDown={(e) => e.key === "Enter" && enviar()}
+        />
+        <button type="button" className="cs-dark-btn" onClick={enviar} disabled={!email.trim() || enviando}>
+          {enviando ? "Desbloqueando…" : "Desbloquear análisis →"}
+        </button>
+        {error && <p className="cs-error">{error}</p>}
+        {auth.configurado && auth.listoGoogle && !auth.checking && (
+          <EntrarConGoogle listo={auth.listoGoogle} className="entrar-google-centro" />
+        )}
+        {auth.error && <p className="cs-error">{auth.error}</p>}
+      </div>
+    </div>
   );
 }
 
@@ -279,6 +382,18 @@ function SessionModal({
 
   const chat = session.chat || [];
   const notes = session.notes || "";
+
+  /**
+   * ¿Ya dejó el email (acá, en el gate del final o en el simulador)?
+   *
+   * Se lee en un efecto y no al inicializar el estado: el localStorage no
+   * existe en el render del servidor, y calcularlo ahí haría que el HTML y el
+   * primer render del navegador no coincidan.
+   */
+  const [desbloqueado, setDesbloqueado] = useState(true);
+  useEffect(() => {
+    setDesbloqueado(Boolean(savedEmail()));
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -485,6 +600,20 @@ function SessionModal({
           <div className="cs-pane-body">
             {err && <p className="cs-error">{err}</p>}
 
+            {/* El aviso va ARRIBA de la transcripción, no al final: quien entra
+                acá se pone a leer y no llega nunca al pie. */}
+            {tab === "transcript" && !desbloqueado && timeline.length > 0 && (
+              <div className="cs-lock-banner">
+                <p>
+                  <strong>Esto es solo la transcripción.</strong> El análisis de la IA —qué hiciste
+                  bien, dónde la pifiaste y el chat para repreguntar— está sin desbloquear.
+                </p>
+                <button type="button" className="cs-dark-btn" onClick={() => setTab("notes")}>
+                  Ver qué me falta →
+                </button>
+              </div>
+            )}
+
             {tab === "transcript" &&
               (timeline.length === 0 ? (
                 <div className="cs-empty">
@@ -539,6 +668,8 @@ function SessionModal({
                   <h4>Escribiendo tus notas…</h4>
                   <p>El Loro está leyendo la transcripción completa.</p>
                 </div>
+              ) : !desbloqueado ? (
+                <PanelDesbloqueo onListo={() => setDesbloqueado(true)} />
               ) : (
                 <div className="cs-empty">
                   <h4>Todavía no generaste las notas</h4>
@@ -549,7 +680,11 @@ function SessionModal({
                 </div>
               ))}
 
-            {tab === "ask" && (
+            {tab === "ask" && !desbloqueado && (
+              <PanelDesbloqueo onListo={() => setDesbloqueado(true)} />
+            )}
+
+            {tab === "ask" && desbloqueado && (
               <div className="cs-chat">
                 {chat.length === 0 && !chatDraft ? (
                   <div className="cs-empty">
@@ -601,7 +736,7 @@ function SessionModal({
             )}
           </div>
 
-          {tab === "ask" && (
+          {tab === "ask" && desbloqueado && (
             <form
               className="cs-composer"
               onSubmit={(e) => {

@@ -6,7 +6,7 @@ import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 import { BrandLogo } from "../lib/BrandLogo";
 import { rememberEmail, savedEmail } from "../lib/email";
-import { useAuth, BotonGoogle } from "../lib/authClient";
+import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
 
 type Line = { id: number; text: string; final: boolean };
@@ -2099,10 +2099,7 @@ export default function SimuladorPage() {
                       {emailError && <div className="paywall-error">{emailError}</div>}
                       {auth.configurado && auth.listoGoogle && (
                         <>
-                          <div className="paywall-o">
-                            <span>o</span>
-                          </div>
-                          <BotonGoogle listo={auth.listoGoogle} />
+                          <EntrarConGoogle listo={auth.listoGoogle} className="entrar-google-centro" />
                           {auth.error && <div className="paywall-error">{auth.error}</div>}
                         </>
                       )}

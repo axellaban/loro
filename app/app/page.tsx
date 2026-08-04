@@ -11,7 +11,7 @@ import CallSessions from "./CallSessions";
 import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 import { rememberEmail, savedEmail } from "../lib/email";
 import { usePass, storedPassToken, type ActivePass } from "../lib/passClient";
-import { useAuth, BotonGoogle } from "../lib/authClient";
+import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
 import { Markdown } from "../lib/Markdown";
 
@@ -3377,7 +3377,7 @@ export default function Page() {
             ) : (
               auth.configurado &&
               auth.listoGoogle &&
-              !auth.checking && <BotonGoogle listo={auth.listoGoogle} />
+              !auth.checking && <EntrarConGoogle listo={auth.listoGoogle} />
             )}
           </div>
         )}

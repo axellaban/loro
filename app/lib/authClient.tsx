@@ -169,15 +169,23 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
 }
 
 /**
- * El botón oficial de Google. Se usa el suyo y no uno propio porque su marca
- * tiene reglas de uso, y porque el botón real es el que la gente reconoce.
+ * El botón de Google, en su versión de solo logo.
+ *
+ * Es el botón OFICIAL igual —`type: "icon"` es una variante que provee la
+ * propia librería—, no un ícono dibujado por nosotros. Importa: la marca de
+ * Google tiene reglas de uso y su botón trae gratis el manejo de sesiones,
+ * el idioma y la accesibilidad.
+ *
+ * En solo-ícono porque en los dos lugares donde aparece es una alternativa
+ * secundaria, con su propio texto al lado ("O entrá con"): un botón con la
+ * leyenda adentro repetía esa misma frase dos veces y ocupaba el triple.
  */
 export function BotonGoogle({
   listo,
-  ancho,
+  variante = "icono",
 }: {
   listo: boolean;
-  ancho?: number;
+  variante?: "icono" | "estandar";
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const dibujado = useRef(false);
@@ -185,24 +193,38 @@ export function BotonGoogle({
   useEffect(() => {
     if (!listo || dibujado.current || !ref.current) return;
     try {
-      window.google.accounts.id.renderButton(ref.current, {
-        type: "standard",
-        theme: "filled_black",
-        // "medium" en vez de "large": es un botón secundario —la acción
-        // principal de esa pantalla es arrancar la sesión—, y en "large"
-        // competía con ella.
-        size: "medium",
-        text: "signin_with",
-        shape: "pill",
-        logo_alignment: "left",
-        locale: "es",
-        ...(ancho ? { width: ancho } : {}),
-      });
+      window.google.accounts.id.renderButton(
+        ref.current,
+        variante === "icono"
+          ? { type: "icon", shape: "circle", theme: "outline", size: "large" }
+          : {
+              type: "standard",
+              theme: "filled_black",
+              size: "medium",
+              text: "signin_with",
+              shape: "pill",
+              logo_alignment: "left",
+              locale: "es",
+            }
+      );
       dibujado.current = true;
     } catch {
       // no-op: sin botón, la app sigue andando sin login.
     }
-  }, [listo, ancho]);
+  }, [listo, variante]);
 
-  return <div ref={ref} className="google-btn" />;
+  return <div ref={ref} className={`google-btn google-btn-${variante}`} />;
+}
+
+/**
+ * "O entrá con" + el logo. Es el bloque completo tal como se usa en los dos
+ * lugares: así la frase y el botón no se pueden desincronizar.
+ */
+export function EntrarConGoogle({ listo, className = "" }: { listo: boolean; className?: string }) {
+  return (
+    <div className={`entrar-google ${className}`}>
+      <span className="entrar-google-txt">O entrá con</span>
+      <BotonGoogle listo={listo} />
+    </div>
+  );
 }
