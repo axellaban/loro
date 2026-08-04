@@ -44,7 +44,7 @@ const SOURCES = {
     // pregunta la mostraba con los anteojos otra vez puestos y el salto se
     // notaba.
     talks: ["/lora-talk-2-wide.mp4", "/lora-talk-3-wide.mp4", "/lora-talk-1-wide.mp4"],
-    idle: "/lora-idle-wide-v7.mp4",
+    idle: "/lora-idle-wide-v8.mp4",
   },
 };
 
