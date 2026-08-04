@@ -180,19 +180,43 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
   };
 }
 
+/** La G de Google, con sus cuatro colores de marca. */
+function LogoG() {
+  return (
+    <svg className="google-g" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <path
+        fill="#4285F4"
+        d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"
+      />
+      <path
+        fill="#EA4335"
+        d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
+      />
+    </svg>
+  );
+}
+
 /**
- * El botón de Google, en su versión de solo logo.
+ * Entrar con Google: se ve solo la G, sin botón ni recuadro.
  *
- * Es el botón que provee la propia librería, no uno dibujado por nosotros: la
- * marca de Google tiene reglas de uso y su botón trae resueltos el manejo de
- * sesiones, el idioma y la accesibilidad.
+ * El botón REAL de Google sigue existiendo, pero invisible y estirado justo
+ * encima del logo. El click, el teclado y los lectores de pantalla van a él;
+ * nosotros solo ponemos lo que se ve.
  *
- * Se probó la variante de solo logo (`type: "icon"`), que es más linda y más
- * chica, pero en producción salía el círculo vacío, sin la G. La causa está en
- * el reset global de globals.css: `* { margin: 0; padding: 0 }` alcanza al HTML
- * que Google inyecta —no está aislado en un shadow DOM—, y el botón de solo
- * ícono depende de ese padding interno para colocar el logo. El estándar tiene
- * suficiente estructura propia como para sobrevivirlo.
+ * Por qué así y no con la variante de solo ícono de la librería: esa existe
+ * (`type: "icon"`) pero en producción salía el círculo vacío, sin la G. Y por
+ * qué no un botón propio que dispare el login a mano: el flujo de ID token no
+ * se puede lanzar por programa sin caer en One Tap, que el navegador puede
+ * suprimir. Con esta forma la apariencia es nuestra y el mecanismo sigue
+ * siendo el de Google, que es lo que hay que respetar de su marca.
  */
 export function BotonGoogle({ listo }: { listo: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -202,13 +226,10 @@ export function BotonGoogle({ listo }: { listo: boolean }) {
     if (!listo || dibujado.current || !ref.current) return;
     try {
       window.google.accounts.id.renderButton(ref.current, {
-        type: "standard",
+        type: "icon",
+        shape: "square",
         theme: "outline",
-        size: "medium",
-        text: "signin_with",
-        shape: "pill",
-        logo_alignment: "left",
-        locale: "es",
+        size: "large",
       });
       dibujado.current = true;
     } catch {
@@ -216,18 +237,19 @@ export function BotonGoogle({ listo }: { listo: boolean }) {
     }
   }, [listo]);
 
-  return <div ref={ref} className="google-btn" />;
+  return (
+    <span className="google-g-wrap">
+      <span ref={ref} className="google-g-real" />
+      <LogoG />
+    </span>
+  );
 }
 
-/**
- * El botón, con el "o" que lo separa de la otra opción. Sin la frase "entrá
- * con": el propio botón ya dice "Iniciar sesión con Google" y repetirlo al
- * lado era decir dos veces lo mismo.
- */
+/** "O entrá con" + la G. El texto va afuera porque el logo va limpio. */
 export function EntrarConGoogle({ listo, className = "" }: { listo: boolean; className?: string }) {
   return (
     <div className={`entrar-google ${className}`}>
-      <span className="entrar-google-txt">o</span>
+      <span className="entrar-google-txt">O entrá con</span>
       <BotonGoogle listo={listo} />
     </div>
   );

@@ -1638,13 +1638,37 @@ input {
 }
 
 /* ---- Entrar con Google: el pase deja de estar atado al navegador ---- */
-/* El botón lo dibuja Google en un iframe: no se le puede tocar el interior,
-   solo centrarlo y dejarlo respirar. */
-.google-btn {
-  display: flex;
+/* Entrar con Google: se ve solo la G. El botón real de Google va invisible
+   justo encima, así el click y el teclado siguen yendo a él. */
+.google-g-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  min-height: 32px;
+  width: 34px;
+  height: 34px;
+  flex: none;
   color-scheme: light;
+}
+.google-g {
+  width: 26px;
+  height: 26px;
+  display: block;
+  pointer-events: none;
+}
+/* Invisible pero clickeable, y estirado para cubrir todo el área del logo:
+   así no hay ningún punto donde el dedo caiga al lado del botón real. */
+.google-g-real {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+.google-g-real > div,
+.google-g-real iframe {
+  width: 100% !important;
+  height: 100% !important;
 }
 /* "O entrá con" + el logo de Google, en línea. El texto va afuera del botón
    para que el logo quede limpio, como en la referencia. */
@@ -1664,9 +1688,7 @@ input {
   width: 100%;
   margin-top: 6px;
 }
-/* El logo suelto: Google lo dibuja en un iframe circular de 40px, que al lado
-   de una línea de texto de 12px queda desproporcionado. */
-.google-btn-icono { transform: scale(0.8); transform-origin: center; }
+
 
 
 /* ---- Menú de sesión (los tres puntitos del header, estilo Parakeet) ---- */
