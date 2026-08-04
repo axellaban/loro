@@ -5030,3 +5030,19 @@ a.btn-action {
   .cs-card-btns { width: 100%; margin-left: 0; }
   .cs-card-btns > * { flex: 1; }
 }
+
+/* Diagnóstico del avatar (?debug=1). No se ve nunca sin ese parámetro. */
+.sim-avatar-debug {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #a3e635;
+  font: 600 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+  pointer-events: none;
+}

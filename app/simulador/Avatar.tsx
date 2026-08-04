@@ -224,8 +224,65 @@ export default function Avatar({
           <span />
         </div>
       )}
+      <Diagnostico state={state} talkRef={talkRef} idleRef={idleRef} showVideo={showVideo} videoFailed={videoFailed} />
     </div>
   );
+}
+
+/**
+ * Lo que está pasando adentro del avatar, en pantalla.
+ *
+ * Se enciende con `?debug=1` y no existe para nadie más. Está acá porque el
+ * avatar se rompe también en mobile, donde no hay consola que mirar, y porque
+ * el bug no se puede reproducir sin una entrevista real con audio: sin esto,
+ * cada intento de arreglo es una adivinanza que hay que ir a probar afuera.
+ *
+ * Responde las tres preguntas que separan las causas posibles: si llega el
+ * estado "speaking", si el clip de habla está corriendo, y si avanza.
+ */
+function Diagnostico({
+  state,
+  talkRef,
+  idleRef,
+  showVideo,
+  videoFailed,
+}: {
+  state: AvatarState;
+  talkRef: React.RefObject<HTMLVideoElement | null>;
+  idleRef: React.RefObject<HTMLVideoElement | null>;
+  showVideo: boolean;
+  videoFailed: boolean;
+}) {
+  const [on, setOn] = useState(false);
+  const [linea, setLinea] = useState("");
+
+  useEffect(() => {
+    try {
+      setOn(new URLSearchParams(window.location.search).get("debug") === "1");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!on) return;
+    const id = setInterval(() => {
+      const t = talkRef.current;
+      const i = idleRef.current;
+      const seVe = (el: HTMLVideoElement | null) =>
+        el ? Number(getComputedStyle(el).opacity).toFixed(1) : "—";
+      setLinea(
+        `estado: ${state}\n` +
+          `habla: ${t ? (t.paused ? "PAUSADO" : "corriendo") : "sin elemento"} ` +
+          `t=${t ? t.currentTime.toFixed(1) : "—"} op=${seVe(t)}\n` +
+          `espera: ${i ? (i.paused ? "PAUSADO" : "corriendo") : "sin elemento"} ` +
+          `t=${i ? i.currentTime.toFixed(1) : "—"} op=${seVe(i)}\n` +
+          `video listo: ${showVideo ? "sí" : "no"} · falló: ${videoFailed ? "sí" : "no"}`
+      );
+    }, 400);
+    return () => clearInterval(id);
+  }, [on, state, talkRef, idleRef, showVideo, videoFailed]);
+
+  if (!on) return null;
+  return <pre className="sim-avatar-debug">{linea}</pre>;
 }
 
 // SVG del loro de marca (derivado de app/lib/parrot.tsx) con lip-sync por
