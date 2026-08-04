@@ -3224,7 +3224,7 @@ export default function Page() {
       {view === "gate" && !live && (
         <div className="paywall-overlay">
           <div className="paywall postmortem">
-            <div className="paywall-title">¿Querés saber cómo te fue realmente? 🦜</div>
+            <div className="paywall-title">Escuchame Loro, siempre se puede mejorar 🦜</div>
             <p className="paywall-text">
               La entrevista terminó. Ahora veamos qué detectó la IA. Ingresá tu email para
               desbloquear tu reporte “Post-Mortem”:

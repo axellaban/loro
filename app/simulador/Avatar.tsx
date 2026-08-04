@@ -47,20 +47,35 @@ export default function Avatar({
   const idleRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  // Se calcula sincrónicamente en el primer render (no en un efecto posterior)
-  // para no montar nunca los clips verticales de arranque en desktop.
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 880px)").matches
-  );
+  /**
+   * `null` hasta que el componente monta en el navegador, y recién ahí mobile
+   * o desktop.
+   *
+   * Antes esto se resolvía en el primer render leyendo `window`, para no montar
+   * los clips verticales en desktop ni por un instante. El problema: esta
+   * página también se renderiza en el servidor, donde `window` no existe y la
+   * respuesta era siempre "mobile". En mobile daba igual —servidor y navegador
+   * coincidían—, pero en DESKTOP el servidor mandaba un `<video>` con los clips
+   * verticales y el navegador esperaba los horizontales. Como los dos videos
+   * llevan `key`, React se encontraba con elementos distintos a los que había
+   * pintado e hidrataba mal justo ese pedazo: el avatar quedaba clavado en el
+   * clip de espera y el de habla no aparecía nunca.
+   *
+   * Con `null` los dos primeros renders coinciden (no hay video, se ve el SVG),
+   * y los clips correctos entran después. Un frame de SVG a cambio de que el
+   * avatar funcione.
+   */
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
-  // Recalculamos si el usuario cruza el breakpoint (resize / rotación).
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 880px)");
     const update = () => setIsDesktop(mq.matches);
+    update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
 
+  const montado = isDesktop !== null;
   const { talk: talkSrc, idle: idleSrc } = isDesktop ? SOURCES.desktop : SOURCES.mobile;
   const speaking = state === "speaking";
 
@@ -118,7 +133,7 @@ export default function Avatar({
     };
   }, [state, micAnalyser]);
 
-  const showVideo = !videoFailed && videoReady;
+  const showVideo = montado && !videoFailed && videoReady;
 
   return (
     <div
@@ -126,7 +141,7 @@ export default function Avatar({
       className={`sim-avatar sim-avatar-${state} ${micAnalyser ? "sim-avatar-mic" : ""}`}
     >
       <div className="sim-avatar-ring" aria-hidden="true" />
-      {!videoFailed && (
+      {montado && !videoFailed && (
         <>
           {/* Espera: loop en boomerang, pico cerrado. Es el estado por defecto,
               así que va abajo y el de habla se funde encima. */}
@@ -157,6 +172,7 @@ export default function Avatar({
             playsInline
             loop
             preload="auto"
+            onCanPlay={() => setVideoReady(true)}
             onError={failVideo}
             aria-hidden="true"
           />
