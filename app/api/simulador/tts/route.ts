@@ -1,4 +1,7 @@
 export const runtime = "edge";
+// Nunca cacheado: el GET es un diagnóstico y el POST devuelve audio distinto en
+// cada llamada. Sin esto se termina mirando la respuesta de un deploy viejo.
+export const dynamic = "force-dynamic";
 
 import { capacityClosed, rateLimit, sameOriginStrict } from "../../../lib/ratelimit";
 
@@ -24,7 +27,13 @@ const INSTRUCTIONS: Record<"es" | "en", string> = {
   en: `VERY IMPORTANT — dominant vocal texture, exaggerate it on every word: talking-parrot voice, very nasal, raspy, metallic and mostly high-pitched, with a hollow, shrill texture and occasional guttural clicks. You are an American female job interviewer. Natural conversational pace, no long pauses.`,
 };
 
-async function requestSpeech(apiKey: string, model: string, text: string, lang: "es" | "en") {
+async function requestSpeech(
+  apiKey: string,
+  model: string,
+  text: string,
+  lang: "es" | "en",
+  signal?: AbortSignal
+) {
   const body: Record<string, unknown> = {
     model,
     voice: TTS_VOICE,
@@ -43,6 +52,7 @@ async function requestSpeech(apiKey: string, model: string, text: string, lang: 
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
+    signal,
   });
 }
 
@@ -71,32 +81,61 @@ export async function GET() {
     );
   }
 
+  // Con tope propio. Sin esto, si OpenAI se cuelga la función se corta sola y
+  // la respuesta llega vacía: un diagnóstico que no contesta no diagnostica
+  // nada, que es justo el problema que vino a resolver. (Pasó.)
   const probar = async (modelo: string) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
     try {
-      const r = await requestSpeech(apiKey, modelo, "hola", "es");
-      if (r.ok) return { modelo, ok: true, bytes: (await r.arrayBuffer()).byteLength };
-      return { modelo, ok: false, status: r.status, detalle: (await r.text().catch(() => "")).slice(0, 300) };
+      const r = await requestSpeech(apiKey, modelo, "hola", "es", ctrl.signal);
+      if (r.ok) {
+        const bytes = (await r.arrayBuffer()).byteLength;
+        return { modelo, ok: true, bytes };
+      }
+      return {
+        modelo,
+        ok: false,
+        status: r.status,
+        detalle: (await r.text().catch(() => "")).slice(0, 300) || "(sin detalle)",
+      };
     } catch (e: any) {
-      return { modelo, ok: false, detalle: `no se pudo llegar a OpenAI: ${e?.message || e}` };
+      const corto = e?.name === "AbortError";
+      return {
+        modelo,
+        ok: false,
+        detalle: corto
+          ? "OpenAI no contestó en 8 segundos."
+          : `no se pudo llegar a OpenAI: ${e?.message || e}`,
+      };
+    } finally {
+      clearTimeout(t);
     }
   };
 
-  const principal = await probar(TTS_MODEL);
-  // El fallback solo se prueba si el principal falló, para no gastar de gusto.
-  const respaldo = principal.ok ? undefined : await probar(TTS_MODEL_FALLBACK);
-
-  return Response.json(
-    {
-      vozConfigurada: true,
-      principal,
-      respaldo,
-      // Lo que de verdad importa: si los dos fallan, el loro no habla y la
-      // pregunta aparece de golpe.
-      hayVoz: principal.ok || Boolean(respaldo?.ok),
-      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "desconocido",
-    },
-    { headers: sinCache }
-  );
+  // Todo envuelto: pase lo que pase, esto devuelve JSON y no una página vacía.
+  try {
+    const principal = await probar(TTS_MODEL);
+    // El respaldo solo se prueba si el principal falló, para no gastar de gusto.
+    const respaldo = principal.ok ? undefined : await probar(TTS_MODEL_FALLBACK);
+    return Response.json(
+      {
+        vozConfigurada: true,
+        principal,
+        respaldo,
+        // Lo que de verdad importa: si los dos fallan, el loro no habla, no se
+        // mueve, y la pregunta aparece de golpe en vez de escribirse sola.
+        hayVoz: principal.ok || Boolean(respaldo?.ok),
+        commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "desconocido",
+      },
+      { headers: sinCache }
+    );
+  } catch (e: any) {
+    return Response.json(
+      { vozConfigurada: true, hayVoz: false, error: String(e?.message || e) },
+      { headers: sinCache }
+    );
+  }
 }
 
 export async function POST(req: Request) {
