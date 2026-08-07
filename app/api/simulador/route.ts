@@ -547,12 +547,54 @@ function parseModelJson(text: string): unknown {
 // y el parseo fallaba. Vale para los tres proveedores, no solo para Gemini.
 const FEEDBACK_MAX_TOKENS = 4096;
 
+/**
+ * Presupuesto de tiempo del informe.
+ *
+ * Esto corre en el runtime edge, que corta la función alrededor de los 25s. El
+ * informe NO va en streaming —se espera el JSON completo—, así que si el modelo
+ * tarda, la plataforma mata la función en el medio: el navegador recibe un
+ * error sin cuerpo y no hay forma de saber qué pasó. Peor: al fallar un modelo
+ * se probaba el siguiente, sumando su tiempo al del anterior, así que la cadena
+ * de respaldo hacía MÁS probable el corte en vez de menos.
+ *
+ * Con un presupuesto compartido, el corte lo damos nosotros y con un mensaje
+ * que se entiende, antes de que lo dé la plataforma sin decir nada.
+ */
+const FEEDBACK_PRESUPUESTO_MS = 20_000;
+const FEEDBACK_INTENTO_MS = 12_000;
+
+async function pedirConTope(
+  url: string,
+  init: RequestInit,
+  topeMs: number
+): Promise<{ res?: Response; error?: string }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), topeMs);
+  try {
+    return { res: await fetch(url, { ...init, signal: ctrl.signal }) };
+  } catch (e: any) {
+    return {
+      error:
+        e?.name === "AbortError"
+          ? `el modelo tardó más de ${Math.round(topeMs / 1000)}s en armar el informe`
+          : `no se pudo llegar al modelo: ${e?.message || e}`,
+    };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function getFeedback(
   provider: Provider,
   specs: ModelSpec[],
   systemPrompt: string,
   userContent: string
 ): Promise<Response> {
+  // Reloj compartido por todos los intentos: el respaldo no puede sumar tiempo
+  // hasta que la plataforma corte la función sin avisar.
+  const limite = Date.now() + FEEDBACK_PRESUPUESTO_MS;
+  const restante = () => Math.min(limite - Date.now(), FEEDBACK_INTENTO_MS);
+
   if (provider === "openai") {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return new Response("Falta OPENAI_API_KEY.", { status: 500 });
@@ -561,26 +603,42 @@ async function getFeedback(
     let lastModel = "";
     for (const spec of specs) {
       lastModel = spec.model;
+      const queda = restante();
+      if (queda < 3000) {
+        detail = detail || "se acabó el tiempo disponible para armar el informe";
+        break;
+      }
       // Igual que en streaming: los modelos de razonamiento necesitan
       // max_completion_tokens y esfuerzo bajo, o se comen el límite de 25s
       // de Edge razonando.
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+      const intento = await pedirConTope(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(
+            openaiBody({
+              spec,
+              system: systemPrompt,
+              user: userContent,
+              maxTokens: FEEDBACK_MAX_TOKENS,
+              temperature: 0.2,
+              json: true,
+            })
+          ),
         },
-        body: JSON.stringify(
-          openaiBody({
-            spec,
-            system: systemPrompt,
-            user: userContent,
-            maxTokens: FEEDBACK_MAX_TOKENS,
-            temperature: 0.2,
-            json: true,
-          })
-        ),
-      });
+        queda
+      );
+      // Se agotó el tiempo: probar otro modelo solo empeoraría el retraso.
+      if (!intento.res) {
+        detail = intento.error || "";
+        console.error(`[simulador] feedback openai/${spec.model}: ${detail}`);
+        break;
+      }
+      const res = intento.res;
       if (res.ok) {
         const j = await res.json();
         try {
@@ -606,19 +664,34 @@ async function getFeedback(
     let lastModel = "";
     for (const spec of specs) {
       lastModel = spec.model;
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: ANTHROPIC_HEADERS(apiKey),
-        body: JSON.stringify(
-          anthropicBody({
-            spec,
-            system: systemPrompt,
-            user: userContent,
-            maxTokens: FEEDBACK_MAX_TOKENS,
-            temperature: 0.2,
-          })
-        ),
-      });
+      const queda = restante();
+      if (queda < 3000) {
+        detail = detail || "se acabó el tiempo disponible para armar el informe";
+        break;
+      }
+      const intento = await pedirConTope(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: ANTHROPIC_HEADERS(apiKey),
+          body: JSON.stringify(
+            anthropicBody({
+              spec,
+              system: systemPrompt,
+              user: userContent,
+              maxTokens: FEEDBACK_MAX_TOKENS,
+              temperature: 0.2,
+            })
+          ),
+        },
+        queda
+      );
+      if (!intento.res) {
+        detail = intento.error || "";
+        console.error(`[simulador] feedback anthropic/${spec.model}: ${detail}`);
+        break;
+      }
+      const res = intento.res;
       if (res.ok) {
         const j = await res.json();
         try {
@@ -645,20 +718,35 @@ async function getFeedback(
   let lastModel = "";
   for (const spec of specs) {
     lastModel = spec.model;
-    const res = await fetch(geminiUrl(spec.model, "generateContent", apiKey), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        geminiBody({
-          spec,
-          system: systemPrompt,
-          user: userContent,
-          maxOutputTokens: FEEDBACK_MAX_TOKENS,
-          temperature: 0.2,
-          json: true,
-        })
-      ),
-    });
+    const queda = restante();
+    if (queda < 3000) {
+      detail = detail || "se acabó el tiempo disponible para armar el informe";
+      break;
+    }
+    const intento = await pedirConTope(
+      geminiUrl(spec.model, "generateContent", apiKey),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          geminiBody({
+            spec,
+            system: systemPrompt,
+            user: userContent,
+            maxOutputTokens: FEEDBACK_MAX_TOKENS,
+            temperature: 0.2,
+            json: true,
+          })
+        ),
+      },
+      queda
+    );
+    if (!intento.res) {
+      detail = intento.error || "";
+      console.error(`[simulador] feedback gemini/${spec.model}: ${detail}`);
+      break;
+    }
+    const res = intento.res;
     if (res.ok) {
       const j = await res.json();
       try {

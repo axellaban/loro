@@ -1354,7 +1354,18 @@ export default function SimuladorPage() {
             history: finalHistory,
           }),
         });
-        if (!res.ok) throw new Error("No se pudo obtener el reporte de feedback.");
+        if (!res.ok) {
+          // El motivo real viene en el cuerpo: sin esto, "se acabó el crédito
+          // de la API", "el modelo tardó demasiado" y "falta la clave en el
+          // deploy" se ven todos como el mismo error genérico, y no hay forma
+          // de saber cuál es desde afuera. Es el mismo criterio que /api/pass.
+          const detalle = (await res.text().catch(() => "")).trim().slice(0, 300);
+          throw new Error(
+            detalle
+              ? `No se pudo armar el informe: ${detalle}`
+              : `No se pudo armar el informe (error ${res.status}).`
+          );
+        }
         const report = normalizeReport(await res.json());
         setFeedbackReport(report);
         setSavedReport(report);
