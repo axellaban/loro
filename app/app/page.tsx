@@ -908,7 +908,9 @@ function PagoPaso({
             href={p.mercadoPago}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => track(plan === "week" ? "pay_mp_week" : "pay_mp_year")}
+            onClick={() =>
+              track(plan === "week" ? "pay_mp_week" : "pay_mp_year", { value: p.valor })
+            }
           >
             Pagar
           </a>
@@ -928,7 +930,11 @@ function PagoPaso({
                 href={p.binance.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => track(plan === "week" ? "pay_binance_week" : "pay_binance_year")}
+                onClick={() =>
+                  track(plan === "week" ? "pay_binance_week" : "pay_binance_year", {
+                    value: p.valor,
+                  })
+                }
               >
                 Pagar
               </a>
@@ -947,7 +953,9 @@ function PagoPaso({
             <button
               className="btn-action btn-outline"
               onClick={() => {
-                track(plan === "week" ? "pay_binance_week" : "pay_binance_year");
+                track(plan === "week" ? "pay_binance_week" : "pay_binance_year", {
+                  value: p.valor,
+                });
                 onWhatsApp(`${p.wa} Pago desde afuera de Argentina, ¿me pasás el QR de Binance?`);
               }}
             >
@@ -1098,7 +1106,14 @@ type PassPlan = "week" | "year";
  */
 type Plan = {
   titulo: string;
+  /** Cómo se muestra el precio en pantalla. */
   precio: string;
+  /**
+   * El mismo precio como número, para mandarlo con la conversión de Google
+   * Ads. Sin valor, Google optimiza por cantidad de clicks y trata igual al
+   * pase de 7 días que al de 12 meses, que valen muy distinto.
+   */
+  valor: number;
   mercadoPago: string;
   /**
    * Binance Pay. `url` es lo que codifica el QR: en el celular abre la app
@@ -1114,6 +1129,7 @@ const PLANES: Record<PassPlan, Plan> = {
   week: {
     titulo: "Pase Rey Loro Ilimitado (7 días)",
     precio: PASS_WEEK_PRICE,
+    valor: 19.99,
     mercadoPago: "https://mpago.la/1MWT5P9",
     binance: { url: "https://app.binance.com/uni-qr/XARJMtuK", qr: "/binance-qr-semanal.png" },
     wa: `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`,
@@ -1121,6 +1137,7 @@ const PLANES: Record<PassPlan, Plan> = {
   year: {
     titulo: "Pase de 12 meses",
     precio: PASS_YEAR_PRICE,
+    valor: 89,
     mercadoPago: "https://mpago.la/2zYVxoM",
     wa: `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`,
   },

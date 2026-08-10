@@ -102,10 +102,21 @@ export type FunnelEvent =
  *    pocas por mes.
  */
 const CONVERSIONES: Partial<Record<FunnelEvent, string>> = {
-  // sim_email_submit: "pegar acá la etiqueta que da Ads",
-  // pass_activated: "…",
-  // pay_mp_week: "…",
-  // pay_mp_year: "…",
+  // "Compra" en Ads. OJO con el nombre: esto se dispara cuando alguien TOCA
+  // "Pagar", no cuando paga. Entre una cosa y la otra hay un pago afuera y un
+  // WhatsApp, así que el número va a ser más alto que las ventas reales.
+  //
+  // Se hace igual a propósito: al arrancar hay muy pocas ventas por mes y
+  // Google necesita volumen para optimizar. Cuando haya ventas suficientes,
+  // conviene mover esta etiqueta a `pass_activated` —el canje del código, que
+  // sí ocurre en el sitio y sí es una compra— y dejar los clicks como una
+  // acción aparte de "inicio de pago".
+  pay_mp_week: "I-b6CNiZqN8cEOHJlL1E",
+  pay_mp_year: "I-b6CNiZqN8cEOHJlL1E",
+  pay_binance_week: "I-b6CNiZqN8cEOHJlL1E",
+  pay_binance_year: "I-b6CNiZqN8cEOHJlL1E",
+  // sim_email_submit: "…",  ← el lead, cuando crees esa acción en Ads
+  // pass_activated: "…",    ← la compra de verdad
 };
 
 const ADS_ID = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18381874401").trim();
@@ -126,7 +137,8 @@ function ads(event: FunnelEvent, props?: Record<string, string | number | boolea
       send_to: `${ADS_ID}/${etiqueta}`,
       // Con valor, Google puede optimizar por plata y no por cantidad. Solo se
       // manda si quien llama lo pasó: un número inventado ensucia el reporte.
-      ...(typeof props?.value === "number" ? { value: props.value, currency: "ARS" } : {}),
+      // Los pases están en dólares, así que la moneda es USD y no ARS.
+      ...(typeof props?.value === "number" ? { value: props.value, currency: "USD" } : {}),
     });
   } catch {
     // no-op
