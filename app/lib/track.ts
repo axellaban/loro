@@ -115,8 +115,19 @@ const CONVERSIONES: Partial<Record<FunnelEvent, string>> = {
   pay_mp_year: "I-b6CNiZqN8cEOHJlL1E",
   pay_binance_week: "I-b6CNiZqN8cEOHJlL1E",
   pay_binance_year: "I-b6CNiZqN8cEOHJlL1E",
-  // sim_email_submit: "…",  ← el lead, cuando crees esa acción en Ads
-  // pass_activated: "…",    ← la compra de verdad
+  // El lead: dejó su email para desbloquear el informe del simulador.
+  //
+  // En Ads la acción quedó configurada como "carga de página", pero eso no
+  // aplica acá y no hace falta cambiarlo: el aviso no se manda al cargar
+  // ninguna página, se manda cuando el envío del email SALIÓ BIEN. Configurado
+  // por carga haría falta una página de gracias, y esa redirección no existe
+  // —ni conviene, porque agrega un paso a un formulario de un solo campo.
+  sim_email_submit: "RgtrCLL2qt8cEOHJlL1E",
+  // El mismo lead por el otro camino: desbloquear el informe entrando con
+  // Google. Es el mismo hecho —nos deja su email, y encima verificado— y no
+  // contarlo dejaría afuera a quien elige el botón en vez del campo.
+  sim_google_unlock: "RgtrCLL2qt8cEOHJlL1E",
+  // pass_activated: "…",  ← la compra de verdad, para cuando haya volumen
 };
 
 const ADS_ID = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18381874401").trim();
