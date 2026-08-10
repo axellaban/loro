@@ -135,6 +135,27 @@ export default function Privacidad() {
         respuesta&rdquo;, nunca el contenido de tus entrevistas.
       </p>
 
+      <h2>Publicidad</h2>
+      <p>
+        Usamos{" "}
+        <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noreferrer">
+          Google Ads
+        </a>{" "}
+        para dar a conocer Loreado.IA. Google deja cookies en tu navegador para
+        saber si llegaste desde uno de sus anuncios y si después hiciste algo
+        relevante —dejar tu email, activar un pase—. Con eso mide qué anuncios
+        funcionan y puede volver a mostrarte publicidad nuestra en otros sitios.
+      </p>
+      <p>
+        A Google no le mandamos el contenido de tus entrevistas, ni tu CV, ni
+        nada de lo que cargues en la app: solo la señal de que ocurrió una de
+        esas acciones. Podés desactivar la personalización de anuncios en{" "}
+        <a href="https://myadcenter.google.com" target="_blank" rel="noreferrer">
+          myadcenter.google.com
+        </a>{" "}
+        o bloquear las cookies desde tu navegador. La app funciona igual.
+      </p>
+
       <h2>Pagos</h2>
       <p>
         Los pagos se hacen en MercadoPago o Binance. Nunca vemos ni guardamos

@@ -80,6 +80,59 @@ export type FunnelEvent =
   | "hub_practice_click"
   | "hub_copilot_click";
 
+/**
+ * Qué eventos del funnel son CONVERSIONES para Google Ads, y con qué etiqueta.
+ *
+ * Google identifica cada conversión con "ID de conversión / etiqueta". El ID ya
+ * viaja en el tag; las etiquetas las emite Ads al crear cada acción de
+ * conversión y hay que pegarlas acá. Mientras un evento no tenga etiqueta no se
+ * manda nada, y el resto del tracking sigue igual.
+ *
+ * El mapa vive acá y no en Ads a propósito: estos eventos ya se disparan en el
+ * momento exacto del funnel, así que marcar uno como conversión es agregar un
+ * renglón y no salir a buscar dónde engancharlo.
+ *
+ * Sobre cuáles conviene marcar:
+ *  - `pass_activated` es la COMPRA de verdad, y ocurre en el sitio aunque el
+ *    pago sea afuera: la persona canjea su código en la app. Con la ventana de
+ *    90 días de Google, que pasen uno o dos días entre pagar y canjear no
+ *    rompe la atribución.
+ *  - `sim_email_submit` es el lead. Al arrancar conviene que sea la conversión
+ *    principal: Google necesita volumen para optimizar y las compras van a ser
+ *    pocas por mes.
+ */
+const CONVERSIONES: Partial<Record<FunnelEvent, string>> = {
+  // sim_email_submit: "pegar acá la etiqueta que da Ads",
+  // pass_activated: "…",
+  // pay_mp_week: "…",
+  // pay_mp_year: "…",
+};
+
+const ADS_ID = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18381874401").trim();
+
+/**
+ * Avisa la conversión a Google Ads, si este evento es una.
+ *
+ * Nunca rompe: si el tag no cargó —bloqueador, red, deploy sin ID— queda en
+ * nada, igual que los otros dos destinos de track().
+ */
+function ads(event: FunnelEvent, props?: Record<string, string | number | boolean>) {
+  const etiqueta = CONVERSIONES[event];
+  if (!etiqueta || !ADS_ID) return;
+  try {
+    const g = (window as any).gtag;
+    if (typeof g !== "function") return;
+    g("event", "conversion", {
+      send_to: `${ADS_ID}/${etiqueta}`,
+      // Con valor, Google puede optimizar por plata y no por cantidad. Solo se
+      // manda si quien llama lo pasó: un número inventado ensucia el reporte.
+      ...(typeof props?.value === "number" ? { value: props.value, currency: "ARS" } : {}),
+    });
+  } catch {
+    // no-op
+  }
+}
+
 export function track(event: FunnelEvent, props?: Record<string, string | number | boolean>) {
   try {
     vercelTrack(event, props);
@@ -91,6 +144,7 @@ export function track(event: FunnelEvent, props?: Record<string, string | number
   } catch {
     // no-op
   }
+  ads(event, props);
 }
 
 // Liga el distinct_id anónimo actual a una identidad real (hoy, el único dato

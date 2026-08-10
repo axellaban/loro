@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { AnalyticsClient } from "./lib/analytics-client";
+import { GoogleAds } from "./lib/GoogleAds";
 import "./globals.css";
 
 // Dominio base para resolver OG/Twitter images y URLs absolutas. Se puede
@@ -137,6 +138,7 @@ export default function RootLayout({
         {children}
         <Analytics />
         <AnalyticsClient />
+        <GoogleAds />
       </body>
     </html>
   );
