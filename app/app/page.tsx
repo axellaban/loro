@@ -1199,7 +1199,9 @@ async function decodificarImagen(file: File): Promise<CanvasImageSource & { widt
 }
 
 // ---------- Endpointing semántico ----------
-export default function Page() {
+const DEFAULT_TAGLINE = "El Loro escucha tu entrevista en tiempo real y te sopla las respuestas exactas. 100% indetectable en Google Meet, Teams y Zoom. 🦜";
+
+export default function Page({ tagline = DEFAULT_TAGLINE }: { tagline?: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [mode, setMode] = useState<Mode>("mic");
   const [error, setError] = useState("");
@@ -2755,8 +2757,7 @@ export default function Page() {
 
       {showSetup && (
         <p className="tagline">
-          El Loro escucha tu entrevista en tiempo real y te sopla las respuestas exactas. 100%
-          indetectable en Google Meet, Teams y Zoom. 🦜
+          {tagline}
         </p>
       )}
 
