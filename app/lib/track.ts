@@ -133,6 +133,44 @@ const CONVERSIONES: Partial<Record<FunnelEvent, string>> = {
 const ADS_ID = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18381874401").trim();
 
 /**
+ * Identificador que Google usa para no contar dos veces la misma conversión.
+ *
+ * El problema es concreto: alguien toca "Pagar", se abre MercadoPago, vuelve,
+ * duda, toca de nuevo. Sin este id eso son tres compras en el reporte y la
+ * campaña optimiza para un número inventado.
+ *
+ * Lo armamos con quién + qué + cuándo. Las tres partes hacen falta:
+ *  - quién: un id anónimo del navegador. Sin esto el id sería igual para todo
+ *    el mundo y Google contaría UNA sola conversión por día en toda la cuenta.
+ *  - qué + cuándo: los toques repetidos de un mismo día cuentan una vez, y una
+ *    compra de verdad en otro día vuelve a contar. Fijarlo para siempre
+ *    borraría las recompras, que en pases semanales son lo que queremos ver.
+ *
+ * El id anónimo no identifica a nadie: es un número al azar, igual que el que
+ * ya usan las analíticas del sitio.
+ */
+const ANON_KEY = "loreado:anon:v1";
+
+function idAnonimo() {
+  try {
+    let id = localStorage.getItem(ANON_KEY);
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      localStorage.setItem(ANON_KEY, id);
+    }
+    return id;
+  } catch {
+    // Sin localStorage (modo privado, bloqueadores) no podemos deduplicar.
+    // Preferimos contar de más antes que colapsar a todos en un mismo id.
+    return Math.random().toString(36).slice(2, 12);
+  }
+}
+
+function idDeConversion(event: FunnelEvent) {
+  return `${idAnonimo()}-${event}-${new Date().toISOString().slice(0, 10)}`;
+}
+
+/**
  * Avisa la conversión a Google Ads, si este evento es una.
  *
  * Nunca rompe: si el tag no cargó —bloqueador, red, deploy sin ID— queda en
@@ -150,6 +188,7 @@ function ads(event: FunnelEvent, props?: Record<string, string | number | boolea
       // manda si quien llama lo pasó: un número inventado ensucia el reporte.
       // Los pases están en dólares, así que la moneda es USD y no ARS.
       ...(typeof props?.value === "number" ? { value: props.value, currency: "USD" } : {}),
+      transaction_id: idDeConversion(event),
     });
   } catch {
     // no-op
