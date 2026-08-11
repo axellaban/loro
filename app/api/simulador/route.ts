@@ -560,8 +560,15 @@ const FEEDBACK_MAX_TOKENS = 4096;
  * Con un presupuesto compartido, el corte lo damos nosotros y con un mensaje
  * que se entiende, antes de que lo dé la plataforma sin decir nada.
  */
-const FEEDBACK_PRESUPUESTO_MS = 20_000;
-const FEEDBACK_INTENTO_MS = 12_000;
+/*
+ * 12s no alcanzaban: armar el informe completo en JSON son varios miles de
+ * tokens y el modelo se pasaba, así que cortábamos nosotros un pedido que
+ * habría terminado bien. Un intento que llega vale más que dos que mueren
+ * dentro del límite de la plataforma, así que el intento se lleva casi todo
+ * el presupuesto y el respaldo solo entra si el primero falla rápido.
+ */
+const FEEDBACK_PRESUPUESTO_MS = 22_000;
+const FEEDBACK_INTENTO_MS = 21_000;
 
 async function pedirConTope(
   url: string,
