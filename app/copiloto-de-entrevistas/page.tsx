@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Hub from "../Hub";
+import { AppPage } from "../app/page";
 
 export const metadata: Metadata = {
   title: "Copiloto de entrevistas laborales con IA — Loreado.IA",
@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/copiloto-de-entrevistas" },
 };
 
-// Subtítulo sin palabras que infringen políticas de Google Ads
+// Tagline sin palabras que infringen políticas de Google Ads
 // (sin "indetectable", sin "sopla").
-const ADS_COPILO_SUB =
-  "Respuestas inteligentes en tiempo real, ancladas a tu CV y al puesto.";
+const ADS_TAGLINE =
+  "Tu asistente de IA para entrevistas laborales. Transcripción en tiempo real y respuestas inteligentes ancladas a tu CV y al puesto. 🦜";
 
 export default function CopiloDeEntrevistasPage() {
-  return <Hub copiloSub={ADS_COPILO_SUB} />;
+  return <AppPage tagline={ADS_TAGLINE} />;
 }

@@ -1201,7 +1201,7 @@ async function decodificarImagen(file: File): Promise<CanvasImageSource & { widt
 // ---------- Endpointing semántico ----------
 const DEFAULT_TAGLINE = "El Loro escucha tu entrevista en tiempo real y te sopla las respuestas exactas. 100% indetectable en Google Meet, Teams y Zoom. 🦜";
 
-export default function Page({ tagline = DEFAULT_TAGLINE }: { tagline?: string }) {
+export function AppPage({ tagline = DEFAULT_TAGLINE }: { tagline?: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [mode, setMode] = useState<Mode>("mic");
   const [error, setError] = useState("");
@@ -3630,4 +3630,11 @@ export default function Page({ tagline = DEFAULT_TAGLINE }: { tagline?: string }
       )}
     </main>
   );
+}
+
+// Next.js 14 requiere que el default export de page.tsx no tenga props.
+// AppPage se exporta como named export para que otras rutas (ej. /copiloto-de-entrevistas)
+// puedan importarla y pasarle props custom.
+export default function Page() {
+  return <AppPage />;
 }
