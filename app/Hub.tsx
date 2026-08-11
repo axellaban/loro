@@ -456,7 +456,7 @@ function StatsCounter() {
 }
 
 // Hub minimal (Luhmann): un solo mensaje y dos puertas.
-export default function Hub() {
+export default function Hub({ copiloSub = "Te sopla las respuestas exactas. 100% indetectable en vivo." }: { copiloSub?: string }) {
   const [wordIdx, setWordIdx] = useState(0);
   useEffect(() => {
     const id = setInterval(() => {
@@ -521,7 +521,7 @@ export default function Hub() {
                 <MatrixPill3D type="red" />
               </div>
               <span className="hub-option-label hub-label-red">Copiloto</span>
-              <span className="hub-option-sub">Te sopla las respuestas exactas. 100% indetectable en vivo.</span>
+              <span className="hub-option-sub">{copiloSub}</span>
             </Link>
           </div>
         </div>
