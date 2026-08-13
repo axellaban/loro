@@ -45,8 +45,9 @@ si no vas a ver ruido de módulos faltantes que no tiene que ver con tu cambio).
   `app/lib/precios.ts`, que es el único lugar donde viven los precios.
 - `app/lib/track-server.ts` — eventos desde el servidor (edge) a PostHog. `track.ts`
   es del navegador y no sirve para esto.
-- `app/api/uso/route.ts` — consumo y saldo de Deepgram, que es el único que no se
-  puede medir desde adentro (el navegador habla directo por WebSocket).
+- `app/api/uso/route.ts` + `app/uso/` — el panel de consumo: gasto de los modelos
+  (contador propio en Upstash, se lee al instante) y saldo de Deepgram (consultado
+  a Deepgram, que es el único proveedor que lo expone por API). Detrás de `USO_TOKEN`.
 - `app/lib/analytics-client.tsx` — inicializa PostHog client-side (`autocapture: false`
   a propósito — en las textareas se pega CV y no queremos rozar ese contenido).
 - `next.config.mjs` — reverse proxy `/ingest/*` → PostHog (evita adblockers).
@@ -80,7 +81,8 @@ Ver `.env.example` para la lista completa y comentarios. Resumen:
 | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | No | Override de modelo por provider |
 | `CAPACITY_CLOSED` | No | `"1"` = kill switch: 503 en endpoints pagos, la waitlist sigue abierta. Requiere redeploy |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | Sin ella, `track()` es no-op hacia PostHog (Vercel Analytics igual descarta eventos custom en Hobby). El servidor usa la misma key para los eventos de consumo (`uso_llm`, `uso_tts`) |
-| `USO_TOKEN` | No | Token de `/api/uso` (consumo y saldo de Deepgram). Sin él, el endpoint responde 503 |
+| `USO_TOKEN` | No | Token del panel de consumo (`/uso`). Sin él, el panel responde 503 |
+| `PRESUPUESTO_MENSUAL_USD` | No | Contra qué compara el panel el gasto en modelos. Los tres proveedores de LLM no exponen saldo por API: el límite lo ponés vos |
 | `GFORM_ACTION` / `GFORM_EMAIL_ENTRY` | No | Override del Google Form de waitlist |
 
 Las `NEXT_PUBLIC_*` se leen en build time — cambiarlas en Vercel requiere redeploy.

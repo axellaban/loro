@@ -78,6 +78,45 @@ async function cmd(args: (string | number)[]): Promise<any> {
   }
 }
 
+/**
+ * Varios comandos en UN solo viaje a Upstash.
+ *
+ * Lo pide el contador de gasto: cada respuesta de un modelo suma media docena
+ * de campos (total, total por proveedor, pedidos, tokens, vencimiento) y
+ * mandarlos de a uno serían seis viajes en el camino de una respuesta que la
+ * persona está esperando. Devuelve un resultado por comando, en orden, o
+ * `undefined` si no hay credenciales o falló la llamada entera.
+ */
+export async function pipeline(comandos: (string | number)[][]): Promise<any[] | undefined> {
+  const c = creds();
+  if (!c || comandos.length === 0) return undefined;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(`${c.url}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${c.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(comandos.map((cmd) => cmd.map(String))),
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    if (!r.ok) {
+      console.error(`[kv] pipeline devolvió ${r.status}`);
+      return undefined;
+    }
+    const j: any = await r.json();
+    return Array.isArray(j) ? j.map((x) => x?.result) : undefined;
+  } catch (err: any) {
+    console.error("[kv] pipeline falló:", err?.message || err);
+    return undefined;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export async function get(key: string): Promise<string | null> {
   const r = await cmd(["GET", key]);
   return typeof r === "string" ? r : null;

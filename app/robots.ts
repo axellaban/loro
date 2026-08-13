@@ -7,7 +7,9 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://loreado.vercel.app
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      { userAgent: "*", allow: "/" },
+      // /uso es el panel de consumo (interno, detrás de token): no tiene por
+      // qué aparecer en ningún buscador.
+      { userAgent: "*", allow: "/", disallow: "/uso" },
       {
         userAgent: [
           "GPTBot",

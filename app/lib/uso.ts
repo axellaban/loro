@@ -10,6 +10,7 @@
 // el reporte (log de Vercel + evento a PostHog). Medir no puede costar caro ni
 // romper nada: si algo falla, se loguea y la respuesta del usuario sigue igual.
 
+import { pipeline } from "./kv";
 import { costoTTSUSD, costoUSD } from "./precios";
 import { eventoServidor } from "./track-server";
 
@@ -98,6 +99,65 @@ export function usoOpenAI(uso: Uso, evt: any): void {
   uso.cache = num(u.prompt_tokens_details?.cached_tokens);
 }
 
+/**
+ * El día, en hora de Argentina.
+ *
+ * Con fechas UTC el "hoy" del panel se reiniciaría a las 21:00 de acá, justo
+ * en el horario de más uso, y el número del día se vería partido en dos.
+ */
+export function diaLocal(d: Date = new Date()): string {
+  try {
+    // en-CA da directamente YYYY-MM-DD.
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+export const CLAVE_GASTO = (dia: string) => `gasto:${dia}`;
+/** Los contadores se borran solos: el panel mira 30 días y esto deja margen. */
+const TTL_GASTO = 40 * 86_400;
+
+/**
+ * Suma lo consumido a los contadores del día en Upstash.
+ *
+ * Los eventos de PostHog sirven para analizar, pero para responder "¿cuánto
+ * llevo hoy?" en el momento hacen falta contadores propios: un total que se
+ * lee de una, sin esperar la ingesta ni pagar una consulta. Es también la base
+ * sobre la que después se puede frenar el gasto solo.
+ *
+ * Si no hay Upstash configurado esto no hace nada y el resto sigue igual: la
+ * medición nunca puede romper una respuesta.
+ */
+async function sumarGasto(d: {
+  provider: string;
+  usd: number | null;
+  tokensIn: number;
+  tokensOut: number;
+}): Promise<void> {
+  const k = CLAVE_GASTO(diaLocal());
+  const comandos: (string | number)[][] = [
+    ["HINCRBY", k, "req", 1],
+    ["HINCRBY", k, "in", Math.round(d.tokensIn)],
+    ["HINCRBY", k, "out", Math.round(d.tokensOut)],
+    ["EXPIRE", k, TTL_GASTO],
+  ];
+  // toFixed evita la notación exponencial: un pedido de dos tokens da algo
+  // como 1e-7, que Redis rechaza como número inválido y se perdería el
+  // incremento entero.
+  const monto = d.usd === null ? null : Number(d.usd.toFixed(8));
+  if (monto === null) {
+    // Sin precio cargado el gasto no se puede sumar, pero que el pedido
+    // existió sí se anota: si no, el total del panel miente para abajo y no
+    // hay forma de darse cuenta.
+    comandos.push(["HINCRBY", k, "sin_precio", 1]);
+  } else if (monto > 0) {
+    comandos.push(["HINCRBYFLOAT", k, "usd", monto.toFixed(8)]);
+    comandos.push(["HINCRBYFLOAT", k, `usd:${d.provider}`, monto.toFixed(8)]);
+  }
+  await pipeline(comandos);
+}
+
 export type ReporteLLM = {
   /** Qué endpoint gastó: answer, answer-screen, session, sim-pregunta… */
   tag: string;
@@ -129,24 +189,30 @@ export async function reportarUso(r: ReporteLLM): Promise<void> {
       `[uso] ${r.tag} ${r.provider}/${r.model} in=${uso.in} out=${uso.out} think=${uso.thinking} cache=${uso.cache} usd=${usd === null ? "sin-precio" : usd.toFixed(6)}${r.cortado ? " cortado=1" : ""}`
     );
 
-    await eventoServidor(
-      "uso_llm",
-      {
-        tag: r.tag,
-        provider: r.provider,
-        model: r.model,
-        tokens_in: uso.in,
-        tokens_out: uso.out,
-        tokens_thinking: uso.thinking,
-        tokens_cache: uso.cache,
-        // null cuando el modelo no tiene precio cargado en precios.ts: en
-        // PostHog se ve como un hueco, que es la señal de que falta cargarlo.
-        usd,
-        cortado: Boolean(r.cortado),
-        con_pase: Boolean(r.usuario),
-      },
-      r.usuario
-    );
+    // Los dos destinos en paralelo: el contador es para el panel (ahora
+    // mismo) y el evento es para analizar después (por modelo, por cliente).
+    // En serie sumarían sus latencias al cierre del stream.
+    await Promise.all([
+      sumarGasto({ provider: r.provider, usd, tokensIn: uso.in, tokensOut: uso.out }),
+      eventoServidor(
+        "uso_llm",
+        {
+          tag: r.tag,
+          provider: r.provider,
+          model: r.model,
+          tokens_in: uso.in,
+          tokens_out: uso.out,
+          tokens_thinking: uso.thinking,
+          tokens_cache: uso.cache,
+          // null cuando el modelo no tiene precio cargado en precios.ts: en
+          // PostHog se ve como un hueco, que es la señal de que falta cargarlo.
+          usd,
+          cortado: Boolean(r.cortado),
+          con_pase: Boolean(r.usuario),
+        },
+        r.usuario
+      ),
+    ]);
   } catch (err: any) {
     console.error("[uso] no se pudo reportar:", err?.message || err);
   }
@@ -162,14 +228,19 @@ export async function reportarUsoTTS(d: {
     if (d.caracteres <= 0) return;
     const usd = costoTTSUSD(d.caracteres);
     console.log(`[uso] sim-tts openai/${d.model} chars=${d.caracteres} usd=${usd.toFixed(6)}`);
-    await eventoServidor("uso_tts", {
-      tag: "sim-tts",
-      provider: "openai",
-      model: d.model,
-      caracteres: d.caracteres,
-      lang: d.lang,
-      usd,
-    });
+    await Promise.all([
+      // La voz cuenta aparte de los modelos de texto: en el panel se ve como
+      // un proveedor propio, si no se mezcla con el gasto de GPT.
+      sumarGasto({ provider: "tts", usd, tokensIn: 0, tokensOut: 0 }),
+      eventoServidor("uso_tts", {
+        tag: "sim-tts",
+        provider: "openai",
+        model: d.model,
+        caracteres: d.caracteres,
+        lang: d.lang,
+        usd,
+      }),
+    ]);
   } catch (err: any) {
     console.error("[uso] no se pudo reportar el TTS:", err?.message || err);
   }
