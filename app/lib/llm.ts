@@ -114,7 +114,12 @@ export function openaiBody(opts: {
       { role: "user", content: userContent },
     ],
   };
-  if (opts.stream) body.stream = true;
+  // Sin `include_usage`, OpenAI NO manda el consumo en streaming y el gasto de
+  // GPT queda invisible. Agrega un chunk final con `usage` y nada más.
+  if (opts.stream) {
+    body.stream = true;
+    body.stream_options = { include_usage: true };
+  }
   if (opts.json) body.response_format = { type: "json_object" };
   if (opts.spec.reasoning) {
     // Los modelos de razonamiento usan max_completion_tokens y rechazan

@@ -13,6 +13,11 @@ import {
   openaiBody,
   upstreamMessage,
 } from "../../lib/llm";
+// El parser SSE es el mismo de /api/answer: acá vivía una copia idéntica, y
+// duplicarlo otra vez significaba que la medición de consumo iba a existir en
+// un endpoint y no en el otro.
+import { sseTextStream } from "../../lib/stream";
+import { nuevoUso, reportarUso, usoAnthropic, usoGemini, usoOpenAI } from "../../lib/uso";
 
 // El spec del registro decide la forma del request (ver app/lib/models.ts).
 // Sin overrides por env var: pisaban en silencio el modelo del selector.
@@ -346,52 +351,6 @@ async function textStreamResponse(stream: ReadableStream, model: string) {
   });
 }
 
-function sseTextStream(
-  upstream: ReadableStream<Uint8Array>,
-  extract: (json: string) => string | null
-): ReadableStream {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  const reader = upstream.getReader();
-  let buffer = "";
-  return new ReadableStream({
-    // El pull loopea hasta encolar datos reales: si resuelve sin encolar,
-    // Vercel Edge puede pausar el stream y la sala queda colgada.
-    async pull(controller) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        let enqueuedAny = false;
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const json = trimmed.slice(5).trim();
-          if (!json || json === "[DONE]") continue;
-          try {
-            const text = extract(json);
-            if (text) {
-              controller.enqueue(encoder.encode(text));
-              enqueuedAny = true;
-            }
-          } catch {
-            // fragmento incompleto: se ignora
-          }
-        }
-        if (enqueuedAny) return;
-      }
-    },
-    cancel() {
-      reader.cancel();
-    },
-  });
-}
-
 async function streamGemini(
   specs: ModelSpec[],
   systemPrompt: string,
@@ -423,8 +382,17 @@ async function streamGemini(
     });
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
+      const uso = nuevoUso();
       return await textStreamResponse(
-        sseTextStream(upstream.body, (json) => geminiChunk(JSON.parse(json), spec.model)),
+        sseTextStream(
+          upstream.body,
+          (json) => {
+            const evt = JSON.parse(json);
+            usoGemini(uso, evt);
+            return geminiChunk(evt, spec.model);
+          },
+          (cortado) => reportarUso({ tag: "sim-pregunta", provider: "gemini", model: spec.model, uso, cortado })
+        ),
         spec.model
       );
     }
@@ -464,14 +432,20 @@ async function streamAnthropic(specs: ModelSpec[], systemPrompt: string, userCon
     });
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
+      const uso = nuevoUso();
       return await textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-            return evt.delta.text ?? null;
-          }
-          return null;
-        }),
+        sseTextStream(
+          upstream.body,
+          (json) => {
+            const evt = JSON.parse(json);
+            usoAnthropic(uso, evt);
+            if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+              return evt.delta.text ?? null;
+            }
+            return null;
+          },
+          (cortado) => reportarUso({ tag: "sim-pregunta", provider: "anthropic", model: spec.model, uso, cortado })
+        ),
         spec.model
       );
     }
@@ -514,11 +488,17 @@ async function streamOpenAI(specs: ModelSpec[], systemPrompt: string, userConten
     });
     if (upstream.ok && upstream.body) {
       if (spec !== specs[0]) console.warn(`[simulador] fallback a ${spec.model}`);
+      const uso = nuevoUso();
       return await textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          return evt.choices?.[0]?.delta?.content ?? null;
-        }),
+        sseTextStream(
+          upstream.body,
+          (json) => {
+            const evt = JSON.parse(json);
+            usoOpenAI(uso, evt);
+            return evt.choices?.[0]?.delta?.content ?? null;
+          },
+          (cortado) => reportarUso({ tag: "sim-pregunta", provider: "openai", model: spec.model, uso, cortado })
+        ),
         spec.model
       );
     }
@@ -648,6 +628,12 @@ async function getFeedback(
       const res = intento.res;
       if (res.ok) {
         const j = await res.json();
+        const uso = nuevoUso();
+        usoOpenAI(uso, j);
+        // Sin await, a diferencia del streaming: el informe pelea contra el
+        // límite de 25s de edge con un presupuesto de 22s, y esperar al reporte
+        // podría ser lo que haga que la función se corte. El log sale igual.
+        void reportarUso({ tag: "sim-informe", provider: "openai", model: spec.model, uso });
         try {
           return Response.json(parseModelJson(j.choices?.[0]?.message?.content || "{}"));
         } catch {
@@ -701,6 +687,9 @@ async function getFeedback(
       const res = intento.res;
       if (res.ok) {
         const j = await res.json();
+        const uso = nuevoUso();
+        usoAnthropic(uso, j);
+        void reportarUso({ tag: "sim-informe", provider: "anthropic", model: spec.model, uso });
         try {
           // anthropicText busca el primer bloque de texto: leer content[0]
           // devolvía vacío si el modelo emitía otro bloque antes.
@@ -756,6 +745,9 @@ async function getFeedback(
     const res = intento.res;
     if (res.ok) {
       const j = await res.json();
+      const uso = nuevoUso();
+      usoGemini(uso, j);
+      void reportarUso({ tag: "sim-informe", provider: "gemini", model: spec.model, uso });
       try {
         return Response.json(parseModelJson(j.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
       } catch {

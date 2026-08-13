@@ -216,5 +216,7 @@ ${transcript || "(vacío)"}
     reasoningMaxTokens: image ? 2000 : 1500,
     temperature: 0.4,
     tag: image ? "answer-screen" : "answer",
+    // Para poder mirar el consumo por cliente que pagó, no solo el total.
+    usuario: pass?.email,
   });
 }

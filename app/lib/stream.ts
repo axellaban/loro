@@ -16,6 +16,7 @@ import {
   type LlmImage,
   type Turn,
 } from "./llm";
+import { nuevoUso, reportarUso, usoAnthropic, usoGemini, usoOpenAI } from "./uso";
 
 /**
  * Cadena de intentos: el modelo pedido y después el estable del MISMO
@@ -36,15 +37,34 @@ export function fallbackChain(spec: ModelSpec): ModelSpec[] {
 /**
  * Parser SSE genérico: lee el body upstream, parte por líneas "data:", y por
  * cada JSON extrae el texto con `extract`. Reenvía solo texto plano al cliente.
+ *
+ * `alTerminar` corre una sola vez cuando el stream se cierra, ya sea porque
+ * terminó o porque el cliente cortó. Es el enganche de la medición de consumo:
+ * el total de tokens recién se conoce con el último evento, y sin esto no hay
+ * ningún momento en el que reportarlo.
+ *
+ * Se espera (await) antes de cerrar: en edge, un fetch suelto después de cerrar
+ * la respuesta se puede morir con la función. El costo es que el stream cierra
+ * lo que tarde el reporte DESPUÉS del último token (~100ms, 2s en el peor caso
+ * si PostHog no contesta). El texto ya llegó entero, así que no se ve como
+ * lentitud de la respuesta; a lo sumo el "generando" tarda un instante más en
+ * apagarse. El log a Vercel sale siempre, aunque el evento se pierda.
  */
 export function sseTextStream(
   upstream: ReadableStream<Uint8Array>,
-  extract: (json: string) => string | null
+  extract: (json: string) => string | null,
+  alTerminar?: (cortado: boolean) => void | Promise<void>
 ): ReadableStream {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const reader = upstream.getReader();
   let buffer = "";
+  let terminado = false;
+  const terminar = async (cortado: boolean) => {
+    if (terminado) return;
+    terminado = true;
+    await alTerminar?.(cortado);
+  };
   return new ReadableStream({
     // El pull loopea hasta encolar datos reales: si resuelve sin encolar,
     // Vercel Edge puede pausar el stream (fix redescubierto del historial viejo).
@@ -52,6 +72,7 @@ export function sseTextStream(
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          await terminar(false);
           controller.close();
           return;
         }
@@ -78,6 +99,9 @@ export function sseTextStream(
       }
     },
     cancel() {
+      // El cliente cortó (cerró la pestaña, cambió de pregunta). Lo consumido
+      // hasta acá ya se factura igual, así que se reporta marcado como cortado.
+      void terminar(true);
       reader.cancel();
     },
   });
@@ -102,6 +126,8 @@ export type StreamOpts = {
   image?: LlmImage | null;
   /** Prefijo de los logs, para saber qué endpoint falló. */
   tag: string;
+  /** Email del pase, si lo hay: permite ver el consumo por cliente. */
+  usuario?: string;
 };
 
 /** Despacha al proveedor del spec. Todos devuelven texto plano en streaming. */
@@ -146,8 +172,18 @@ async function streamGemini(opts: StreamOpts): Promise<Response> {
     });
     if (upstream.ok && upstream.body) {
       if (spec !== opts.specs[0]) console.warn(`[${opts.tag}] fallback a ${spec.model}`);
+      const uso = nuevoUso();
       return textStreamResponse(
-        sseTextStream(upstream.body, (json) => geminiChunk(JSON.parse(json), spec.model)),
+        sseTextStream(
+          upstream.body,
+          (json) => {
+            const evt = JSON.parse(json);
+            usoGemini(uso, evt);
+            return geminiChunk(evt, spec.model);
+          },
+          (cortado) =>
+            reportarUso({ tag: opts.tag, provider: "gemini", model: spec.model, uso, cortado, usuario: opts.usuario })
+        ),
         spec.model
       );
     }
@@ -189,15 +225,22 @@ async function streamAnthropic(opts: StreamOpts): Promise<Response> {
     });
     if (upstream.ok && upstream.body) {
       if (spec !== opts.specs[0]) console.warn(`[${opts.tag}] fallback a ${spec.model}`);
+      const uso = nuevoUso();
       return textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          // Solo nos interesan los deltas de texto del bloque de contenido.
-          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-            return evt.delta.text ?? null;
-          }
-          return null;
-        }),
+        sseTextStream(
+          upstream.body,
+          (json) => {
+            const evt = JSON.parse(json);
+            usoAnthropic(uso, evt);
+            // Solo nos interesan los deltas de texto del bloque de contenido.
+            if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+              return evt.delta.text ?? null;
+            }
+            return null;
+          },
+          (cortado) =>
+            reportarUso({ tag: opts.tag, provider: "anthropic", model: spec.model, uso, cortado, usuario: opts.usuario })
+        ),
         spec.model
       );
     }
@@ -241,11 +284,19 @@ async function streamOpenAI(opts: StreamOpts): Promise<Response> {
     });
     if (upstream.ok && upstream.body) {
       if (spec !== opts.specs[0]) console.warn(`[${opts.tag}] fallback a ${spec.model}`);
+      const uso = nuevoUso();
       return textStreamResponse(
-        sseTextStream(upstream.body, (json) => {
-          const evt = JSON.parse(json);
-          return evt.choices?.[0]?.delta?.content ?? null;
-        }),
+        sseTextStream(
+          upstream.body,
+          (json) => {
+            const evt = JSON.parse(json);
+            // El último chunk viene sin `choices` y solo con `usage`.
+            usoOpenAI(uso, evt);
+            return evt.choices?.[0]?.delta?.content ?? null;
+          },
+          (cortado) =>
+            reportarUso({ tag: opts.tag, provider: "openai", model: spec.model, uso, cortado, usuario: opts.usuario })
+        ),
         spec.model
       );
     }

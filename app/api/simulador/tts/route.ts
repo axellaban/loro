@@ -4,6 +4,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { capacityClosed, rateLimit, sameOriginStrict } from "../../../lib/ratelimit";
+import { reportarUsoTTS } from "../../../lib/uso";
 
 // Voz del entrevistador del simulador. gpt-4o-mini-tts soporta `instructions`
 // (tono/acento); tts-1 no, por eso el retry lo omite.
@@ -175,14 +176,21 @@ export async function POST(req: Request) {
   }
   const lang: "es" | "en" = body.lang === "en" ? "en" : "es";
 
+  let modeloUsado = TTS_MODEL;
   let upstream = await requestSpeech(apiKey, TTS_MODEL, text, lang);
   if (!upstream.ok && upstream.status >= 400 && upstream.status < 500) {
+    modeloUsado = TTS_MODEL_FALLBACK;
     upstream = await requestSpeech(apiKey, TTS_MODEL_FALLBACK, text, lang);
   }
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.text().catch(() => "");
     return new Response(`TTS error: ${detail || upstream.status}`, { status: 502 });
   }
+
+  // Sin await a propósito: el audio arranca a sonar mientras el candidato
+  // espera, y no vale la pena demorarlo por una métrica. La función sigue viva
+  // mientras se transmite el audio, que es tiempo de sobra para que salga.
+  void reportarUsoTTS({ model: modeloUsado, caracteres: text.length, lang });
 
   return new Response(upstream.body, {
     headers: {

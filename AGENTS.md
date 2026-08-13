@@ -40,6 +40,13 @@ si no vas a ver ruido de módulos faltantes que no tiene que ver con tu cambio).
   `capacityClosed()` (kill switch global).
 - `app/lib/track.ts` — wrapper de analytics (`track()`, `identify()`), fail-safe (nunca
   rompe la UI). Todo evento nuevo se agrega al union type `FunnelEvent` acá.
+- `app/lib/uso.ts` — medición de consumo: lee los tokens que informa cada proveedor
+  dentro del stream y los reporta (log `[uso]` + evento a PostHog). El costo sale de
+  `app/lib/precios.ts`, que es el único lugar donde viven los precios.
+- `app/lib/track-server.ts` — eventos desde el servidor (edge) a PostHog. `track.ts`
+  es del navegador y no sirve para esto.
+- `app/api/uso/route.ts` — consumo y saldo de Deepgram, que es el único que no se
+  puede medir desde adentro (el navegador habla directo por WebSocket).
 - `app/lib/analytics-client.tsx` — inicializa PostHog client-side (`autocapture: false`
   a propósito — en las textareas se pega CV y no queremos rozar ese contenido).
 - `next.config.mjs` — reverse proxy `/ingest/*` → PostHog (evita adblockers).
@@ -51,6 +58,10 @@ si no vas a ver ruido de módulos faltantes que no tiene que ver con tu cambio).
 - Analytics: siempre a través de `track()`/`identify()` de `app/lib/track.ts`, nunca
   `posthog.capture` directo desde componentes. Nombrar eventos en snake_case
   (`answer_requested`, no `answerRequested`).
+- Todo endpoint que le paga a un proveedor reporta su consumo con `reportarUso()` de
+  `app/lib/uso.ts`. Si agregás un modelo al registro, cargale el precio en
+  `app/lib/precios.ts`: sin precio los tokens se miden igual, pero el costo queda en
+  blanco (`usd=sin-precio`) y ese gasto no aparece en ningún total.
 - El generar respuesta es **siempre manual** (botón "Responder"), nunca automático
   mientras la persona habla — es una decisión de producto explícita, no la cambies sin
   que te lo pidan.
@@ -68,7 +79,8 @@ Ver `.env.example` para la lista completa y comentarios. Resumen:
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | No | Providers alternativos, soportados en backend, sin UI hoy |
 | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | No | Override de modelo por provider |
 | `CAPACITY_CLOSED` | No | `"1"` = kill switch: 503 en endpoints pagos, la waitlist sigue abierta. Requiere redeploy |
-| `NEXT_PUBLIC_POSTHOG_KEY` | No | Sin ella, `track()` es no-op hacia PostHog (Vercel Analytics igual descarta eventos custom en Hobby) |
+| `NEXT_PUBLIC_POSTHOG_KEY` | No | Sin ella, `track()` es no-op hacia PostHog (Vercel Analytics igual descarta eventos custom en Hobby). El servidor usa la misma key para los eventos de consumo (`uso_llm`, `uso_tts`) |
+| `USO_TOKEN` | No | Token de `/api/uso` (consumo y saldo de Deepgram). Sin él, el endpoint responde 503 |
 | `GFORM_ACTION` / `GFORM_EMAIL_ENTRY` | No | Override del Google Form de waitlist |
 
 Las `NEXT_PUBLIC_*` se leen en build time — cambiarlas en Vercel requiere redeploy.
