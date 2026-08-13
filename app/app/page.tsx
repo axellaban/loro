@@ -13,6 +13,7 @@ import { rememberEmail, savedEmail } from "../lib/email";
 import { usePass, storedPassToken, type ActivePass } from "../lib/passClient";
 import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
+import { usePagoVuelta } from "../lib/pagoVuelta";
 import { Markdown } from "../lib/Markdown";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
@@ -868,10 +869,16 @@ function PassParty({ pass, onDone }: { pass: ActivePass; onDone: () => void }) {
 /**
  * Paso de pago: se elige el pase y acá se elige CÓMO pagarlo.
  *
- * Argentina va por Mercado Pago con link directo; el resto del mundo por
- * Binance Pay, cuyo QR todavía se manda a mano. En los dos casos el alta la
- * hace una persona con el comprobante, así que el cierre siempre es WhatsApp —
- * y eso se dice de entrada para que nadie pague esperando un alta automática.
+ * Tres medios y NO son equivalentes, así que el orden de la pantalla no es
+ * decorativo. La tarjeta va primera porque es el único con alta automática: se
+ * paga y se entra, sin que haya una persona en el medio mirando comprobantes.
+ * Mercado Pago y Binance siguen abajo porque en Argentina la tarjeta
+ * internacional tiene impuestos y mucha gente prefiere el otro camino aunque
+ * tarde.
+ *
+ * La diferencia se dice en pantalla, en el badge de cada tarjeta: quien elige
+ * Mercado Pago tiene que saber de entrada que el cierre es por WhatsApp, y
+ * quien elige tarjeta tiene que saber que no hay que escribirle a nadie.
  */
 function PagoPaso({
   plan,
@@ -883,6 +890,41 @@ function PagoPaso({
   onWhatsApp: (msg: string) => void;
 }) {
   const p = PLANES[plan];
+  // Solo para el botón de tarjeta: mientras se crea la sesión de Checkout hay
+  // un viaje al servidor y otro a Stripe. Sin este estado el botón parece
+  // colgado y se toca de nuevo.
+  const [yendo, setYendo] = useState(false);
+  const [errorTarjeta, setErrorTarjeta] = useState("");
+
+  const pagarConTarjeta = useCallback(async () => {
+    if (yendo) return;
+    setYendo(true);
+    setErrorTarjeta("");
+    track(plan === "week" ? "pay_stripe_week" : "pay_stripe_year", { value: p.valor });
+    try {
+      const r = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const j = await r.json().catch(() => null);
+      if (j?.ok && j.url) {
+        // Se navega en la MISMA pestaña, no en una nueva. Checkout vuelve por
+        // /api/stripe/return y esa vuelta tiene que aterrizar en la pestaña
+        // donde está la app: abierta aparte, el pase se activaría en una
+        // ventana huérfana y la original seguiría mostrando el paywall.
+        window.location.href = j.url;
+        return;
+      }
+      track("pay_stripe_error");
+      setErrorTarjeta(j?.error || "No se pudo abrir el pago con tarjeta.");
+    } catch {
+      track("pay_stripe_error");
+      setErrorTarjeta("No hay conexión para abrir el pago.");
+    }
+    setYendo(false);
+  }, [plan, p.valor, yendo]);
+
   return (
     <div className="paywall-overlay" onClick={onClose}>
       <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
@@ -893,6 +935,31 @@ function PagoPaso({
         <p className="paywall-text">
           {p.titulo} — <strong>{p.precio}</strong>
         </p>
+
+        <div className="stype-card">
+          <div className="stype-head">
+            <span className="stype-name">
+              <CardIcon /> Tarjeta
+            </span>
+            {/* El badge dice el beneficio, no el proveedor: "Stripe" no le
+                significa nada a quien está por comprar, "entrás al instante"
+                sí — y es lo único que diferencia este botón de los de abajo. */}
+            <span className="stype-badge">Entrás al instante</span>
+          </div>
+          <button
+            type="button"
+            className="btn-action btn-primary"
+            onClick={pagarConTarjeta}
+            disabled={yendo}
+          >
+            {yendo ? "Abriendo…" : "Pagar"}
+          </button>
+          <p className="paywall-fineprint pago-nota">
+            Débito o crédito. El pase se activa solo al pagar — no hay que
+            escribirle a nadie.
+          </p>
+          {errorTarjeta ? <p className="paywall-error">{errorTarjeta}</p> : null}
+        </div>
 
         {/* El nombre del método está en el badge, así que el botón solo dice
             "Pagar": repetirlo era ruido en una tarjeta que ya se entiende. */}
@@ -964,8 +1031,12 @@ function PagoPaso({
           )}
         </div>
 
+        {/* Este aviso quedó abajo de Mercado Pago y Binance a propósito: es
+            verdad para esos dos y NO para la tarjeta, que se activa sola. Antes
+            estaba al pie del cartel entero, y desde que hay un medio automático
+            eso sería mentir en el único lugar donde no conviene hacerlo. */}
         <p className="paywall-fineprint pago-nota">
-          Cuando pagues, mandame el comprobante por{" "}
+          Si pagaste por Mercado Pago o Binance, mandame el comprobante por{" "}
           <a
             href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
               `${p.wa} Ya pagué, te mando el comprobante.`
@@ -980,6 +1051,57 @@ function PagoPaso({
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Administrar mi suscripción": abre el portal de facturación de Stripe.
+ *
+ * Ahí adentro se cambia la tarjeta, se bajan las facturas y —sobre todo— se da
+ * de baja. Todo eso es de Stripe y está bien que lo sea: es la parte que hay
+ * que mantener al día con las reglas de las tarjetas, y no vale la pena
+ * reescribirla para tener peor.
+ *
+ * Se muestra siempre que haya sesión, sin preguntar antes si esta persona
+ * compró con tarjeta. Averiguarlo costaría un viaje al servidor en cada carga
+ * de la app, para una respuesta que casi siempre es "no tiene nada que
+ * administrar". Sale más barato preguntarlo cuando lo tocan, y contestar ahí
+ * si no hay compras.
+ */
+function PortalLink() {
+  const [yendo, setYendo] = useState(false);
+  const [error, setError] = useState("");
+
+  const abrir = useCallback(async () => {
+    if (yendo) return;
+    setYendo(true);
+    setError("");
+    track("portal_open");
+    try {
+      const r = await fetch("/api/stripe/portal", { method: "POST" });
+      const j = await r.json().catch(() => null);
+      if (j?.ok && j.url) {
+        window.location.href = j.url;
+        return;
+      }
+      setError(
+        r.status === 404
+          ? "No encontramos compras con esta cuenta. Si pagaste por Mercado Pago o Binance, escribime por WhatsApp."
+          : j?.error || "No se pudo abrir el portal."
+      );
+    } catch {
+      setError("No hay conexión para abrir el portal.");
+    }
+    setYendo(false);
+  }, [yendo]);
+
+  return (
+    <>
+      <button type="button" className="meta-link" onClick={abrir} disabled={yendo}>
+        {yendo ? "Abriendo…" : "Administrar suscripción →"}
+      </button>
+      {error ? <span className="meta-pase">{error}</span> : null}
+    </>
   );
 }
 
@@ -1316,6 +1438,11 @@ export default function Page() {
    * sesión y acá se instala solo, sin que tenga que buscar el código.
    */
   const auth = useAuth(adoptarPase);
+  /**
+   * El aviso de una vuelta de Stripe que NO terminó en pase. El caso feliz no
+   * pasa por acá: vuelve como `?pase=…` y lo levanta usePass, con fiesta.
+   */
+  const avisoPago = usePagoVuelta();
   /**
    * Con el login, PostHog deja de ver un navegador anónimo y pasa a ver a una
    * persona: las sesiones del celular y las de la compu se juntan bajo el mismo
@@ -3361,9 +3488,21 @@ export default function Page() {
             {pass ? (
               // El email vuelve, pero en el tooltip: ocupa cero y sigue estando
               // para cuando alguien necesite saber de quién es el pase.
-              <span className="meta-pase" title={`Pase de ${pass.email}`}>
-                👑 Pase activo · vence {fmtPassExpiry(pass.expiresAt)}
-              </span>
+              <>
+                <span className="meta-pase" title={`Pase de ${pass.email}`}>
+                  👑 Pase activo · vence {fmtPassExpiry(pass.expiresAt)}
+                </span>
+                {/* Dar de baja tiene que estar a un toque de donde dice que el
+                    pase está activo. No es cortesía: vender una suscripción sin
+                    una salida visible es lo que convierte una baja en un
+                    contracargo, que sale mucho más caro que la baja.
+
+                    Solo aparece con la sesión de Google abierta porque el
+                    portal necesita saber de quién es la cuenta, y solo si el
+                    pase vino de una compra con tarjeta —a quien activé a mano
+                    por WhatsApp no hay nada que administrarle. */}
+                {auth.cuenta && <PortalLink />}
+              </>
             ) : (
               !passOpen && (
                 <button type="button" className="meta-link" onClick={() => setPassOpen(true)}>
@@ -3439,6 +3578,7 @@ export default function Page() {
             valida parece "no hacer nada" y no hay pista de por qué. */}
         {showSetup && !pass && passError && <p className="paywall-error">{passError}</p>}
         {showSetup && auth.error && <p className="paywall-error">{auth.error}</p>}
+        {showSetup && avisoPago && <p className="paywall-error">{avisoPago}</p>}
       </footer>
       )}
 

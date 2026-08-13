@@ -38,6 +38,10 @@ si no vas a ver ruido de módulos faltantes que no tiene que ver con tu cambio).
   (reporta éxito/fallo real, a diferencia de un submit `no-cors` opaco).
 - `app/lib/ratelimit.ts` — rate limiting in-memory, guard de same-origin estricto, y
   `capacityClosed()` (kill switch global).
+- `app/api/stripe/*` + `app/lib/stripe.ts`, `app/lib/stripePases.ts` — cobro con tarjeta
+  y facturación. **Stripe no es el sistema de permisos**: emite los mismos pases firmados
+  de `lib/pass.ts` que emite `scripts/pase.mjs` a mano, y de ahí en adelante nada más del
+  proyecto sabe que Stripe existe. Detalle completo en [STRIPE.md](./STRIPE.md).
 - `app/lib/track.ts` — wrapper de analytics (`track()`, `identify()`), fail-safe (nunca
   rompe la UI). Todo evento nuevo se agrega al union type `FunnelEvent` acá.
 - `app/lib/analytics-client.tsx` — inicializa PostHog client-side (`autocapture: false`
@@ -70,6 +74,10 @@ Ver `.env.example` para la lista completa y comentarios. Resumen:
 | `CAPACITY_CLOSED` | No | `"1"` = kill switch: 503 en endpoints pagos, la waitlist sigue abierta. Requiere redeploy |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | Sin ella, `track()` es no-op hacia PostHog (Vercel Analytics igual descarta eventos custom en Hobby) |
 | `GFORM_ACTION` / `GFORM_EMAIL_ENTRY` | No | Override del Google Form de waitlist |
+| `STRIPE_SECRET_KEY` | No | Cobro con tarjeta. Sin ella el botón avisa que no está configurado y MP/Binance siguen igual |
+| `STRIPE_WEBHOOK_SECRET` | No | Verifica los webhooks. **Sin ella se cobra pero las renovaciones no emiten pase** |
+| `STRIPE_PRICE_WEEK` / `STRIPE_PRICE_YEAR` | No | IDs de precio. Los crea `scripts/stripe-setup.mjs`; son distintos en test y en live |
+| `STRIPE_ADMIN_SECRET` | No | Habilita facturar a mano (`scripts/facturar.mjs`) |
 
 Las `NEXT_PUBLIC_*` se leen en build time — cambiarlas en Vercel requiere redeploy.
 

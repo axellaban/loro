@@ -79,11 +79,28 @@ export default function Terms() {
 
       <h2>Pases y pagos</h2>
       <p>
-        Los pases se compran por MercadoPago o Binance y habilitan uso ilimitado
-        durante el plazo contratado (7 días o 12 meses). Cada pase vale{" "}
-        <strong>para una sola persona y una sola cuenta</strong>: al activarlo
-        estando dentro de tu cuenta de Google, queda atado a ella. Compartirlo
-        no funciona.
+        Los pases se compran con tarjeta, por MercadoPago o por Binance, y
+        habilitan uso ilimitado durante el plazo contratado (7 días o 12 meses).
+        Cada pase vale <strong>para una sola persona y una sola cuenta</strong>:
+        al activarlo estando dentro de tu cuenta de Google, queda atado a ella.
+        Compartirlo no funciona.
+      </p>
+      {/* La renovación automática hay que decirla antes de cobrarla, no
+          después. Es lo que exigen las reglas de las tarjetas y, más concreto,
+          es la diferencia entre una baja y un contracargo. */}
+      <p>
+        Los pases comprados <strong>con tarjeta se renuevan solos</strong> al
+        final de cada período (cada 7 días o cada 12 meses, según el que hayas
+        elegido) hasta que los des de baja. Podés darlos de baja cuando quieras
+        desde <em>Administrar suscripción</em> dentro de la app, que abre el
+        portal de facturación de Stripe — ahí mismo cambiás la tarjeta y bajás
+        tus facturas. Al dar de baja conservás el acceso hasta el final del
+        período que ya pagaste. Los pases de MercadoPago y Binance no se
+        renuevan solos.
+      </p>
+      <p>
+        Los pagos con tarjeta los procesa Stripe: los datos de tu tarjeta nunca
+        pasan por nuestros servidores.
       </p>
       <p>
         Si el servicio no funciona como corresponde y no lo podemos resolver,

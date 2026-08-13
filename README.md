@@ -82,7 +82,18 @@ del post): ver [LAUNCH.md](./LAUNCH.md).
   diarización (Deepgram `diarize=true` + filtrar por speaker) — queda para v2.
 - Usa echo cancellation + noise suppression en modo mic; los apaga en modo pestaña.
 
+## Cobro
+
+Pases ilimitados por 7 días o 12 meses. Tres medios, y solo uno da de alta solo:
+
+- **Tarjeta (Stripe)** — se paga y se entra, sin intermediarios. Suscripción con
+  baja autogestionada desde el portal de facturación.
+- **Mercado Pago / Binance** — el alta la hace una persona con el comprobante.
+- **Factura** — para empresas que pagan por transferencia (`scripts/facturar.mjs`).
+
+Puesta en marcha, pruebas y paso a producción: **[STRIPE.md](./STRIPE.md)**.
+
 ## Limitaciones (a propósito)
 
-- Sin auth, sin base de datos, sin cobro. MVP funcional, no producto.
+- Sin base de datos más allá de Upstash para los pases. MVP funcional.
 - El overlay NO es "indetectable": es una web normal. Deliberado.

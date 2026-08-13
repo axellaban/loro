@@ -10,7 +10,7 @@
 
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 import { verificarIdToken } from "../../lib/google";
-import { marcarRegistrado, pasePorCuenta } from "../../lib/passStore";
+import { atarPaseACuenta, marcarRegistrado, pasePorCuenta, pasePorEmail } from "../../lib/passStore";
 import { registrarEmail } from "../../lib/gform";
 import { verifyPass } from "../../lib/pass";
 import * as kv from "../../lib/kv";
@@ -36,12 +36,33 @@ const SIN_CACHE = {
  * en lo que hay guardado: si el pase venció mientras tanto, tiene que dejar de
  * valer solo, igual que en /api/pass.
  */
-async function paseDeCuenta(sub: string) {
-  const token = await pasePorCuenta(sub);
+async function paseDeCuenta(sub: string, email?: string) {
   const secret = process.env.PASS_SECRET;
-  if (!token || !secret) return null;
+  if (!secret) return null;
+
+  // Primero el pase de la cuenta. Si no hay, el que compró este email en
+  // Stripe: son dos hechos separados en el tiempo —se paga con tarjeta y recién
+  // después se entra con Google, o se renueva sola una suscripción de alguien
+  // que hace meses no toca el login— y el email es lo único que los une.
+  //
+  // Es también lo que hace que las RENOVACIONES lleguen. El webhook emite el
+  // pase nuevo cuando no hay nadie mirando la pantalla; entrar con Google es
+  // el momento en que se lo entregamos.
+  let token = await pasePorCuenta(sub);
+  let porEmail = false;
+  if (!token && email) {
+    token = await pasePorEmail(email);
+    porEmail = Boolean(token);
+  }
+  if (!token) return null;
+
   const r = await verifyPass(token, secret);
   if (!r.ok) return null;
+
+  // Encontrado por email, se anota en la cuenta: la próxima vez sale por el
+  // camino corto y el pase queda atado a un solo Google, como cualquier otro.
+  if (porEmail) await atarPaseACuenta(sub, token, r.claims.expiresAt).catch(() => {});
+
   return {
     token,
     email: r.claims.email,
@@ -88,7 +109,7 @@ export async function GET(req: Request) {
     );
   }
   return Response.json(
-    { sesion: datosSesion(sesion), pase: await paseDeCuenta(sesion.sub) },
+    { sesion: datosSesion(sesion), pase: await paseDeCuenta(sesion.sub, sesion.email) },
     { headers: SIN_CACHE }
   );
 }
@@ -158,7 +179,7 @@ export async function POST(req: Request) {
     {
       ok: true,
       sesion: { sub: v.user.sub, email: v.user.email, nombre: v.user.nombre, foto: v.user.foto },
-      pase: await paseDeCuenta(v.user.sub),
+      pase: await paseDeCuenta(v.user.sub, v.user.email),
     },
     { headers: { ...SIN_CACHE, "Set-Cookie": cookieDeSesion(token) } }
   );

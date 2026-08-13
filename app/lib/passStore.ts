@@ -94,3 +94,85 @@ export async function liberar(sub: string, token: string): Promise<void> {
   await kv.del(`pase:cuenta:${sub}`);
   await kv.del(`pase:reclamo:${await kv.huella(token)}`);
 }
+
+// ---------- Pases emitidos por Stripe ----------
+//
+// Los pases que se venden por Stripe entran por otra puerta que los que activo
+// a mano: cuando el webhook los emite, quien pagó puede no haber entrado nunca
+// con Google, así que no hay `sub` con el cual atarlos. Lo único que sí
+// tenemos siempre es el email con el que pagó.
+//
+// De ahí la clave por email: es el puente entre "pagó en Stripe" y "entró con
+// Google" cuando esas dos cosas pasan en momentos distintos —que es el caso
+// normal, porque el webhook llega mientras la persona todavía está en la
+// pantalla de Stripe.
+//
+// El email se guarda hasheado por la misma razón que el token del reclamo: lo
+// que quede en la base no tiene que servir para saber quién compró.
+
+/** Normaliza el email antes de hashearlo: Stripe lo devuelve tal cual lo tipearon. */
+function normalizarEmail(email: string): string {
+  return String(email || "").trim().toLowerCase();
+}
+
+/** Deja anotado el pase de quien pagó, para dárselo cuando entre con Google. */
+export async function guardarPasePorEmail(
+  email: string,
+  token: string,
+  expiresAt: number
+): Promise<void> {
+  const e = normalizarEmail(email);
+  if (!kv.disponible() || !e) return;
+  await kv.set(`pase:email:${await kv.huella(e)}`, token, ttl(expiresAt));
+}
+
+/** El pase que compró este email, si compró alguno. */
+export async function pasePorEmail(email: string): Promise<string | null> {
+  const e = normalizarEmail(email);
+  if (!kv.disponible() || !e) return null;
+  return kv.get(`pase:email:${await kv.huella(e)}`);
+}
+
+/**
+ * Ata un pase a una cuenta sin pasar por `reclamar`.
+ *
+ * La diferencia importa: `reclamar` existe para que un código que circula por
+ * WhatsApp se lo quede uno solo. Acá el emisor somos nosotros y sabemos a
+ * quién le corresponde porque lo dice Stripe, así que no hay carrera que
+ * resolver — y pasar por el NX sería peor: si el mismo pase se re-emite en la
+ * renovación, el reclamo viejo lo rechazaría contra su propio dueño.
+ */
+export async function atarPaseACuenta(
+  sub: string,
+  token: string,
+  expiresAt: number
+): Promise<void> {
+  if (!kv.disponible() || !sub) return;
+  const segundos = ttl(expiresAt);
+  await kv.set(`pase:cuenta:${sub}`, token, segundos);
+  // El reclamo se escribe igual, para que el código no se pueda reenviar y
+  // activar en otra cuenta. Si ya existía a nombre de este mismo sub, el NX
+  // falla y no pasa nada: el dueño no cambió.
+  await kv.setIfAbsent(`pase:reclamo:${await kv.huella(token)}`, sub, segundos);
+}
+
+/**
+ * El cliente de Stripe de una cuenta, para abrirle el portal de facturación
+ * sin tener que buscarlo por email en cada visita.
+ *
+ * Sin vencimiento corto: un cliente de Stripe no caduca, y perderlo significa
+ * crear uno duplicado en la próxima compra —dos clientes con el mismo email,
+ * cada uno con la mitad de las facturas—. Dos años cubre de sobra el pase más
+ * largo que vendemos.
+ */
+const CLIENTE_TTL = 2 * 365 * 24 * 60 * 60;
+
+export async function guardarCliente(sub: string, customerId: string): Promise<void> {
+  if (!kv.disponible() || !sub || !customerId) return;
+  await kv.set(`stripe:cliente:${sub}`, customerId, CLIENTE_TTL);
+}
+
+export async function clienteDeCuenta(sub: string): Promise<string | null> {
+  if (!kv.disponible() || !sub) return null;
+  return kv.get(`stripe:cliente:${sub}`);
+}

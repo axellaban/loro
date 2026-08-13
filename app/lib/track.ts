@@ -62,6 +62,16 @@ export type FunnelEvent =
   | "pay_binance_week"
   | "pay_binance_year"
   | "pay_receipt_click"
+  // Tarjeta por Stripe: es el único medio donde el alta es automática, así que
+  // se separa el CLICK (arranca el pago) de la VUELTA (Stripe ya confirmó el
+  // cobro). Los otros medios no permiten esa distinción — el pago ocurre
+  // afuera y nadie nos avisa.
+  | "pay_stripe_week"
+  | "pay_stripe_year"
+  | "pay_stripe_error"
+  | "pay_stripe_success"
+  | "pay_stripe_cancel"
+  | "portal_open"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"
@@ -128,6 +138,17 @@ const CONVERSIONES: Partial<Record<FunnelEvent, string>> = {
   // contarlo dejaría afuera a quien elige el botón en vez del campo.
   sim_google_unlock: "RgtrCLL2qt8cEOHJlL1E",
   // pass_activated: "…",  ← la compra de verdad, para cuando haya volumen
+  //
+  // pay_stripe_success: "…",  ← la MEJOR señal que vamos a tener
+  //
+  // Con Stripe el cobro se confirma solo, así que este evento se dispara
+  // cuando la plata entró de verdad — no cuando alguien tocó un botón. Es la
+  // conversión que hay que mandarle a Google en cuanto haya volumen: entrenar
+  // la campaña con clicks de "Pagar" la optimiza para gente que abre el
+  // checkout y se va, que es justo lo contrario de lo que queremos.
+  //
+  // El valor va con el evento (ver PagoPaso), así que Ads puede optimizar por
+  // plata y distinguir el pase de 7 días del de 12 meses.
 };
 
 const ADS_ID = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18381874401").trim();
