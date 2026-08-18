@@ -7,6 +7,7 @@ import { extractSentences } from "../simulador/tts";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable } from "../lib/models";
 import { ProviderIcon } from "../lib/ProviderIcon";
 import { looksLikeQuestion } from "../lib/question";
+import { ACOPLE_INICIAL, actualizarAcople, esVozPropia } from "../lib/eco";
 import CallSessions from "./CallSessions";
 import { loadSessions, saveSession, type CallSession } from "../lib/sessions";
 import { rememberEmail, savedEmail } from "../lib/email";
@@ -1516,6 +1517,27 @@ export default function Page() {
   const micAnalyserRef = useRef<AnalyserNode | null>(null);
   const micVadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const micActiveRangesRef = useRef<{ start: number; end: number }[]>([]);
+  /**
+   * La MISMA medición, pero del audio de la pestaña. Es la referencia contra la
+   * cual se decide si lo que suena en el micrófono sos vos o es el eco del
+   * entrevistador saliendo por tus parlantes.
+   */
+  const tabAnalyserRef = useRef<AnalyserNode | null>(null);
+  /**
+   * Cuánto de lo que suena en la pestaña vuelve a entrar por el micrófono,
+   * medido en vivo (0 = nada, 1 = entra igual de fuerte que en el original).
+   *
+   * Depende de cosas que no podemos saber de antemano —volumen de los
+   * parlantes, si usás auriculares, ganancia del mic, qué tan bien le sale la
+   * cancelación de eco a ESE navegador en ESA máquina—, así que se estima sola
+   * mientras la sesión corre en vez de fijar un número que va a estar mal en la
+   * mitad de los casos.
+   *
+   * Arranca alto a propósito: hasta tener medido el eco, conviene equivocarse
+   * atribuyéndole una frase al entrevistador (que es lo que casi siempre es) y
+   * no a vos.
+   */
+  const acopleEcoRef = useRef(ACOPLE_INICIAL);
   /** Reloj de pared en el que abrió el socket de Deepgram vigente: los
    *  timestamps `start`/`duration` de sus mensajes son relativos a este 0. */
   const streamStartAtRef = useRef(0);
@@ -2233,6 +2255,25 @@ export default function Page() {
     });
   }, [pedirPestania, usarVideoCompartido]);
 
+  /**
+   * Cuelga un medidor de energía del audio de la pestaña.
+   *
+   * Se llama al arrancar en modo pestaña y cada vez que se cambia de pestaña:
+   * el medidor tiene que apuntar SIEMPRE al audio que está sonando ahora.
+   */
+  const medirPestania = useCallback((stream: MediaStream, ctx: AudioContext) => {
+    try {
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      an.smoothingTimeConstant = 0;
+      ctx.createMediaStreamSource(stream).connect(an);
+      tabAnalyserRef.current = an;
+      // El eco depende de esta pestaña y de su volumen, así que se vuelve a
+      // estimar desde cero en vez de arrastrar el valor de la anterior.
+      acopleEcoRef.current = ACOPLE_INICIAL;
+    } catch {}
+  }, []);
+
   /** Cambiar de pestaña compartida sin cortar la sesión. */
   const cambiarPestania = useCallback(async () => {
     try {
@@ -2251,14 +2292,27 @@ export default function Page() {
         const src = ctx.createMediaStreamSource(nuevo);
         src.connect(worklet);
         tabSourceRef.current = src;
+        // El audio nuevo también es la referencia contra la que se mide el eco
+        // que se le cuela al micrófono. Sin re-apuntarlo, el detector seguiría
+        // comparando contra la pestaña anterior —ya muda— y volvería a
+        // atribuirte a vos lo que dice el entrevistador.
+        medirPestania(nuevo, ctx);
+        setError("");
       } else {
-        at.forEach((t) => t.stop());
+        // Compartió sin tildar "audio de la pestaña". Antes esto se tragaba en
+        // silencio: se veía el video al lado y el transcript no volvía nunca,
+        // sin ninguna pista de por qué. Se corta el video también, porque un
+        // panel mudo es peor que ninguno: parece que está funcionando.
+        s.getTracks().forEach((t) => t.stop());
+        usarVideoCompartido([]);
+        setError('No se compartió el audio. Al elegir la pestaña hay que tildar "Compartir audio de la pestaña".');
+        return;
       }
       track("tab_switched");
     } catch {
       // Canceló el selector: no pasa nada, sigue compartiendo lo de antes.
     }
-  }, [pedirPestania, usarVideoCompartido]);
+  }, [pedirPestania, usarVideoCompartido, medirPestania]);
 
   /** Apaga el detector de energía del mic y olvida las ventanas ya medidas. */
   const stopMicVad = useCallback(() => {
@@ -2284,15 +2338,30 @@ export default function Page() {
       src.connect(analyser);
       micAnalyserRef.current = analyser;
       const buf = new Float32Array(analyser.fftSize);
+      const bufTab = new Float32Array(analyser.fftSize);
+
+      const energia = (an: AnalyserNode, b: typeof buf) => {
+        an.getFloatTimeDomainData(b);
+        let sum = 0;
+        for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
+        return Math.sqrt(sum / b.length);
+      };
+
       micVadTimerRef.current = setInterval(() => {
         const an = micAnalyserRef.current;
         if (!an) return;
-        an.getFloatTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-        const rms = Math.sqrt(sum / buf.length);
+        const rms = energia(an, buf);
         const now = Date.now();
-        if (rms >= 0.02) {
+
+        // ¿Sos vos, o es el entrevistador saliendo por tus parlantes? El
+        // criterio y el porqué están en lib/eco.ts; acá solo se le pasan las
+        // dos energías del instante. Sin pestaña, `rmsTab` es 0 y se comporta
+        // igual que el umbral de siempre.
+        const anTab = tabAnalyserRef.current;
+        const rmsTab = anTab ? energia(anTab, bufTab) : 0;
+        acopleEcoRef.current = actualizarAcople(acopleEcoRef.current, rms, rmsTab);
+
+        if (esVozPropia(rms, rmsTab, acopleEcoRef.current)) {
           const ranges = micActiveRangesRef.current;
           const last = ranges[ranges.length - 1];
           if (last && now - last.end <= 250) last.end = now;
@@ -2397,6 +2466,9 @@ export default function Page() {
       };
       source.connect(worklet);
       tabSourceRef.current = mode === "tab" ? source : null;
+      // La referencia contra la que se mide el eco que se le cuela al mic. En
+      // modo micrófono no hay pestaña y no hay nada que descontar.
+      if (mode === "tab") medirPestania(stream, audioCtx);
 
       // Con la pestaña capturada, TU micrófono entra al mismo grafo: dos
       // fuentes conectadas al mismo nodo se suman, así que Deepgram recibe la
@@ -2559,7 +2631,30 @@ export default function Page() {
         }, 1000);
       }
 
-      stream.getAudioTracks()[0].onended = () => stop();
+      // Se cortó la fuente de audio: cerraste la pestaña compartida, tocaste
+      // "Dejar de compartir", o se desenchufó el micrófono.
+      //
+      // Antes esto terminaba la sesión SIEMPRE, y era el final más frustrante
+      // posible: cerrar la pestaña de la reunión —algo que uno hace sin
+      // pensar apenas termina la entrevista, o para volver a mirar algo—
+      // archivaba todo y devolvía a la pantalla de inicio, con las respuestas
+      // en pantalla y el copiloto a mitad de camino.
+      //
+      // Con el micrófono conectado sigue entrando audio, así que la sesión no
+      // tiene por qué morir: se cae solo el panel de la pestaña y el
+      // transcript, las respuestas y el botón de volver a compartir quedan
+      // donde estaban. Sin ninguna fuente de audio no hay nada que escuchar y
+      // ahí sí se corta — que además evita dejar abierto, y facturando, un
+      // socket de Deepgram mudo.
+      stream.getAudioTracks()[0].onended = () => {
+        if (mode === "tab" && micOnRef.current) {
+          tabSourceRef.current?.disconnect();
+          tabSourceRef.current = null;
+          setSharing(false);
+          return;
+        }
+        stop();
+      };
 
       // Wake lock: evita que el celular apague la pantalla en modo mic.
       try {
@@ -2634,6 +2729,11 @@ export default function Page() {
     stopMicVad();
     setMicOn(false);
     tabSourceRef.current = null;
+    // El medidor de la pestaña se suelta acá y NO en stopMicVad: desconectar y
+    // volver a conectar el micrófono no tiene por qué borrar lo que sabemos
+    // del eco de esta pestaña, que se sigue midiendo igual.
+    tabAnalyserRef.current = null;
+    acopleEcoRef.current = ACOPLE_INICIAL;
     setSharing(false);
     try {
       wakeLockRef.current?.release?.();
@@ -3056,6 +3156,23 @@ export default function Page() {
           <span className="listen-text listen-text-live">
             <ListenText text={lines.length ? lineText(lines[lines.length - 1]) : ""} />
           </span>
+          {/* Volver a compartir SIN cortar la sesión.
+              El único botón que hacía esto vivía adentro del panel de la
+              pestaña, así que desaparecía justo cuando hacía falta: si se
+              cortaba el compartir, no quedaba forma de retomarlo salvo
+              terminar la sesión y empezar otra —perdiendo el transcript y las
+              respuestas—. Acá está en la barra que se muestra exactamente en
+              ese estado: sesión viva, nada compartido. */}
+          {mode === "tab" && (
+            <button
+              type="button"
+              className="listen-toggle"
+              onClick={() => void cambiarPestania()}
+              title="Volver a compartir la pestaña de la reunión"
+            >
+              Compartir pantalla
+            </button>
+          )}
         </div>
       )}
 
