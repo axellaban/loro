@@ -545,7 +545,39 @@ function parseModelJson(text: string): unknown {
 
 // El reporte necesita margen de tokens: con 5 preguntas, 2048 truncaba el JSON
 // y el parseo fallaba. Vale para los tres proveedores, no solo para Gemini.
+//
+// Es el presupuesto de la respuesta VISIBLE: a los modelos que piensan (Gemini
+// 3.x, los de razonamiento de OpenAI) los builders de lib/llm.ts les suman
+// aparte el margen que se va a comer el pensamiento.
 const FEEDBACK_MAX_TOKENS = 4096;
+
+/**
+ * El texto crudo del modelo convertido en informe, o una excepción.
+ *
+ * Antes cada proveedor hacía `parseModelJson(texto || "{}")`, y ese `|| "{}"`
+ * escondía el peor final posible: si el modelo no llegaba a escribir nada, el
+ * `{}` parseaba perfecto y se devolvía un 200 con un informe VACÍO. El
+ * candidato terminaba su entrevista y veía un reporte en blanco con puntaje 0,
+ * sin ningún error — y el modelo de respaldo no se probaba nunca, porque para
+ * el código había salido todo bien.
+ *
+ * Tratarlo como falla es lo que hace que la cadena de respaldo sirva para algo
+ * en el caso en que más falta hace.
+ */
+function reporteDeTexto(texto: string | undefined): unknown {
+  const t = (texto || "").trim();
+  if (!t) throw new Error("el modelo devolvió una respuesta vacía");
+  const r = parseModelJson(t) as Record<string, unknown> | null;
+  // Parsear no alcanza: un objeto sin ninguno de los campos que sostienen el
+  // informe es tan inservible como no haber contestado, y conviene gastar el
+  // respaldo antes que entregarlo.
+  const tieneAlgo =
+    !!r &&
+    typeof r === "object" &&
+    (typeof r.score === "number" || typeof r.summary === "string" || Array.isArray(r.questions));
+  if (!tieneAlgo) throw new Error("el informe vino incompleto");
+  return r;
+}
 
 /**
  * Presupuesto de tiempo del informe.
@@ -649,10 +681,15 @@ async function getFeedback(
       if (res.ok) {
         const j = await res.json();
         try {
-          return Response.json(parseModelJson(j.choices?.[0]?.message?.content || "{}"));
-        } catch {
-          detail = "JSON inválido del modelo";
-          console.error(`[simulador] feedback openai/${spec.model}: JSON inválido`);
+          return Response.json(reporteDeTexto(j.choices?.[0]?.message?.content));
+        } catch (e: any) {
+          detail = e?.message || "JSON inválido del modelo";
+          // `finish_reason` es la pista que separa "el modelo escribió
+          // cualquier cosa" de "se quedó sin presupuesto de tokens": con
+          // "length" el problema es el techo, no el prompt.
+          console.error(
+            `[simulador] feedback openai/${spec.model}: ${detail} (finish_reason: ${j.choices?.[0]?.finish_reason || "?"})`
+          );
           continue;
         }
       }
@@ -704,10 +741,12 @@ async function getFeedback(
         try {
           // anthropicText busca el primer bloque de texto: leer content[0]
           // devolvía vacío si el modelo emitía otro bloque antes.
-          return Response.json(parseModelJson(anthropicText(j) || "{}"));
-        } catch {
-          detail = "JSON inválido del modelo";
-          console.error(`[simulador] feedback anthropic/${spec.model}: JSON inválido`);
+          return Response.json(reporteDeTexto(anthropicText(j)));
+        } catch (e: any) {
+          detail = e?.message || "JSON inválido del modelo";
+          console.error(
+            `[simulador] feedback anthropic/${spec.model}: ${detail} (stop_reason: ${j?.stop_reason || "?"})`
+          );
           continue;
         }
       }
@@ -757,10 +796,12 @@ async function getFeedback(
     if (res.ok) {
       const j = await res.json();
       try {
-        return Response.json(parseModelJson(j.candidates?.[0]?.content?.parts?.[0]?.text || "{}"));
-      } catch {
-        detail = "JSON inválido del modelo";
-        console.error(`[simulador] feedback gemini/${spec.model}: JSON inválido`);
+        return Response.json(reporteDeTexto(j.candidates?.[0]?.content?.parts?.[0]?.text));
+      } catch (e: any) {
+        detail = e?.message || "JSON inválido del modelo";
+        console.error(
+          `[simulador] feedback gemini/${spec.model}: ${detail} (finishReason: ${j.candidates?.[0]?.finishReason || "?"})`
+        );
         continue;
       }
     }

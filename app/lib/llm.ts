@@ -34,6 +34,25 @@ export const GEMINI_THINKING_LEVEL = "low";
  */
 export const GEMINI_THINKING_HEADROOM = 2048;
 
+/**
+ * Lo mismo, para los modelos de razonamiento de OpenAI (GPT-5.x / o-series).
+ *
+ * `max_completion_tokens` NO es el techo de la respuesta visible: es el
+ * presupuesto compartido entre los tokens de razonamiento —que no se ven, pero
+ * se cuentan— y el texto que devuelve. Sin margen, el modelo razona, se come el
+ * presupuesto y contesta cortado; si el razonamiento se lo lleva TODO, contesta
+ * vacío con `finish_reason: "length"`.
+ *
+ * Es el mismo problema que ya estaba resuelto para Gemini unas líneas más
+ * arriba, y que acá faltaba. Se notaba solo en el informe del simulador: una
+ * pregunta de entrevista son decenas de tokens y entra igual, pero el reporte
+ * completo en JSON son miles y quedaba siempre del lado equivocado del límite.
+ *
+ * Es un tope, no un objetivo: se factura lo que se genera, y la profundidad del
+ * razonamiento la sigue fijando `reasoning_effort`.
+ */
+export const OPENAI_REASONING_HEADROOM = 3072;
+
 export function geminiUrl(model: string, method: "generateContent" | "streamGenerateContent", apiKey: string) {
   const qs = method === "streamGenerateContent" ? "?alt=sse&key=" : "?key=";
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:${method}${qs}${apiKey}`;
@@ -119,7 +138,12 @@ export function openaiBody(opts: {
   if (opts.spec.reasoning) {
     // Los modelos de razonamiento usan max_completion_tokens y rechazan
     // temperature. reasoning_effort bajo es clave para la latencia en vivo.
-    body.max_completion_tokens = opts.maxTokens;
+    //
+    // El margen es lo que hace que `maxTokens` signifique lo mismo para todos
+    // los proveedores: "tokens para la respuesta que se ve". Sin él, quien
+    // llama tiene que adivinar cuánto va a razonar el modelo, y en el informe
+    // del simulador esa adivinanza salía siempre mal.
+    body.max_completion_tokens = opts.maxTokens + OPENAI_REASONING_HEADROOM;
     body.reasoning_effort = "low";
   } else {
     body.max_tokens = opts.maxTokens;
