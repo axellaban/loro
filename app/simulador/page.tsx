@@ -6,6 +6,13 @@ import Avatar, { type AvatarState } from "./Avatar";
 import { TtsQueue, extractSentences } from "./tts";
 import { BrandLogo } from "../lib/BrandLogo";
 import { rememberEmail, savedEmail } from "../lib/email";
+import {
+  CONFIRM_MS,
+  MIN_ANSWER_CHARS,
+  TRAILING_INCOMPLETE,
+  cierraConUtteranceEnd,
+  silencioNecesario,
+} from "../lib/turno";
 import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
 
@@ -495,53 +502,10 @@ const LS_KEY_CONTEXT = "simulador:context:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";
 
 
-// Umbral mínimo para considerar que hubo una respuesta real (evita cerrar el
-// turno por un carraspeo transcripto).
-const MIN_ANSWER_CHARS = 10;
-// Endpointing adaptativo: esperamos poco si la respuesta SONÓ completa y mucho
-// si quedó a media frase o en muletilla. Total percibido = umbral + gracia.
-const COMPLETE_MS = 1700; // frase terminada con puntuación → responder ágil sin cortar pausas naturales
-const INCOMPLETE_MS = 2600; // a media frase / muletilla → esperar (pausa para pensar)
-// Ventana de gracia cancelable si el candidato retoma la palabra.
-const CONFIRM_MS = 600;
-
-// Muletillas y conjunciones: si la respuesta termina así, casi seguro sigue.
-const TRAILING_INCOMPLETE = new Set([
-  "y", "o", "u", "e", "pero", "porque", "que", "entonces", "asi", "así",
-  "tipo", "eh", "este", "esto", "mmm", "em", "digamos", "bueno", "aver",
-  "a", "de", "en", "con", "para", "como", "cuando", "si", "más", "mas",
-  "o", "sea", "osea", "ta", "nada",
-]);
-
-/**
- * Palabras mínimas para que una frase puntuada cuente como respuesta terminada.
- *
- * Sin esto, la cortesía con la que arranca casi toda primera respuesta —"hola,
- * buenas tardes.", "sí, claro.", "buena pregunta."— cumple los tres requisitos
- * de abajo y entra en la ventana rápida: la persona saluda, toma aire para
- * arrancar de verdad, y a los 2,3s el entrevistador le habla encima. Es EL
- * corte que se ve en la primera pregunta y casi no se ve después, porque en el
- * medio se arranca a media idea y eso ya caía en la ventana larga.
- *
- * El costo es que una respuesta corta pero genuina ("tengo ocho años de
- * experiencia") espera ~0,9s más. Barato al lado de que te corten hablando.
- */
-const MIN_COMPLETE_WORDS = 12;
-
-// ¿La respuesta suena terminada? Requiere sustancia, puntuación terminal (la da
-// smart_format en los finales) y que la última palabra no sea muletilla.
-// Mientras hay interinos sin puntuar cuenta como incompleta → paciente.
-function looksComplete(text: string): boolean {
-  const t = text.trim();
-  if (t.length < MIN_ANSWER_CHARS) return false;
-  if (!/[.!?…]$/.test(t)) return false;
-  const words = t.split(/\s+/).filter(Boolean);
-  if (words.length < MIN_COMPLETE_WORDS) return false;
-  const lastWord = words[words.length - 1]
-    .toLowerCase()
-    .replace(/[.,!?…"”'’)\]]+$/g, "");
-  return !!lastWord && !TRAILING_INCOMPLETE.has(lastWord);
-}
+// Cuándo el candidato terminó de hablar: lógica pura, en lib/turno.ts para
+// poder probarla. Es la decisión más delicada del simulador —contestar antes de
+// tiempo es hablarle encima a alguien que estaba pensando— y la que más se
+// beneficia de tener tests.
 // Sin respuesta real: a los 12s ofrecemos pasar de pregunta; a los 25s la
 // sala avanza sola, para que un candidato que se queda mudo no quede colgado.
 const STUCK_MS = 12000;
@@ -806,7 +770,7 @@ export default function SimuladorPage() {
           stuckRef.current = false;
           setStuck(false);
         }
-        const needed = looksComplete(answer) ? COMPLETE_MS : INCOMPLETE_MS;
+        const needed = silencioNecesario(answer);
         if (Date.now() - lastSpeechAtRef.current >= needed) enterConfirming();
         return;
       }
@@ -883,11 +847,13 @@ export default function SimuladorPage() {
     dgUltimoRef.current = Date.now();
 
     if (msg.type === "UtteranceEnd") {
-      // Deepgram marca 1s de silencio. Solo cerramos ya si la frase sonó
-      // completa; si quedó a media, el watchdog espera su umbral largo.
+      // Deepgram marca 1,5s de silencio: es el camino MÁS corto de los dos, y
+      // por eso era por acá por donde entraba la mayoría de los cortes. Solo
+      // cerramos ya si la respuesta sonó completa Y todavía es corta (ver
+      // lib/turno.ts); si no, el watchdog espera su umbral largo.
       if (
         phaseRef.current === "listening" &&
-        looksComplete(currentAnswerRef.current.trim())
+        cierraConUtteranceEnd(currentAnswerRef.current.trim())
       ) {
         enterConfirming();
       }
