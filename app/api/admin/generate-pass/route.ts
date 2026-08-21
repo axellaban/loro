@@ -1,5 +1,5 @@
-import { rateLimit, sameOriginStrict } from "../../../lib/ratelimit";
-import { createPass, PLAN_DAYS, type PassPlan, fmtPassExpiry } from "../../../lib/pass";
+import { rateLimit } from "../../../lib/ratelimit";
+import { createPass, PLAN_DAYS, type PassPlan, fmtPassExpiry, timingSafeEqual } from "../../../lib/pass";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -20,12 +20,9 @@ const SIN_CACHE = {
  * adminToken: token secreto de admin (debe coincidir con ADMIN_PASS_TOKEN)
  */
 export async function POST(req: Request) {
-  if (!sameOriginStrict(req)) {
-    return Response.json(
-      { ok: false, error: "Origen no permitido." },
-      { status: 403, headers: SIN_CACHE }
-    );
-  }
+  // Sin chequeo de mismo-origen a propósito: este endpoint lo llama un admin
+  // desde curl/un script, no el navegador de la app. La autenticación real es
+  // el adminToken de abajo.
 
   // Rate limit: máximo 100 pases/min para evitar spam
   const rl = rateLimit(req, "admin-pass", 100, 60_000);
@@ -67,7 +64,7 @@ export async function POST(req: Request) {
   }
 
   // Validar token de admin
-  if (token !== adminToken) {
+  if (!token || !timingSafeEqual(token, adminToken)) {
     return Response.json(
       { ok: false, error: "Token de admin inválido." },
       { status: 401, headers: SIN_CACHE }
