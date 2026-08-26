@@ -64,10 +64,18 @@ const chequear = (c, m) => { if (!c) fallos++; ok(c, m); };
 // --- alta de las dos puntas ---
 const ana = cliente("Ana");
 const beto = cliente("Beto");
-await ana.llamar("/api/nido", { nombre: "Ana", ave: "loro", lat: -34.6037, lng: -58.3816 });   // Buenos Aires
+const alta = await ana.llamar("/api/nido", { nombre: "Ana", ave: "loro", lat: -34.6037, lng: -58.3816 }); // Buenos Aires
+// El alta tiene que traer TODO lo necesario para entrar al mapa. Si el código
+// no viniera acá, la app dependería de una segunda consulta para arrancar — que
+// es exactamente lo que la dejaba clavada en "Armando el nido…".
+chequear(!!alta.yo && /^[A-Z0-9]{6}$/.test(alta.codigo || ""), "crear el nido devuelve el nido y su código");
 await beto.llamar("/api/nido", { nombre: "Beto", ave: "cotorra", lat: -34.9011, lng: -56.1645 }); // Montevideo
 
 const estAna = await ana.llamar("/api/estado");
+chequear(
+  ["upstash", "archivo"].includes(estAna.almacenamiento),
+  `el estado dice dónde guarda (${estAna.almacenamiento})`
+);
 const estBeto = await beto.llamar("/api/estado");
 console.log(`  Ana ${estAna.codigo} · Beto ${estBeto.codigo}`);
 chequear(estAna.codigo !== estBeto.codigo, "cada nido tiene su propio código");

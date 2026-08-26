@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       ...(punto ? { lat: punto.lat, lng: punto.lng } : {}),
     };
     await guardarNido(actualizado);
-    return ok({ ok: true, yo: verNido(actualizado, actualizado) });
+    return ok({ ok: true, yo: verNido(actualizado, actualizado), codigo: existente.codigo });
   }
 
   const punto = puntoDe(b);
@@ -54,8 +54,10 @@ export async function POST(req: Request) {
   }
 
   const creado = await crearNido({ nombre, ave, punto });
+  // El código va acá y no solo en /api/estado: con esto la app entra al mapa
+  // con todo lo que necesita, sin depender de una segunda consulta.
   return ok(
-    { ok: true, yo: verNido(creado, creado) },
+    { ok: true, yo: verNido(creado, creado), codigo: creado.codigo },
     { "Set-Cookie": cookieDeSesion(creado.id) }
   );
 }

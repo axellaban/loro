@@ -11,6 +11,7 @@
 import { error, freno, nidoDeRequest, ok } from "../../../lib/api";
 import { amigos, atenderVecina, buzon, escalaGlobal, type Nido } from "../../../lib/datos";
 import { verLoro, verNido } from "../../../lib/vista";
+import { store } from "../../../lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,19 @@ export async function GET(req: Request) {
   }
 
   const yo = await nidoDeRequest(req);
-  if (!yo) return ok({ yo: null, ahora: Date.now(), escala: escalaGlobal(), amigos: [], loros: [] });
+  // `almacenamiento` no es telemetría: es lo único que distingue "se borró tu
+  // cookie" de "el deploy no tiene base y cada instancia arranca vacía", que
+  // desde el navegador se ven exactamente igual.
+  if (!yo) {
+    return ok({
+      yo: null,
+      ahora: Date.now(),
+      escala: escalaGlobal(),
+      almacenamiento: store().nombre,
+      amigos: [],
+      loros: [],
+    });
+  }
 
   // Doña Cotorra contesta acá: sin worker ni cron, cuando mirás ya está.
   await atenderVecina(yo.id);
@@ -36,6 +49,7 @@ export async function GET(req: Request) {
   return ok({
     ahora,
     escala: escalaGlobal(),
+    almacenamiento: store().nombre,
     yo: verNido(yo, yo),
     codigo: yo.codigo,
     amigos: bandada.map((a) => verNido(a, yo)),

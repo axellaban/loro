@@ -150,7 +150,11 @@ export default function Nido() {
   if (!est.yo) {
     return (
       <Onboarding
-        alTerminar={() => {
+        alTerminar={(yo, codigo) => {
+          // Primero se planta lo que ya tenemos —esto es lo que hace que se
+          // entre al mapa al instante— y recién después se sale a completar
+          // el resto (bandada, loros, escala).
+          est.sembrar(yo, codigo);
           pedirPermisoAvisos();
           est.refrescar();
         }}

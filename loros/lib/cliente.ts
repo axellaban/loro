@@ -18,9 +18,18 @@ export type Estado = {
   loros: LoroVista[];
   /** Escala de tiempo del servidor. El navegador calcula los ETA con la misma. */
   escala: number;
+  /** "upstash" | "archivo". Sirve para explicar por qué se pierde un nido. */
+  almacenamiento: string;
 };
 
-const VACIO: Estado = { yo: null, codigo: "", amigos: [], loros: [], escala: 1 };
+const VACIO: Estado = {
+  yo: null,
+  codigo: "",
+  amigos: [],
+  loros: [],
+  escala: 1,
+  almacenamiento: "",
+};
 
 export async function pedir<T = any>(
   url: string,
@@ -46,10 +55,21 @@ export function useEstado() {
   // nunca llegan.
   const desfase = useRef(0);
   const enVuelo = useRef(false);
+  /** Alguien pidió refrescar mientras había una consulta abierta. */
+  const pendiente = useRef(false);
+  /** Tuvimos nido alguna vez. Si el servidor deja de verlo, es un problema. */
+  const huboNido = useRef(false);
 
   const refrescar = useCallback(async () => {
-    // Si la consulta anterior sigue abierta (red lenta), no se encima otra.
-    if (enVuelo.current) return;
+    // Dos consultas encimadas no sirven de nada, pero DESCARTAR la segunda sí
+    // hace daño: el pedido que se hace justo después de armar el nido caía
+    // siempre en esta rama y la app se quedaba esperando el tic del intervalo,
+    // hasta doce segundos, con el botón clavado en "Armando el nido…". Ahora
+    // se anota y se corre apenas termina la que estaba.
+    if (enVuelo.current) {
+      pendiente.current = true;
+      return;
+    }
     enVuelo.current = true;
     try {
       const antes = Date.now();
@@ -57,12 +77,29 @@ export function useEstado() {
       // Se descuenta medio viaje de ida y vuelta: la respuesta se armó más o
       // menos a la mitad del pedido.
       desfase.current = Number(j.ahora) - (antes + Date.now()) / 2;
+
+      if (j.yo) huboNido.current = true;
+
+      if (!j.yo && huboNido.current) {
+        // Teníamos nido y el servidor dejó de encontrarlo. En vez de mandar a
+        // la persona de vuelta al onboarding —donde crearía otro nido y
+        // perdería su código y su bandada— se conserva lo que hay y se dice
+        // qué pasa. La causa casi siempre es la misma y la nombramos.
+        setError(
+          j.almacenamiento === "archivo"
+            ? "El servidor no encuentra tu nido. Está guardando en memoria, así que cada instancia arranca vacía: falta configurar Upstash (KV_REST_API_URL y KV_REST_API_TOKEN) y volver a deployar."
+            : "El servidor no encuentra tu nido. Puede ser que se haya borrado la cookie de este navegador."
+        );
+        return;
+      }
+
       setEstado({
         yo: j.yo ?? null,
         codigo: j.codigo || "",
         amigos: j.amigos || [],
         loros: j.loros || [],
         escala: Number(j.escala) > 0 ? Number(j.escala) : 1,
+        almacenamiento: String(j.almacenamiento || ""),
       });
       setError("");
     } catch (e: any) {
@@ -70,7 +107,29 @@ export function useEstado() {
     } finally {
       enVuelo.current = false;
       setCargando(false);
+      if (pendiente.current) {
+        pendiente.current = false;
+        refrescarRef.current?.();
+      }
     }
+  }, []);
+
+  // El propio refrescar se llama a sí mismo cuando quedó uno pendiente; el ref
+  // rompe el círculo de la definición.
+  const refrescarRef = useRef(refrescar);
+  refrescarRef.current = refrescar;
+
+  /**
+   * Planta el nido que acaba de devolver /api/nido, sin esperar una consulta.
+   *
+   * Es lo que hace que armar el nido lleve al mapa en el acto: el dato ya vino
+   * en la respuesta del POST, y salir a buscarlo de nuevo era la diferencia
+   * entre entrar al toque y quedarse mirando un botón.
+   */
+  const sembrar = useCallback((yo: NidoVista, codigo: string) => {
+    huboNido.current = true;
+    setEstado((prev) => ({ ...prev, yo, codigo }));
+    setCargando(false);
   }, []);
 
   const ahoraServidor = useCallback(() => Date.now() + desfase.current, []);
@@ -105,7 +164,7 @@ export function useEstado() {
     };
   }, [refrescar, hayVuelos]);
 
-  return { ...estado, cargando, error, refrescar, ahoraServidor, setEstado };
+  return { ...estado, cargando, error, refrescar, sembrar, ahoraServidor, setEstado };
 }
 
 /** Un tic por segundo, para los contadores que bajan solos. */

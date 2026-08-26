@@ -15,7 +15,11 @@ import { Ave } from "./Ave";
 
 const Mapa = dynamic(() => import("./Mapa"), { ssr: false });
 
-export function Onboarding({ alTerminar }: { alTerminar: (yo: NidoVista) => void }) {
+export function Onboarding({
+  alTerminar,
+}: {
+  alTerminar: (yo: NidoVista, codigo: string) => void;
+}) {
   const [paso, setPaso] = useState(1);
   const [nombre, setNombre] = useState("");
   const [punto, setPunto] = useState<Punto | null>(null);
@@ -43,12 +47,18 @@ export function Onboarding({ alTerminar }: { alTerminar: (yo: NidoVista) => void
     setOcupado(true);
     setError("");
     try {
-      const r = await pedir<{ yo: NidoVista }>("/api/nido", {
+      const r = await pedir<{ yo: NidoVista; codigo: string }>("/api/nido", {
         datos: { nombre: nombre.trim(), ave, lat: punto.lat, lng: punto.lng },
       });
-      alTerminar(r.yo);
+      // El nido ya vino en la respuesta: se lo pasamos entero al padre en vez
+      // de salir a buscarlo de nuevo.
+      alTerminar(r.yo, r.codigo || "");
     } catch (e: any) {
       setError(e?.message || "No se pudo crear el nido.");
+    } finally {
+      // Siempre, no solo cuando falla. Estaba solo en el catch, así que en el
+      // camino de éxito el botón se quedaba en "Armando el nido…" para siempre
+      // si por lo que fuera la app no llegaba a cambiar de pantalla.
       setOcupado(false);
     }
   }
