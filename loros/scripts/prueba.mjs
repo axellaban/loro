@@ -31,7 +31,23 @@ function cliente(nombre) {
       if (!r.ok) throw new Error(`${ruta} → ${r.status}: ${j.error}`);
       return j;
     },
+    /** Sigue un link crudo (sin JSON): para /entrar?llave=… */
+    async abrir(ruta) {
+      const r = await fetch(BASE + ruta, { redirect: "manual" });
+      const set = r.headers.getSetCookie?.() ?? [r.headers.get("set-cookie")].filter(Boolean);
+      if (set.length) cookie = set[0].split(";")[0];
+      return r;
+    },
   };
+}
+
+/** Metros entre dos puntos, para chequear que lo que se muestra no es lo real. */
+function metros(a, b) {
+  const R = 6371008.8, rad = (x) => (x * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 const ok = (c, m) => console.log(`${c ? "✓" : "✗"} ${m}`);
@@ -56,6 +72,29 @@ chequear(sumado.amigo.nombre === "Ana", "Beto sumó a Ana con el código");
 const anaAhora = await ana.llamar("/api/estado");
 chequear(anaAhora.amigos.some((a) => a.id === sumado.amigo.id) === false, "(control) Ana no se agrega a sí misma");
 chequear(anaAhora.amigos.some((a) => a.nombre === "Beto"), "la amistad quedó de los dos lados");
+
+// --- privacidad de la ubicación ---
+const REAL_ANA = { lat: -34.6037, lng: -58.3816 };
+const anaSegunBeto = (await beto.llamar("/api/estado")).amigos.find((a) => a.nombre === "Ana");
+const corrimiento = metros(REAL_ANA, { lat: anaSegunBeto.lat, lng: anaSegunBeto.lng });
+console.log(`  Beto ve a Ana corrida ${Math.round(corrimiento)} m de donde está`);
+chequear(corrimiento > 150, "las coordenadas de Ana NO son las reales");
+chequear(corrimiento <= anaSegunBeto.radioKm * 1000 + 1, "el corrimiento entra en el radio declarado");
+chequear(anaSegunBeto.radioKm > 0, "viene el radio de la zona para dibujarla");
+chequear(
+  Math.abs(anaSegunBeto.distanciaKm - 205) < 3,
+  `la distancia real sí es exacta (${anaSegunBeto.distanciaKm?.toFixed(1)} km)`
+);
+
+const anaSegunAna = (await ana.llamar("/api/estado")).yo;
+chequear(metros(REAL_ANA, anaSegunAna) < 1, "Ana sí ve su propia ubicación exacta");
+chequear(anaSegunAna.radioKm === 0, "el nido propio va sin zona");
+
+const otraVez = (await beto.llamar("/api/estado")).amigos.find((a) => a.nombre === "Ana");
+chequear(
+  otraVez.lat === anaSegunBeto.lat && otraVez.lng === anaSegunBeto.lng,
+  "el punto corrido es SIEMPRE el mismo (si bailara, se promedia y se recupera el real)"
+);
 
 // --- código inexistente y código propio ---
 for (const [codigo, motivo] of [["ZZZZZZ", "código inexistente"], [estBeto.codigo, "código propio"]]) {
@@ -117,6 +156,19 @@ chequear(!!leido.loro.leido, "queda marcado como leído");
 // --- Carla no ve nada de esto ---
 const deCarla = await carla.llamar("/api/estado");
 chequear(!deCarla.loros.some((l) => l.id === vuelo.id), "un tercero no ve el loro ajeno");
+
+// --- la llave: el mismo nido en otro dispositivo ---
+const { llave } = await ana.llamar("/api/sesion");
+const compuDeAna = cliente("Ana (compu)");
+const r = await compuDeAna.abrir(`/entrar?llave=${encodeURIComponent(llave)}`);
+chequear(r.status === 303, "la llave redirige al mapa");
+const enLaCompu = await compuDeAna.llamar("/api/estado");
+chequear(enLaCompu.codigo === estAna.codigo, "es el MISMO nido, con su código y su bandada");
+chequear(enLaCompu.loros.some((l) => l.id === vuelo.id), "y con su historial de loros");
+
+const conLlaveTrucha = cliente("intruso");
+await conLlaveTrucha.abrir("/entrar?llave=aaaaaaaaaaaa.bbbbbbbbbbbb");
+chequear((await conLlaveTrucha.llamar("/api/estado")).yo === null, "una llave falsa no abre nada");
 
 console.log(fallos ? `\n${fallos} FALLO(S)` : "\nTodo en verde ✓");
 process.exit(fallos ? 1 : 0);

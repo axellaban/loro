@@ -36,9 +36,9 @@ export async function GET(req: Request) {
   return ok({
     ahora,
     escala: escalaGlobal(),
-    yo: verNido(yo),
+    yo: verNido(yo, yo),
     codigo: yo.codigo,
-    amigos: bandada.map(verNido),
+    amigos: bandada.map((a) => verNido(a, yo)),
     loros,
   });
 }

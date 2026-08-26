@@ -28,5 +28,5 @@ export async function POST(req: Request) {
   if (!otro) return error("No hay ningún nido con ese código.");
 
   await emparejar(yo.id, otro.id);
-  return ok({ ok: true, amigo: verNido(otro) });
+  return ok({ ok: true, amigo: verNido(otro, yo) });
 }

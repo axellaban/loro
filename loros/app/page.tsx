@@ -103,7 +103,7 @@ export default function Portada() {
           style={{
             display: "grid",
             gap: 14,
-            gridTemplateColumns: "repeat(auto-fit, minmax(212px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
           }}
         >
           {[
@@ -119,13 +119,18 @@ export default function Portada() {
             },
             {
               n: "03",
-              t: "Seguí el vuelo",
-              d: "La ves cruzar el mapa en vivo, con lo que falta y lo que ya recorrió. Los dos miran la misma ave.",
+              t: "Le avisan que viene",
+              d: "Al otro le llega el aviso apenas despegás: «viene un loro, llega en 4 h». Saber que algo está en camino es la mitad del asunto.",
             },
             {
               n: "04",
               t: "Aterriza",
               d: "Recién ahí se abre el mensaje. Ni un segundo antes: el texto no sale del servidor hasta que el ave llega.",
+            },
+            {
+              n: "05",
+              t: "Nadie ve tu casa",
+              d: "De los demás ves una zona de 3 km y su ciudad, nunca un punto exacto. La distancia y el tiempo sí son reales.",
             },
           ].map((x) => (
             <div key={x.n} className="tarjeta" style={{ padding: 20 }}>
@@ -270,6 +275,64 @@ export default function Portada() {
           el viaje a unos minutos manteniendo las proporciones entre aves, así se
           ve la diferencia sin esperar dos semanas.
         </p>
+      </section>
+
+      {/* ---------- privacidad ---------- */}
+      <section style={{ padding: "16px 0 56px" }}>
+        <div
+          className="tarjeta"
+          style={{ padding: "28px 24px", borderColor: "rgba(16,185,129,.28)" }}
+        >
+          <p className="etiqueta">Ubicación</p>
+          <h2 style={{ fontSize: "clamp(24px, 4vw, 33px)", fontWeight: 800, margin: "10px 0 14px" }}>
+            La app sabe dónde estás. Tus contactos, no.
+          </h2>
+          <p
+            style={{
+              color: "var(--suave)",
+              fontSize: 15.5,
+              lineHeight: 1.65,
+              maxWidth: 680,
+              marginBottom: 22,
+            }}
+          >
+            Son dos cosas distintas y esta app las trata como tales. El servidor
+            necesita las coordenadas exactas para calcular cuánto tarda el vuelo.
+            Lo que le manda al otro navegador es otra cosa.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gap: 12,
+              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+            }}
+          >
+            {[
+              {
+                t: "Una zona, no un punto",
+                d: "El nido ajeno se dibuja corrido al azar hasta 3 km, y el mapa muestra ese círculo. El desvío es siempre el mismo, así que nadie puede promediar muchas miradas para encontrar el centro.",
+              },
+              {
+                t: "Ciudad, no calle",
+                d: "El único texto de lugar que se comparte es a nivel ciudad: «Palermo, Argentina». Nunca una dirección.",
+              },
+              {
+                t: "La distancia sí es exacta",
+                d: "Se calcula en el servidor con los puntos reales y viaja ya resuelta. El «205 km» es cierto aunque el dibujo sea aproximado.",
+              },
+              {
+                t: "Solo tu bandada",
+                d: "Nadie te ve si no le diste tu código de nido. No se puede buscar gente ni mandarle un loro a un desconocido.",
+              },
+            ].map((x) => (
+              <div key={x.t}>
+                <h3 style={{ fontSize: 15.5, marginBottom: 7 }}>{x.t}</h3>
+                <p style={{ color: "var(--suave)", fontSize: 13.5, lineHeight: 1.6 }}>{x.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ---------- cierre ---------- */}

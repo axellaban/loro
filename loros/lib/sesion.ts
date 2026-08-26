@@ -55,18 +55,21 @@ export function tokenDe(id: string): string {
   return `${id}.${firmar(id)}`;
 }
 
+/** El id que hay adentro de un token, si la firma cierra. */
+export function idDeToken(token: string): string | null {
+  const corte = String(token || "").lastIndexOf(".");
+  if (corte <= 0) return null;
+  const id = token.slice(0, corte);
+  return firmasIguales(token.slice(corte + 1), firmar(id)) ? id : null;
+}
+
 /** El id del nido que trae el pedido, o null si no hay cookie o está adulterada. */
 export function idDeRequest(req: Request): string | null {
   const cookies = req.headers.get("cookie") || "";
   for (const parte of cookies.split(";")) {
     const [k, ...resto] = parte.trim().split("=");
     if (k !== COOKIE) continue;
-    const token = decodeURIComponent(resto.join("="));
-    const corte = token.lastIndexOf(".");
-    if (corte <= 0) return null;
-    const id = token.slice(0, corte);
-    const firma = token.slice(corte + 1);
-    return firmasIguales(firma, firmar(id)) ? id : null;
+    return idDeToken(decodeURIComponent(resto.join("=")));
   }
   return null;
 }

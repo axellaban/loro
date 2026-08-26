@@ -19,5 +19,5 @@ export async function POST(req: Request) {
   if (!punto) return error("Coordenadas inválidas.");
 
   const n = await actualizarUbicacion(yo.id, punto);
-  return ok({ ok: true, yo: n ? verNido(n) : null });
+  return ok({ ok: true, yo: n ? verNido(n, n) : null });
 }

@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { AVES } from "../lib/aves";
-import { puntoEnRuta, rumbo, ruta, type Punto } from "../lib/geo";
+import { desplazar, puntoEnRuta, rumbo, ruta, type Punto } from "../lib/geo";
 import { aveHtml } from "./Ave";
 import type { LoroVista, NidoVista } from "../lib/vista";
 
@@ -53,16 +53,19 @@ function capaBase(): L.TileLayer {
 
 function iconoNido(n: NidoVista, esMio: boolean): L.DivIcon {
   const color = esMio ? "#10b981" : n.bot ? "#22d3ee" : "#e9f3f0";
-  const pulso = esMio
-    ? `<span style="position:absolute;inset:0;border-radius:99px;background:${color};animation:latido 2.4s ease-out infinite"></span>`
-    : "";
+  // Solo el nido propio late y es un punto lleno. El de los demás es apenas un
+  // centro tenue adentro de su zona: el dato preciso no existe, y el dibujo no
+  // tiene que aparentar que sí.
+  const cuerpo = esMio
+    ? `<span style="position:absolute;inset:0;border-radius:99px;background:${color};animation:latido 2.4s ease-out infinite"></span>
+       <span style="position:absolute;inset:0;border-radius:99px;background:${color};border:2px solid rgba(6,13,12,.9);box-shadow:0 0 12px ${color}88"></span>`
+    : `<span style="position:absolute;inset:3px;border-radius:99px;background:${color};opacity:.75;border:2px solid rgba(6,13,12,.8)"></span>`;
   return L.divIcon({
     className: "marcador-nido",
     iconSize: [14, 14],
     iconAnchor: [7, 7],
     html: `<div style="position:relative;width:14px;height:14px">
-      ${pulso}
-      <span style="position:absolute;inset:0;border-radius:99px;background:${color};border:2px solid rgba(6,13,12,.9);box-shadow:0 0 12px ${color}88"></span>
+      ${cuerpo}
       <span style="position:absolute;left:50%;top:17px;transform:translateX(-50%);white-space:nowrap;font:600 11px/1 ui-sans-serif,system-ui;color:#e9f3f0;text-shadow:0 1px 4px #000,0 0 10px #000;pointer-events:none">${escapar(
         esMio ? "Tu nido" : n.nombre
       )}</span>
@@ -121,6 +124,7 @@ export default function Mapa({
   const contenedor = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const nidos = useRef(new Map<string, L.Marker>());
+  const zonas = useRef(new Map<string, L.Circle>());
   const capas = useRef(new Map<string, CapaVuelo>());
   const encuadrado = useRef(false);
   const alElegirRef = useRef(alElegirPunto);
@@ -170,6 +174,7 @@ export default function Mapa({
       m.remove();
       mapa.current = null;
       nidos.current.clear();
+      zonas.current.clear();
       capas.current.clear();
     };
   }, []);
@@ -189,19 +194,50 @@ export default function Mapa({
 
     for (const n of todos) {
       vistos.add(n.id);
+      const esMio = n.id === yo?.id;
       const existente = nidos.current.get(n.id);
-      const icono = iconoNido(n, n.id === yo?.id);
+      const icono = iconoNido(n, esMio);
       if (existente) {
         existente.setLatLng([n.lat, n.lng]);
         existente.setIcon(icono);
       } else {
         nidos.current.set(n.id, L.marker([n.lat, n.lng], { icon: icono }).addTo(m));
       }
+
+      // El círculo NO es decoración: es el tamaño real de lo que no sabemos.
+      // De la otra persona llega un punto corrido al azar hasta `radioKm`, así
+      // que dibujar un pin sería mentir con precisión de metros.
+      if (n.radioKm > 0) {
+        const zona = zonas.current.get(n.id);
+        if (zona) {
+          zona.setLatLng([n.lat, n.lng]);
+        } else {
+          zonas.current.set(
+            n.id,
+            L.circle([n.lat, n.lng], {
+              radius: n.radioKm * 1000,
+              color: n.bot ? "#22d3ee" : "#94a3b8",
+              weight: 1,
+              opacity: 0.35,
+              dashArray: "4 7",
+              fillColor: n.bot ? "#22d3ee" : "#cbd5e1",
+              fillOpacity: 0.07,
+              interactive: false,
+            }).addTo(m)
+          );
+        }
+      }
     }
     for (const [id, marcador] of nidos.current) {
       if (!vistos.has(id)) {
         marcador.remove();
         nidos.current.delete(id);
+      }
+    }
+    for (const [id, zona] of zonas.current) {
+      if (!vistos.has(id)) {
+        zona.remove();
+        zonas.current.delete(id);
       }
     }
 
@@ -213,15 +249,24 @@ export default function Mapa({
       // los datos llegan antes de que se entere del tamaño real, calcula el
       // zoom para una caja equivocada y deja los dos nidos pegados.
       m.invalidateSize();
-      if (todos.length === 1) {
+      if (todos.length === 1 && todos[0].radioKm === 0) {
         m.setView([todos[0].lat, todos[0].lng], 13);
       } else {
-        m.fitBounds(L.latLngBounds(todos.map((n) => [n.lat, n.lng] as [number, number])), {
-          padding: [70, 70],
-          // 16 y no 14: con dos nidos a un par de kilómetros, un tope bajo los
-          // deja pegados y las dos etiquetas se pisan.
-          maxZoom: 16,
-        });
+        // El encuadre tiene que abarcar las ZONAS, no los puntos: si se calcula
+        // sobre los centros, un círculo de 3 km termina ocupando toda la
+        // pantalla y no se entiende nada.
+        const limites = L.latLngBounds([]);
+        for (const n of todos) {
+          if (n.radioKm > 0) {
+            for (const grados of [0, 90, 180, 270]) {
+              const p = desplazar({ lat: n.lat, lng: n.lng }, n.radioKm, grados);
+              limites.extend([p.lat, p.lng]);
+            }
+          } else {
+            limites.extend([n.lat, n.lng]);
+          }
+        }
+        m.fitBounds(limites, { padding: [50, 50], maxZoom: 14 });
       }
     }
   }, [yo, amigos]);

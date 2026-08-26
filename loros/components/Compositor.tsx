@@ -8,9 +8,9 @@
 // porque llega en 2 minutos" o "mando el guacamayo justamente porque tarda un
 // día"— y el mensaje empieza a decir algo por sí solo.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AVES, AVES_LISTA, type AveId } from "../lib/aves";
-import { distanciaKm, formatearDistancia, formatearDuracion } from "../lib/geo";
+import { formatearDistancia, formatearDuracion } from "../lib/geo";
 import { duracionVuelo } from "../lib/vuelo";
 import { pedir } from "../lib/cliente";
 import type { NidoVista } from "../lib/vista";
@@ -41,10 +41,9 @@ export function Compositor({
   const [enviando, setEnviando] = useState(false);
 
   const para = amigos.find((a) => a.id === paraId) || null;
-  const km = useMemo(
-    () => (para ? distanciaKm({ lat: yo.lat, lng: yo.lng }, { lat: para.lat, lng: para.lng }) : 0),
-    [para, yo.lat, yo.lng]
-  );
+  // La distancia la manda el servidor: las coordenadas que llegan del otro
+  // están corridas a propósito y no sirven para medir (lib/privacidad.ts).
+  const km = para?.distanciaKm ?? 0;
 
   const a = AVES[ave];
   const sobra = a.maxCaracteres - texto.length;

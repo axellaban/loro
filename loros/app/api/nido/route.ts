@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       ...(punto ? { lat: punto.lat, lng: punto.lng } : {}),
     };
     await guardarNido(actualizado);
-    return ok({ ok: true, yo: verNido(actualizado) });
+    return ok({ ok: true, yo: verNido(actualizado, actualizado) });
   }
 
   const punto = puntoDe(b);
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
   const creado = await crearNido({ nombre, ave, punto });
   return ok(
-    { ok: true, yo: verNido(creado) },
+    { ok: true, yo: verNido(creado, creado) },
     { "Set-Cookie": cookieDeSesion(creado.id) }
   );
 }

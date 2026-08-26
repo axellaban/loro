@@ -280,3 +280,28 @@ textarea.campo { resize: none; line-height: 1.55; font-family: var(--fuente); }
   line-height: 1.5;
   text-align: center;
 }
+
+/* ---------- las aves ---------- */
+
+/* El ala rota sobre el hombro del pájaro, no sobre la esquina del SVG:
+   `view-box` hace que el origen se mida en coordenadas del viewBox. */
+.ave .ala {
+  transform-box: view-box;
+  transform-origin: 62px 56px;
+}
+.ave-viva .ala { animation: aletear-ala 0.58s ease-in-out infinite; }
+.ave-viva .rastro { animation: rastro 0.5s linear infinite; }
+.ave-viva .charla { animation: charla 1.9s ease-in-out infinite; }
+
+@keyframes aletear-ala {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  50% { transform: rotate(-14deg) scaleY(0.8); }
+}
+@keyframes rastro {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.7; }
+}
+@keyframes charla {
+  0%, 100% { opacity: 0; }
+  35%, 55% { opacity: 0.85; }
+}

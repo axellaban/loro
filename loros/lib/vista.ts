@@ -1,16 +1,25 @@
 // Lo que ve el navegador.
 //
-// Acá está la regla que sostiene todo el producto: **el texto de un loro que
-// todavía vuela no sale del servidor**. No es que la UI lo tape — no lo tiene.
-// Si viajara igual y la pantalla lo escondiera, abrir las herramientas de
-// desarrollo alcanzaría para leer antes de tiempo, y la espera dejaría de ser
-// real.
+// Dos reglas viven acá, y las dos son del producto, no de la interfaz:
 //
-// Quien lo mandó sí ve siempre su propio texto: lo escribió, ya lo sabe.
+// 1. **El texto de un loro que todavía vuela no sale del servidor.** No es que
+//    la UI lo tape — no lo tiene. Si viajara igual y la pantalla lo escondiera,
+//    abrir las herramientas de desarrollo alcanzaría para leer antes de tiempo,
+//    y la espera dejaría de ser real. Quien lo mandó sí ve siempre su propio
+//    texto: lo escribió, ya lo sabe.
+//
+// 2. **Las coordenadas exactas de otra persona tampoco salen.** Se manda un
+//    punto corrido hasta 3 km (lib/privacidad.ts) y el radio de esa imprecisión,
+//    para que el mapa pueda dibujar una zona en vez de un pin. La distancia y
+//    el tiempo de vuelo se calculan antes, con los puntos reales, así que son
+//    exactos aunque el dibujo sea aproximado.
+//
+// Tu propio nido sí viaja exacto: es tu dato.
 
 import type { AveId } from "./aves";
 import type { Loro, Nido } from "./datos";
-import type { Punto } from "./geo";
+import { distanciaKm, type Punto } from "./geo";
+import { RADIO_ZONA_KM, zonaDe } from "./privacidad";
 
 export type NidoVista = {
   id: string;
@@ -20,14 +29,19 @@ export type NidoVista = {
   lng: number;
   bot: boolean;
   ave: AveId;
+  /** 0 en el nido propio; RADIO_ZONA_KM en los demás. El mapa dibuja con esto. */
+  radioKm: number;
+  /** Distancia real hasta vos, en km. Calculada en el servidor con los puntos
+   *  de verdad — no se puede sacar de lat/lng, que vienen corridos. */
+  distanciaKm?: number;
 };
 
 export type LoroVista = {
   id: string;
   ave: AveId;
   direccion: "enviado" | "recibido";
-  /** La otra punta del vuelo, para el título de la tarjeta. */
   otro: { id: string; nombre: string; bot: boolean };
+  /** Puntas del vuelo: la tuya exacta, la del otro corrida. */
   origen: Punto;
   destino: Punto;
   distanciaKm: number;
@@ -40,15 +54,25 @@ export type LoroVista = {
   leido: number | null;
 };
 
-export function verNido(n: Nido): NidoVista {
+const punto = (n: Nido): Punto => ({ lat: n.lat, lng: n.lng });
+
+/**
+ * @param yo el nido de quien mira. Si es el mismo, va exacto; si no, corrido y
+ *   con la distancia real ya calculada.
+ */
+export function verNido(n: Nido, yo?: Nido | null): NidoVista {
+  const esMio = yo?.id === n.id;
+  const p = esMio ? punto(n) : zonaDe(punto(n), n.id);
   return {
     id: n.id,
     nombre: n.nombre,
     lugar: n.lugar,
-    lat: n.lat,
-    lng: n.lng,
+    lat: p.lat,
+    lng: p.lng,
     bot: n.bot,
     ave: n.ave,
+    radioKm: esMio ? 0 : RADIO_ZONA_KM,
+    distanciaKm: esMio || !yo ? undefined : distanciaKm(punto(yo), punto(n)),
   };
 }
 
@@ -63,6 +87,11 @@ export function verLoro(
   const otro = nidos.get(otroId);
   const llego = ahora >= l.llegada;
 
+  // La punta del otro se corre; la propia queda exacta. Las dos personas ven
+  // líneas apenas distintas y el mismo avance: el tiempo es lo que importa.
+  const origen = enviado ? l.origen : zonaDe(l.origen, l.de);
+  const destino = enviado ? zonaDe(l.destino, l.para) : l.destino;
+
   return {
     id: l.id,
     ave: l.ave,
@@ -72,8 +101,9 @@ export function verLoro(
       nombre: otro?.nombre || "Alguien",
       bot: Boolean(otro?.bot),
     },
-    origen: l.origen,
-    destino: l.destino,
+    origen,
+    destino,
+    // La real, calculada con los puntos de verdad al soltar el ave.
     distanciaKm: l.distanciaKm,
     salida: l.salida,
     llegada: l.llegada,

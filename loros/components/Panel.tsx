@@ -12,7 +12,6 @@ import { useState } from "react";
 import { AVES } from "../lib/aves";
 import {
   cuentaRegresiva,
-  distanciaKm,
   formatearDistancia,
   formatearDuracion,
 } from "../lib/geo";
@@ -128,7 +127,6 @@ export function Panel(p: Props) {
 
         {pestaña === "bandada" && (
           <Bandada
-            yo={p.yo}
             amigos={p.amigos}
             escala={p.escala}
             alEscribir={p.alEscribir}
@@ -145,6 +143,8 @@ export function Panel(p: Props) {
 
 function Cabecera({ yo, codigo }: { yo: NidoVista; codigo: string }) {
   const [copiado, setCopiado] = useState(false);
+  const [llave, setLlave] = useState("");
+  const [pidiendoLlave, setPidiendoLlave] = useState(false);
 
   async function compartir() {
     const texto = `Mandame un loro 🦜 Mi código de nido es ${codigo}`;
@@ -158,6 +158,20 @@ function Cabecera({ yo, codigo }: { yo: NidoVista; codigo: string }) {
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch {}
+  }
+
+  async function pedirLlave() {
+    setPidiendoLlave(true);
+    try {
+      const r = await pedir<{ llave: string }>("/api/sesion");
+      const url = `${window.location.origin}/entrar?llave=${encodeURIComponent(r.llave)}`;
+      setLlave(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+    } catch {
+      setLlave("no-se-pudo");
+    } finally {
+      setPidiendoLlave(false);
+    }
   }
 
   return (
@@ -207,6 +221,61 @@ function Cabecera({ yo, codigo }: { yo: NidoVista; codigo: string }) {
           {codigo}
         </span>
       </div>
+
+      {/* Sin cuentas, el nido vive en esta cookie. Esto es la única forma de
+          llevárselo a otro teléfono — y de no perderlo al limpiar el navegador. */}
+      <button
+        onClick={pedirLlave}
+        disabled={pidiendoLlave}
+        style={{
+          background: "none",
+          border: "none",
+          padding: "8px 2px 0",
+          cursor: "pointer",
+          fontSize: 12,
+          color: "var(--tenue)",
+          textDecoration: "underline",
+          textUnderlineOffset: 3,
+        }}
+      >
+        {llave ? "Llave copiada" : "Abrir mi nido en otro dispositivo"}
+      </button>
+      {llave === "no-se-pudo" && (
+        <p style={{ color: "#fca5a5", fontSize: 12, marginTop: 6 }}>
+          No se pudo generar la llave. Probá de nuevo.
+        </p>
+      )}
+      {llave && llave !== "no-se-pudo" && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: "rgba(251,191,36,.08)",
+            border: "1px solid rgba(251,191,36,.28)",
+          }}
+        >
+          <p style={{ fontSize: 12.5, lineHeight: 1.55, color: "var(--suave)" }}>
+            Copiamos un link al portapapeles. Abrilo en el otro dispositivo y tu
+            nido aparece ahí.{" "}
+            <strong style={{ color: "#fbbf24" }}>
+              No se lo pases a nadie: ese link ES tu nido
+            </strong>
+            , no es tu código.
+          </p>
+          <p
+            style={{
+              marginTop: 8,
+              fontFamily: "var(--mono)",
+              fontSize: 10.5,
+              color: "var(--tenue)",
+              wordBreak: "break-all",
+            }}
+          >
+            {llave}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -379,14 +448,12 @@ function haceCuanto(ms: number): string {
 // ---------- bandada ----------
 
 function Bandada({
-  yo,
   amigos,
   escala,
   alEscribir,
   alEnfocar,
   refrescar,
 }: {
-  yo: NidoVista;
   amigos: NidoVista[];
   escala: number;
   alEscribir: (id?: string) => void;
@@ -450,8 +517,21 @@ function Bandada({
         {error && <p style={{ color: "#fca5a5", fontSize: 13, marginTop: 10 }}>{error}</p>}
       </div>
 
+      <p
+        style={{
+          fontSize: 12,
+          lineHeight: 1.55,
+          color: "var(--tenue)",
+          margin: "0 2px 14px",
+        }}
+      >
+        🔒 En el mapa nadie ve tu dirección: de cada nido ajeno se dibuja una
+        zona de {amigos.find((f) => f.radioKm > 0)?.radioKm ?? 3} km, no un
+        punto. La distancia y el tiempo de vuelo sí son exactos.
+      </p>
+
       {amigos.map((f) => {
-        const km = distanciaKm({ lat: yo.lat, lng: yo.lng }, { lat: f.lat, lng: f.lng });
+        const km = f.distanciaKm ?? 0;
         return (
           <div key={f.id} className="tarjeta" style={{ padding: 14, marginBottom: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

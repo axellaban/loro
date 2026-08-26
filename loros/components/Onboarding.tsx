@@ -121,10 +121,28 @@ export function Onboarding({ alTerminar }: { alTerminar: (yo: NidoVista) => void
             <>
               <p className="etiqueta">Paso 2 de 3</p>
               <h2 style={{ fontSize: 21, margin: "10px 0 6px" }}>¿Desde dónde despega?</h2>
-              <p style={{ color: "var(--suave)", fontSize: 14.5, marginBottom: 16 }}>
+              <p style={{ color: "var(--suave)", fontSize: 14.5, marginBottom: 14 }}>
                 Acá está todo el asunto: tu ave sale de donde estás y tarda lo que
                 tarda hasta el otro. Sin ubicación no hay vuelo, solo chat.
               </p>
+              {/* Este párrafo va acá y no en una política que nadie lee: es el
+                  segundo exacto en que la persona decide dar el permiso. */}
+              <div
+                style={{
+                  padding: "11px 13px",
+                  borderRadius: 10,
+                  background: "rgba(16,185,129,.08)",
+                  border: "1px solid rgba(16,185,129,.24)",
+                  marginBottom: 16,
+                }}
+              >
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--suave)" }}>
+                  🔒 <strong style={{ color: "var(--texto)" }}>Nadie ve dónde vivís.</strong>{" "}
+                  Tus coordenadas se usan para calcular la distancia y no salen de
+                  acá: los demás ven una zona de 3 km y el nombre de tu ciudad,
+                  nunca tu calle. El tiempo de vuelo sí es exacto.
+                </p>
+              </div>
 
               {!aMano ? (
                 <>
@@ -169,6 +187,7 @@ export function Onboarding({ alTerminar }: { alTerminar: (yo: NidoVista) => void
                               lng: punto.lng,
                               bot: false,
                               ave,
+                              radioKm: 0,
                             }
                           : null
                       }
@@ -270,8 +289,9 @@ export function Onboarding({ alTerminar }: { alTerminar: (yo: NidoVista) => void
                 <p style={{ color: "#fca5a5", fontSize: 13.5, marginTop: 12 }}>{error}</p>
               )}
               <p style={{ color: "var(--tenue)", fontSize: 12.5, marginTop: 14, lineHeight: 1.6 }}>
-                Tu ubicación se guarda solo para calcular vuelos, y quien la ve es
-                gente a la que vos le diste tu código.
+                Sin registro ni contraseña: tu nido queda guardado en este
+                navegador. Después podés llevártelo a otro dispositivo con la
+                llave que está en el panel.
               </p>
             </>
           )}

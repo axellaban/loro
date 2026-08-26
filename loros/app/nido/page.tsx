@@ -20,7 +20,7 @@ import {
   pedirUbicacion,
   useEstado,
 } from "../../lib/cliente";
-import { distanciaKm } from "../../lib/geo";
+import { distanciaKm, formatearDuracion } from "../../lib/geo";
 import { AVES } from "../../lib/aves";
 
 const Mapa = dynamic(() => import("../../components/Mapa"), {
@@ -42,30 +42,54 @@ export default function Nido() {
   const [foco, setFoco] = useState<string | null>(null);
   const enfocar = useCallback((id: string) => setFoco(`${id}#${Date.now()}`), []);
   const [aviso, setAviso] = useState("");
-  const yaLlegados = useRef<Set<string> | null>(null);
+  /** id del loro → si ya había aterrizado la última vez que lo vimos. */
+  const conocidos = useRef<Map<string, boolean> | null>(null);
 
   const mostrarAviso = useCallback((texto: string) => {
     setAviso(texto);
     setTimeout(() => setAviso((a) => (a === texto ? "" : a)), 5200);
   }, []);
 
-  // Aterrizajes. La primera vuelta solo toma nota de lo que ya estaba: si no,
-  // al abrir la app saltarían de golpe todos los avisos viejos.
+  // Dos avisos por cada loro que viene hacia vos, y son distintos a propósito:
+  //
+  //   al despegar   "viene en camino, llega en 4 h" — es la mitad de la gracia
+  //                 del producto. Saber que algo está en camino ES el producto;
+  //                 sin este aviso, un guacamayo de un día no se distingue de
+  //                 no haber recibido nada.
+  //   al aterrizar  "ya está acá".
+  //
+  // La primera vuelta solo toma nota de lo que había: si no, al abrir la app
+  // saltarían de golpe todos los avisos viejos.
+  const ahoraServidor = est.ahoraServidor;
   useEffect(() => {
-    const llegados = est.loros.filter((l) => l.llego && l.direccion === "recibido");
-    if (yaLlegados.current === null) {
-      yaLlegados.current = new Set(llegados.map((l) => l.id));
+    const paraMi = est.loros.filter((l) => l.direccion === "recibido");
+    if (conocidos.current === null) {
+      conocidos.current = new Map(paraMi.map((l) => [l.id, l.llego]));
       return;
     }
-    for (const l of llegados) {
-      if (yaLlegados.current.has(l.id)) continue;
-      yaLlegados.current.add(l.id);
+    for (const l of paraMi) {
+      const antes = conocidos.current.get(l.id);
+      conocidos.current.set(l.id, l.llego);
       const a = AVES[l.ave];
-      const texto = `${a.nombre} de ${l.otro.nombre} aterrizó en tu nido.`;
-      mostrarAviso(`🪶 ${texto}`);
-      avisar("Aterrizó un loro 🦜", texto);
+
+      if (antes === undefined && !l.llego) {
+        const falta = formatearDuracion(l.llegada - ahoraServidor());
+        const texto = `${a.nombre} de ${l.otro.nombre} viene en camino. Llega en ${falta}.`;
+        mostrarAviso(`🪶 ${texto}`);
+        avisar("Viene un loro en camino 🦜", texto);
+        continue;
+      }
+
+      // Aterrizó mientras mirábamos, o aterrizó con la app cerrada y lo vemos
+      // recién ahora. El corte de dos minutos evita avisar de algo de ayer.
+      const reciénLlegado = antes === undefined && ahoraServidor() - l.llegada < 120_000;
+      if (l.llego && (antes === false || reciénLlegado)) {
+        const texto = `${a.nombre} de ${l.otro.nombre} aterrizó en tu nido.`;
+        mostrarAviso(`🪶 ${texto}`);
+        avisar("Aterrizó un loro 🦜", texto);
+      }
     }
-  }, [est.loros, mostrarAviso]);
+  }, [est.loros, mostrarAviso, ahoraServidor]);
 
   // El nido sigue al dispositivo: si te moviste más de 300 m, el próximo vuelo
   // sale desde donde estás ahora y no desde donde estabas cuando te registraste.

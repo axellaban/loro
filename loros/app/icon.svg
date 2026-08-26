@@ -1,13 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" width="120" height="100">
-  <rect width="120" height="100" fill="#060d0c"/>
-  <path d="M2 46 L34 39 L34 55 Z" fill="#10b981" opacity="0.55"/>
-  <path d="M6 52 L34 44 L34 62 Z" fill="#10b981" opacity="0.8"/>
-  <path d="M54 55 C50 70 57 85 73 93 C65 79 63 66 64 56 Z" fill="#10b981" opacity="0.62"/>
-  <path d="M28 51 C31 42 45 38 63 40 C78 41 86 45 89 50 C86 56 76 60 60 60 C43 60 30 58 28 51 Z" fill="#10b981"/>
-  <path d="M52 47 C45 27 55 8 77 4 C69 21 67 35 66 48 Z" fill="#10b981"/>
-  <path d="M84 34 C82 25 90 23 90 32 Z" fill="#a3e635"/>
-  <path d="M90 32 C90 23 98 25 95 35 Z" fill="#22d3ee"/>
-  <circle cx="88" cy="45" r="11.5" fill="#34d399"/>
-  <path d="M97 38 C110 37 115 45 108 52 C103 57 97 54 96 48 Z" fill="#f59e0b"/>
-  <circle cx="92" cy="42" r="3.1" fill="#08110f"/>
+<rect width="120" height="100" rx="18" fill="#060d0c"/>
+<g transform="translate(6 6) scale(0.9)">
+<path d="M32 46 C18 42 12 48 12 58 C12 68 20 72 32 68 Z" fill="#059669"/>
+<path d="M30 52 C20 50 17 54 18 60 C19 65 24 66 30 64 Z" fill="#10b981"/>
+<path d="M30 58 C32 44 50 36 70 38 C86 39 95 46 95 55 C95 65 82 71 61 71 C42 71 29 68 30 58 Z" fill="#10b981"/>
+<path d="M40 64 C40 74 54 80 70 78 C56 82 41 78 38 70 Z" fill="#6ee7b7" opacity="0.9"/>
+<g class="ala">
+  <path d="M52 54 C40 34 52 12 76 9 C66 24 62 40 63 57 Z" fill="#34d399"/>
+  <path d="M57 51 C53 37 58 24 70 18 C64 30 60 41 61 52 Z" fill="#ffffff" opacity="0.32"/>
+  <path d="M56 47 C54 39 57 31 63 26 C60 34 58 41 59 48 Z" fill="#f87171"/>
+</g>
+<circle cx="85" cy="40" r="17.5" fill="#10b981"/>
+<path d="M72 32 C76 21 92 21 97 30 C90 27 79 27 72 32 Z" fill="#fbbf24"/>
+<path d="M69 46 C68 34 76 27 86 28 C80 35 78 43 79 51 Z" fill="#ecfdf5"/>
+<circle cx="75" cy="53" r="4.4" fill="#fb7185" opacity="0.5"/>
+<circle cx="85" cy="37" r="6.2" fill="#ffffff"/>
+<circle cx="86.4" cy="37.3" r="3.4720000000000004" fill="#10201c"/>
+<circle cx="87.6" cy="35.4" r="1.364" fill="#ffffff"/>
+<g transform="translate(93 43) scale(1.02)">
+<path d="M-6 -9 C10 -10 18 -1 15 8 C13 15 6 16 3 10 C0 5 -3 -1 -6 -9 Z" fill="#f59e0b"/>
+<path d="M1 8 C5 15 14 14 14 7 C10 11 5 11 1 8 Z" fill="#c2410c"/>
+</g></g>
 </svg>
