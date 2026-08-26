@@ -13,6 +13,11 @@ por WhatsApp.
 Deploy: Next.js 14 (App Router) en Vercel. Proyecto de Vercel: `copiloto-mvp`. URL de
 producción: `https://loreado.vercel.app`.
 
+> **Ojo:** `loros/` es **otro proyecto**, no tiene nada que ver con Loreado.IA.
+> Es una app de mensajería con su propio `package.json`, su propio deploy y su
+> propio README. No comparten código ni datos. Todo lo que sigue en este archivo
+> es sobre Loreado.IA.
+
 ## Cómo correrlo
 
 ```bash

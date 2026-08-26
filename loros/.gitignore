@@ -1,0 +1,9 @@
+node_modules
+.next
+.env.local
+.data
+*.tsbuildinfo
+next-env.d.ts
+
+# El .env.example SÍ va al repo (la regla .env* de la raíz lo dejaba afuera).
+!.env.example
