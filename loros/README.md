@@ -6,6 +6,11 @@ Mensajería donde el mensaje vuela. Tu ave despega desde tu ubicación real y
 tarda lo que tiene que tardar hasta el nido de la otra persona. Hasta que no
 aterriza, el mensaje **no existe** del otro lado.
 
+> **Este proyecto ya vive en su propio repo:**
+> [axellaban/Enviaunloro](https://github.com/axellaban/Enviaunloro), con la app
+> en la raíz y listo para importar desde Vercel. Lo que queda acá es la copia
+> desde donde se armó; si los dos se tocan, el que manda es el repo propio.
+>
 > Es un proyecto aparte de Loreado.IA (lo que vive en la raíz de este repo). No
 > comparten código, ni datos, ni deploy.
 
@@ -162,8 +167,10 @@ de dónde sale el id.
 
 ## Cómo está hecho
 
-Next.js 14 (App Router), TypeScript, Leaflet. Sin base de datos obligatoria,
-sin login, sin dependencias de UI.
+Next.js 16 (App Router), React 19, TypeScript, Leaflet. Sin base de datos
+obligatoria, sin login, sin dependencias de UI. `npm audit` da cero
+vulnerabilidades — vale la pena mantenerlo así, porque esto se deploya público.
+Requiere Node 20.9 o más.
 
 ```
 lib/aves.ts       la tabla de las cuatro especies. Todo sale de acá.
