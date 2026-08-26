@@ -132,6 +132,11 @@ export default function Portada() {
               t: "Nadie ve tu casa",
               d: "De los demás ves una zona de 3 km y su ciudad, nunca un punto exacto. La distancia y el tiempo sí son reales.",
             },
+            {
+              n: "06",
+              t: "…o no aterriza",
+              d: "2 de cada 1000 loros no llegan nunca. Es poco. No es cero. Y cuando pasa, ese mensaje se perdió de verdad.",
+            },
           ].map((x) => (
             <div key={x.n} className="tarjeta" style={{ padding: 20 }}>
               <p
@@ -275,6 +280,46 @@ export default function Portada() {
           el viaje a unos minutos manteniendo las proporciones entre aves, así se
           ve la diferencia sin esperar dos semanas.
         </p>
+      </section>
+
+      {/* ---------- extravío ---------- */}
+      <section style={{ padding: "16px 0 56px" }}>
+        <div
+          className="tarjeta"
+          style={{
+            padding: "30px 26px",
+            borderStyle: "dashed",
+            borderColor: "rgba(255,255,255,.16)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 22, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <span style={{ opacity: 0.28, filter: "grayscale(1)", display: "inline-flex" }}>
+              <Ave especie="guacamayo" size={78} />
+            </span>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <p className="etiqueta">0,2%</p>
+              <h2
+                style={{
+                  fontSize: "clamp(23px, 3.8vw, 31px)",
+                  fontWeight: 800,
+                  margin: "10px 0 12px",
+                }}
+              >
+                Dos de cada mil loros no llegan nunca
+              </h2>
+              <p style={{ color: "var(--suave)", fontSize: 15.5, lineHeight: 1.65, maxWidth: 620 }}>
+                Lo distrajo una bandada, se lo llevó el viento, encontró un árbol
+                que le gustó más. Cuando pasa, el mapa te lo dice y ese mensaje se
+                perdió de verdad: quien lo esperaba nunca va a saber qué decía. Vos
+                recuperás tu texto y podés volver a intentarlo.
+              </p>
+              <p style={{ color: "var(--tenue)", fontSize: 13.5, lineHeight: 1.6, marginTop: 14 }}>
+                Es poco y no es cero, y esa es la idea: si mandar algo no pudiera
+                salir mal, esperarlo no significaría nada.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ---------- privacidad ---------- */}

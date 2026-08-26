@@ -29,13 +29,17 @@ type Props = {
   ahoraServidor: () => number;
   alEnfocar: (id: string) => void;
   alEscribir: (idAmigo?: string) => void;
+  alReenviar: (loro: LoroVista) => void;
   refrescar: () => void;
 };
 
 export function Panel(p: Props) {
   const [pestaña, setPestaña] = useState<"vuelo" | "buzon" | "bandada">("vuelo");
-  const enVuelo = p.loros.filter((l) => !l.llego).sort((a, b) => a.llegada - b.llegada);
-  const llegados = p.loros.filter((l) => l.llego);
+  const enVuelo = p.loros
+    .filter((l) => !l.llego && !l.perdido)
+    .sort((a, b) => a.llegada - b.llegada);
+  // El buzón guarda lo que terminó, haya terminado bien o mal.
+  const llegados = p.loros.filter((l) => l.llego || l.perdido);
   const sinLeer = llegados.filter((l) => l.direccion === "recibido" && !l.leido).length;
 
   useTic(enVuelo.length > 0);
@@ -119,7 +123,12 @@ export function Panel(p: Props) {
               />
             ) : (
               llegados.map((l) => (
-                <TarjetaBuzon key={l.id} loro={l} refrescar={p.refrescar} />
+                <TarjetaBuzon
+                  key={l.id}
+                  loro={l}
+                  refrescar={p.refrescar}
+                  alReenviar={p.alReenviar}
+                />
               ))
             )}
           </>
@@ -365,12 +374,22 @@ function TarjetaVuelo({
 
 // ---------- buzón ----------
 
-function TarjetaBuzon({ loro, refrescar }: { loro: LoroVista; refrescar: () => void }) {
+function TarjetaBuzon({
+  loro,
+  refrescar,
+  alReenviar,
+}: {
+  loro: LoroVista;
+  refrescar: () => void;
+  alReenviar: (loro: LoroVista) => void;
+}) {
   const [abriendo, setAbriendo] = useState(false);
   const [abierto, setAbierto] = useState(Boolean(loro.leido));
   const a = AVES[loro.ave];
   const enviado = loro.direccion === "enviado";
   const sellado = !enviado && !abierto;
+
+  if (loro.perdido) return <TarjetaPerdido loro={loro} alReenviar={alReenviar} />;
 
   async function abrir() {
     setAbriendo(true);
@@ -433,6 +452,97 @@ function TarjetaBuzon({ loro, refrescar }: { loro: LoroVista; refrescar: () => v
           }}
         >
           {loro.texto}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * El loro que no llegó.
+ *
+ * Se muestra apagado y con el borde cortado: tiene que leerse distinto de un
+ * mensaje entregado incluso de reojo. A quien lo mandó se le devuelve su texto
+ * y un botón para volver a intentarlo —perder lo que escribiste sin siquiera
+ * poder copiarlo sería ensañamiento—. A quien lo esperaba no se le muestra
+ * nada del contenido: ese mensaje no llegó y no va a llegar.
+ */
+function TarjetaPerdido({
+  loro,
+  alReenviar,
+}: {
+  loro: LoroVista;
+  alReenviar: (loro: LoroVista) => void;
+}) {
+  const a = AVES[loro.ave];
+  const enviado = loro.direccion === "enviado";
+
+  return (
+    <div
+      className="tarjeta"
+      style={{
+        padding: 14,
+        marginBottom: 10,
+        borderStyle: "dashed",
+        borderColor: "rgba(255,255,255,.14)",
+        background: "rgba(255,255,255,.02)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ opacity: 0.3, filter: "grayscale(1)", display: "inline-flex" }}>
+          <Ave especie={loro.ave} size={26} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "var(--suave)" }}>
+            {enviado
+              ? `${a.nombre} perdido camino a ${loro.otro.nombre}`
+              : `Se perdió un ${a.nombre.toLowerCase()} de ${loro.otro.nombre}`}
+          </p>
+          <p style={{ color: "var(--tenue)", fontSize: 11.5 }}>
+            🍃 No llegó · voló{" "}
+            {formatearDistancia(
+              loro.distanciaKm *
+                Math.min(1, ((loro.extravio ?? 0) - loro.salida) / Math.max(1, loro.llegada - loro.salida))
+            )}{" "}
+            de {formatearDistancia(loro.distanciaKm)}
+          </p>
+        </div>
+      </div>
+
+      {loro.motivo && (
+        <p style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.55, color: "var(--suave)" }}>
+          {loro.motivo}
+        </p>
+      )}
+
+      {enviado ? (
+        <>
+          <p
+            style={{
+              marginTop: 10,
+              padding: "9px 11px",
+              borderRadius: 9,
+              background: "rgba(0,0,0,.25)",
+              fontSize: 13.5,
+              lineHeight: 1.55,
+              color: "var(--tenue)",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {loro.texto}
+          </p>
+          <button
+            className="boton fantasma chico"
+            style={{ width: "100%", marginTop: 10 }}
+            onClick={() => alReenviar(loro)}
+          >
+            Volver a mandarlo
+          </button>
+        </>
+      ) : (
+        <p style={{ marginTop: 8, fontSize: 12.5, color: "var(--tenue)", fontStyle: "italic" }}>
+          Nunca vas a saber qué decía.
         </p>
       )}
     </div>

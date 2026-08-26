@@ -21,6 +21,8 @@ export function Compositor({
   amigos,
   escala,
   destinoInicial,
+  textoInicial,
+  aveInicial,
   alCerrar,
   alEnviado,
 }: {
@@ -28,14 +30,17 @@ export function Compositor({
   amigos: NidoVista[];
   escala: number;
   destinoInicial?: string | null;
+  /** Precargados al volver a mandar un loro que se perdió. */
+  textoInicial?: string;
+  aveInicial?: AveId;
   alCerrar: () => void;
   alEnviado: (mensaje: string) => void;
 }) {
   const [paraId, setParaId] = useState<string>(
     destinoInicial || amigos[0]?.id || ""
   );
-  const [ave, setAve] = useState<AveId>(yo.ave);
-  const [texto, setTexto] = useState("");
+  const [ave, setAve] = useState<AveId>(aveInicial ?? yo.ave);
+  const [texto, setTexto] = useState(textoInicial ?? "");
   const [turbo, setTurbo] = useState(false);
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);

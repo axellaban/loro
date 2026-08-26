@@ -15,7 +15,7 @@ import {
 } from "./geo";
 import { lugarDe } from "./geocode";
 import { escribirDoc, leerDoc, store } from "./store";
-import { duracionVuelo } from "./vuelo";
+import { duracionVuelo, probabilidadExtravio } from "./vuelo";
 import { nuevoId } from "./sesion";
 
 export type Nido = {
@@ -47,12 +47,35 @@ export type Loro = {
   /** Epoch ms del despegue y del aterrizaje. El vuelo es la diferencia. */
   salida: number;
   llegada: number;
-  /** Vuelo acelerado x60, para poder mostrar la app sin esperar de verdad. */
+  /** Vuelo acelerado, para poder mostrar la app sin esperar de verdad. */
   turbo: boolean;
+  /**
+   * Epoch ms en que el ave se pierde, o null si llega bien. Se sortea al
+   * soltarla y queda escrito: si se decidiera al mirar, dos personas mirando
+   * el mismo vuelo obtendrían resultados distintos.
+   */
+  extravio: number | null;
+  /** Qué le pasó. Vacío si no se perdió. */
+  motivo: string;
   leido: number | null;
   /** Interno de Doña Cotorra: si ya devolvió el ave con su respuesta. */
   respondido?: boolean;
 };
+
+/**
+ * Qué le pasó al ave que no llegó. Da lo mismo cuál toque —ninguna es más
+ * cierta que otra— pero que haya una explicación concreta es lo que separa
+ * "se perdió" de "la app falló".
+ */
+const MOTIVOS = [
+  "Lo distrajo una bandada y se fue con ellos.",
+  "Paró a comer semillas en un balcón y no volvió a salir.",
+  "Se lo llevó el viento para el otro lado.",
+  "Se metió en una tormenta y perdió el rumbo.",
+  "Encontró un árbol que le gustó más que tu destinatario.",
+  "Se cruzó con otra ave y se olvidó de todo.",
+  "Lo vieron por última vez dando vueltas sobre un campanario.",
+];
 
 /** Tope por buzón. Un MVP no necesita historial infinito. */
 const MAX_BUZON = 80;
@@ -224,6 +247,14 @@ export async function enviarLoro(datos: {
   const destino: Punto = { lat: datos.para.lat, lng: datos.para.lng };
   const km = distanciaKm(origen, destino);
   const salida = Date.now();
+  const duracion = duracionVuelo(km, datos.ave, datos.turbo, escalaGlobal());
+
+  // El sorteo va acá, una sola vez, y el resultado queda guardado. Ni cerca
+  // del principio ni del final: perderse a los tres segundos de despegar no se
+  // vive como un viaje que salió mal, y perderse rozando el destino es una
+  // crueldad innecesaria.
+  const seExtravia = Math.random() < probabilidadExtravio();
+  const dondeSePierde = 0.15 + Math.random() * 0.7;
 
   const loro: Loro = {
     id: nuevoId(),
@@ -235,8 +266,10 @@ export async function enviarLoro(datos: {
     destino,
     distanciaKm: km,
     salida,
-    llegada: salida + duracionVuelo(km, datos.ave, datos.turbo, escalaGlobal()),
+    llegada: salida + duracion,
     turbo: datos.turbo,
+    extravio: seExtravia ? salida + Math.round(duracion * dondeSePierde) : null,
+    motivo: seExtravia ? MOTIVOS[Math.floor(Math.random() * MOTIVOS.length)] : "",
     leido: null,
   };
 
@@ -272,6 +305,8 @@ export async function buzon(id: string): Promise<Loro[]> {
 export async function marcarLeido(loroId: string, lector: string): Promise<Loro | null> {
   const l = await loro(loroId);
   if (!l || l.para !== lector) return null;
+  // Nunca llegó: no hay nada que abrir, y menos que marcar como leído.
+  if (l.extravio !== null && Date.now() >= l.extravio) return l;
   if (Date.now() < l.llegada) return l;
   if (l.leido) return l;
   const actualizado = { ...l, leido: Date.now() };
@@ -339,6 +374,8 @@ export async function atenderVecina(idUsuario: string): Promise<void> {
   const ahora = Date.now();
   for (const l of await buzon(id)) {
     if (l.para !== id || l.respondido || l.llegada > ahora) continue;
+    // A la vecina tampoco le llegan los que se pierden.
+    if (l.extravio !== null && ahora >= l.extravio) continue;
     await escribirDoc(claveLoro(l.id), { ...l, respondido: true, leido: l.leido || ahora });
 
     const plantilla = RESPUESTAS[Math.floor(Math.random() * RESPUESTAS.length)];

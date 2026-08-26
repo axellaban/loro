@@ -49,6 +49,12 @@ export type LoroVista = {
   llegada: number;
   turbo: boolean;
   llego: boolean;
+  /** Se perdió: no llegó ni va a llegar. */
+  perdido: boolean;
+  /** Cuándo se perdió. null mientras siga volando — ver la nota de abajo. */
+  extravio: number | null;
+  /** Qué le pasó. Vacío hasta que efectivamente se pierde. */
+  motivo: string;
   /** null mientras vuela y es para vos: todavía no existe de este lado. */
   texto: string | null;
   leido: number | null;
@@ -85,7 +91,14 @@ export function verLoro(
   const enviado = l.de === yo;
   const otroId = enviado ? l.para : l.de;
   const otro = nidos.get(otroId);
-  const llego = ahora >= l.llegada;
+
+  // El extravío se sortea al despegar y queda escrito, pero NO viaja hasta que
+  // pasa. Si se mandara desde el principio, abrir las herramientas de
+  // desarrollo diría de antemano que ese loro no va a llegar, y esperar algo
+  // que ya sabés que no llega no es esperar.
+  const extravio = l.extravio ?? null;
+  const perdido = extravio !== null && ahora >= extravio;
+  const llego = !perdido && ahora >= l.llegada;
 
   // La punta del otro se corre; la propia queda exacta. Las dos personas ven
   // líneas apenas distintas y el mismo avance: el tiempo es lo que importa.
@@ -109,6 +122,11 @@ export function verLoro(
     llegada: l.llegada,
     turbo: l.turbo,
     llego,
+    perdido,
+    extravio: perdido ? extravio : null,
+    motivo: perdido ? l.motivo || "" : "",
+    // Un loro perdido nunca llega, así que su texto tampoco: quien lo esperaba
+    // no va a saber nunca qué decía. Quien lo escribió lo sigue viendo.
     texto: enviado || llego ? l.texto : null,
     leido: l.leido,
   };

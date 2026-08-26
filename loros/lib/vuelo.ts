@@ -11,6 +11,26 @@ import { AVES, type AveId } from "./aves";
 export const VUELO_MINIMO_MS = 25_000;
 
 /**
+ * Uno de cada quinientos loros no llega nunca.
+ *
+ * Es poco y no es cero, y esa es exactamente la idea: si mandar algo no
+ * pudiera salir mal, esperarlo no significaría nada. El número es chico a
+ * propósito —a nadie le tiene que pasar dos veces seguidas— pero existe, y
+ * cuando pasa, el mensaje se pierde de verdad: no hay reintento automático ni
+ * copia guardada del lado de quien lo esperaba.
+ *
+ * Se puede pisar con LOROS_PROB_EXTRAVIO (0 a 1). Sirve para probar el camino
+ * del extravío sin mandar quinientos loros.
+ */
+export function probabilidadExtravio(): number {
+  const n = Number(process.env.LOROS_PROB_EXTRAVIO ?? "0.002");
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.002;
+}
+
+/** Para mostrarlo en la portada sin depender del entorno del servidor. */
+export const EXTRAVIO_POR_DEFECTO = 0.002;
+
+/**
  * Cuánto dura, más o menos, el vuelo de prueba del ave más lenta. El resto de
  * las aves entran abajo de ese techo, en proporción.
  */

@@ -11,6 +11,13 @@
 
 const BASE = process.env.LOROS_URL || "http://localhost:3001";
 
+// Con el servidor arrancado con LOROS_PROB_EXTRAVIO=1 (todos los loros se
+// pierden), pasale la misma variable a la prueba y verifica ese camino en vez
+// del normal:
+//   LOROS_PROB_EXTRAVIO=1 npm run start
+//   LOROS_PROB_EXTRAVIO=1 npm run prueba
+const MODO_EXTRAVIO = process.env.LOROS_PROB_EXTRAVIO === "1";
+
 function cliente(nombre) {
   let cookie = "";
   return {
@@ -132,6 +139,10 @@ chequear(!!enVueloBeto, "a Beto le aparece el loro en el aire");
 chequear(enVueloBeto.texto === null, "EL TEXTO NO VIAJA mientras el ave vuela");
 chequear(enVueloBeto.llego === false, "figura como en vuelo");
 chequear(enVueloBeto.otro.nombre === "Ana", "sabe de quién viene");
+chequear(
+  enVueloBeto.perdido === false && enVueloBeto.extravio === null,
+  "mientras vuela no se filtra si se va a perder"
+);
 
 const enVueloAna = (await ana.llamar("/api/estado")).loros.find((l) => l.id === vuelo.id);
 chequear(enVueloAna.texto === SECRETO, "Ana sí ve su propio texto desde el minuto cero");
@@ -142,16 +153,40 @@ try {
   chequear(r.loro.texto === null, "abrirlo antes de tiempo no revela nada");
 } catch { chequear(true, "abrirlo antes de tiempo no revela nada"); }
 
-// --- esperar el aterrizaje ---
+// --- esperar el final del vuelo ---
 console.log(`  esperando ${segundos + 4} s…`);
 await new Promise((r) => setTimeout(r, (segundos + 4) * 1000));
 
-const llegado = (await beto.llamar("/api/estado")).loros.find((l) => l.id === vuelo.id);
-chequear(llegado.llego === true, "aterrizó");
-chequear(llegado.texto === SECRETO, "recién ahora Beto lee el mensaje");
+const final = (await beto.llamar("/api/estado")).loros.find((l) => l.id === vuelo.id);
 
-const leido = await beto.llamar("/api/loros/leer", { id: vuelo.id });
-chequear(!!leido.loro.leido, "queda marcado como leído");
+if (MODO_EXTRAVIO) {
+  console.log("  (modo extravío: todos los loros se pierden)");
+  chequear(final.perdido === true, "el loro se perdió");
+  chequear(final.llego === false, "y NO figura como llegado");
+  chequear(final.texto === null, "Beto NUNCA ve el texto de un loro perdido");
+  chequear(Boolean(final.motivo), "viene el motivo de lo que le pasó");
+  chequear(
+    final.extravio > vuelo.salida && final.extravio < vuelo.llegada,
+    "se perdió en el medio del camino, no al despegar ni al llegar"
+  );
+
+  const deAna = (await ana.llamar("/api/estado")).loros.find((l) => l.id === vuelo.id);
+  chequear(deAna.perdido === true, "Ana también se entera");
+  chequear(deAna.texto === SECRETO, "y recupera su texto para volver a mandarlo");
+
+  const intento = await beto.llamar("/api/loros/leer", { id: vuelo.id });
+  chequear(
+    intento.loro.texto === null && !intento.loro.leido,
+    "abrir un loro perdido no revela nada ni lo marca leído"
+  );
+} else {
+  chequear(final.llego === true, "aterrizó");
+  chequear(final.perdido === false, "no se perdió");
+  chequear(final.texto === SECRETO, "recién ahora Beto lee el mensaje");
+
+  const leido = await beto.llamar("/api/loros/leer", { id: vuelo.id });
+  chequear(!!leido.loro.leido, "queda marcado como leído");
+}
 
 // --- Carla no ve nada de esto ---
 const deCarla = await carla.llamar("/api/estado");

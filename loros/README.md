@@ -23,6 +23,8 @@ diseño del producto: elegir el ave es parte del mensaje.
 | **Loro** 🦜 | 40 km/h | 1000 caracteres | El clásico |
 | **Guacamayo** 👑 | 25 km/h | 2000 caracteres | El ceremonioso |
 
+Y el 0,2% de los loros no llega nunca. Es poco. No es cero.
+
 Las velocidades **no** son ornitología — un guacamayo de verdad vuela más
 rápido que un perico. Son balance de juego, y viven todas en
 [`lib/aves.ts`](lib/aves.ts): cambiás un número ahí y se corrigen solos la
@@ -54,6 +56,29 @@ piden API key. Todas las variables opcionales están en
 ```bash
 npm run typecheck   # tsc --noEmit
 npm run prueba      # prueba de punta a punta contra la API (con el server corriendo)
+```
+
+## El 0,2%
+
+Dos de cada mil loros no llegan. Se pierden en algún punto del camino —entre el
+15% y el 85% del trayecto, para que no sea ni un chiste al despegar ni una
+crueldad rozando el destino— y ese mensaje se perdió de verdad: quien lo
+esperaba nunca sabe qué decía, no hay reintento automático ni copia guardada de
+su lado. Quien lo mandó recupera su texto y puede volver a intentarlo.
+
+El sorteo pasa una sola vez, al soltar el ave, y el resultado queda escrito: si
+se decidiera al mirar, dos personas mirando el mismo vuelo obtendrían
+respuestas distintas. Pero **no viaja al navegador hasta que ocurre** — si se
+mandara desde el principio, abrir las herramientas de desarrollo diría de
+antemano que ese loro no va a llegar, y esperar algo que ya sabés que no llega
+no es esperar.
+
+Se puede pisar con `LOROS_PROB_EXTRAVIO` (0 a 1) para probar ese camino sin
+mandar quinientos loros:
+
+```bash
+LOROS_PROB_EXTRAVIO=1 npm run start   # todos se pierden
+npm run prueba                        # la suite detecta el modo y lo verifica
 ```
 
 ## Ubicación y privacidad

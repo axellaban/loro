@@ -21,7 +21,12 @@ import {
   useEstado,
 } from "../../lib/cliente";
 import { distanciaKm, formatearDuracion } from "../../lib/geo";
-import { AVES } from "../../lib/aves";
+import { AVES, type AveId } from "../../lib/aves";
+import type { LoroVista } from "../../lib/vista";
+
+type EstadoLoro = "vuelo" | "llego" | "perdido";
+const estadoDe = (l: LoroVista): EstadoLoro =>
+  l.perdido ? "perdido" : l.llego ? "llego" : "vuelo";
 
 const Mapa = dynamic(() => import("../../components/Mapa"), {
   ssr: false,
@@ -34,56 +39,74 @@ const Mapa = dynamic(() => import("../../components/Mapa"), {
 
 export default function Nido() {
   const est = useEstado();
-  const [compositor, setCompositor] = useState<{ abierto: boolean; para?: string | null }>({
-    abierto: false,
-  });
+  const [compositor, setCompositor] = useState<{
+    abierto: boolean;
+    para?: string | null;
+    texto?: string;
+    ave?: AveId;
+  }>({ abierto: false });
   // El foco lleva un número pegado atrás para que tocar dos veces el mismo nido
   // vuelva a mover la cámara: si fuera solo el id, React no vería un cambio.
   const [foco, setFoco] = useState<string | null>(null);
   const enfocar = useCallback((id: string) => setFoco(`${id}#${Date.now()}`), []);
   const [aviso, setAviso] = useState("");
-  /** id del loro → si ya había aterrizado la última vez que lo vimos. */
-  const conocidos = useRef<Map<string, boolean> | null>(null);
+  /** id del loro → en qué estado lo vimos la última vez. */
+  const conocidos = useRef<Map<string, EstadoLoro> | null>(null);
 
   const mostrarAviso = useCallback((texto: string) => {
     setAviso(texto);
     setTimeout(() => setAviso((a) => (a === texto ? "" : a)), 5200);
   }, []);
 
-  // Dos avisos por cada loro que viene hacia vos, y son distintos a propósito:
+  // Un aviso por cada cambio de estado, y son distintos a propósito:
   //
-  //   al despegar   "viene en camino, llega en 4 h" — es la mitad de la gracia
-  //                 del producto. Saber que algo está en camino ES el producto;
-  //                 sin este aviso, un guacamayo de un día no se distingue de
-  //                 no haber recibido nada.
-  //   al aterrizar  "ya está acá".
+  //   despega   "viene en camino, llega en 4 h" — es la mitad de la gracia del
+  //             producto. Saber que algo está en camino ES el producto; sin
+  //             este aviso, un guacamayo de un día no se distingue de no haber
+  //             recibido nada.
+  //   aterriza  "ya está acá".
+  //   se pierde a las dos puntas, porque las dos se quedaron esperando.
   //
   // La primera vuelta solo toma nota de lo que había: si no, al abrir la app
   // saltarían de golpe todos los avisos viejos.
   const ahoraServidor = est.ahoraServidor;
   useEffect(() => {
-    const paraMi = est.loros.filter((l) => l.direccion === "recibido");
     if (conocidos.current === null) {
-      conocidos.current = new Map(paraMi.map((l) => [l.id, l.llego]));
+      conocidos.current = new Map(est.loros.map((l) => [l.id, estadoDe(l)]));
       return;
     }
-    for (const l of paraMi) {
+    for (const l of est.loros) {
       const antes = conocidos.current.get(l.id);
-      conocidos.current.set(l.id, l.llego);
-      const a = AVES[l.ave];
+      const ahora = estadoDe(l);
+      conocidos.current.set(l.id, ahora);
+      if (antes === ahora) continue;
 
-      if (antes === undefined && !l.llego) {
+      const a = AVES[l.ave];
+      const mio = l.direccion === "enviado";
+      // Lo que apareció ya resuelto pasó con la app cerrada. Se avisa solo si
+      // fue recién: nadie quiere enterarse hoy de algo de anteayer.
+      const nuevo = antes === undefined;
+      const reciente = ahoraServidor() - (l.extravio ?? l.llegada) < 120_000;
+
+      if (ahora === "perdido" && (!nuevo || reciente)) {
+        const texto = mio
+          ? `Tu ${a.nombre.toLowerCase()} se perdió camino a ${l.otro.nombre}. ${l.motivo}`
+          : `Un ${a.nombre.toLowerCase()} de ${l.otro.nombre} se perdió en el camino.`;
+        mostrarAviso(`🍃 ${texto}`);
+        avisar("Se perdió un loro 🍃", texto);
+        continue;
+      }
+
+      // Los avisos de despegue y aterrizaje son solo para lo que viene hacia
+      // vos: de lo que mandás ya te enteraste al mandarlo.
+      if (mio) continue;
+
+      if (nuevo && ahora === "vuelo") {
         const falta = formatearDuracion(l.llegada - ahoraServidor());
         const texto = `${a.nombre} de ${l.otro.nombre} viene en camino. Llega en ${falta}.`;
         mostrarAviso(`🪶 ${texto}`);
         avisar("Viene un loro en camino 🦜", texto);
-        continue;
-      }
-
-      // Aterrizó mientras mirábamos, o aterrizó con la app cerrada y lo vemos
-      // recién ahora. El corte de dos minutos evita avisar de algo de ayer.
-      const reciénLlegado = antes === undefined && ahoraServidor() - l.llegada < 120_000;
-      if (l.llego && (antes === false || reciénLlegado)) {
+      } else if (ahora === "llego" && (antes === "vuelo" || reciente)) {
         const texto = `${a.nombre} de ${l.otro.nombre} aterrizó en tu nido.`;
         mostrarAviso(`🪶 ${texto}`);
         avisar("Aterrizó un loro 🦜", texto);
@@ -135,7 +158,7 @@ export default function Nido() {
     );
   }
 
-  const enVuelo = est.loros.filter((l) => !l.llego);
+  const enVuelo = est.loros.filter((l) => !l.llego && !l.perdido);
 
   return (
     <div className="app">
@@ -185,6 +208,14 @@ export default function Nido() {
           ahoraServidor={est.ahoraServidor}
           alEnfocar={enfocar}
           alEscribir={(id) => setCompositor({ abierto: true, para: id })}
+          alReenviar={(l) =>
+            setCompositor({
+              abierto: true,
+              para: l.otro.id,
+              texto: l.texto || "",
+              ave: l.ave,
+            })
+          }
           refrescar={est.refrescar}
         />
         <div className="pie-panel">
@@ -204,6 +235,8 @@ export default function Nido() {
           amigos={est.amigos}
           escala={est.escala}
           destinoInicial={compositor.para}
+          textoInicial={compositor.texto}
+          aveInicial={compositor.ave}
           alCerrar={() => setCompositor({ abierto: false })}
           alEnviado={(mensaje) => {
             setCompositor({ abierto: false });
