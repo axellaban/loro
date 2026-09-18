@@ -1,4 +1,6 @@
-export const runtime = "edge";
+// Runtime Node (el default): ver la nota de /api/answer sobre por qué no va
+// `runtime = "edge"`. Tope alto porque este route espera a un modelo.
+export const maxDuration = 60;
 
 // Diagnóstico: pega un request mínimo a CADA modelo del registro y reporta si
 // responde o con qué error. Usa los mismos constructores de body que los routes

@@ -1,4 +1,6 @@
-export const runtime = "edge";
+// Runtime Node (el default): ver la nota de /api/answer sobre por qué no va
+// `runtime = "edge"`. Tope alto porque este route espera a un modelo.
+export const maxDuration = 60;
 
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 import { specForRequest, type Provider } from "../../lib/models";

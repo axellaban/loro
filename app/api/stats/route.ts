@@ -1,4 +1,19 @@
-export const runtime = "edge";
+// Runtime Node (el default): ver la nota de /api/answer sobre por qué no va
+// `runtime = "edge"`. `maxDuration` explícito para no quedar atado al default
+// del plan; los timeouts que de verdad mandan son los internos de cada llamada.
+export const maxDuration = 30;
+/**
+ * OBLIGATORIO acá, no es decorativo. Este GET no recibe `Request` ni toca
+ * ninguna API de request, así que fuera del runtime edge Next lo prerenderiza
+ * en el build y serviría el conteo de PostHog congelado al momento del deploy:
+ * el contador del home no volvería a moverse nunca. (Lo destapó la tabla de
+ * rutas del build, que lo mostró como ○ en vez de ƒ.)
+ *
+ * No pelea con el CDN: `force-dynamic` solo saca la generación estática. El
+ * `Cache-Control: s-maxage=300` que pone `respuesta()` más abajo sigue siendo el
+ * que manda, así que la función corre en el miss y el CDN sirve el resto.
+ */
+export const dynamic = "force-dynamic";
 
 /**
  * Pageviews históricas del sitio, para el contador del home.

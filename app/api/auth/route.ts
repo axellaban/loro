@@ -22,7 +22,10 @@ import {
   type Sesion,
 } from "../../lib/session";
 
-export const runtime = "edge";
+// Runtime Node (el default): ver la nota de /api/answer sobre por qué no va
+// `runtime = "edge"`. `maxDuration` explícito para no quedar atado al default
+// del plan; los timeouts que de verdad mandan son los internos de cada llamada.
+export const maxDuration = 30;
 /** Nunca cacheado: la respuesta depende de quién pregunta. */
 export const dynamic = "force-dynamic";
 

@@ -4,7 +4,10 @@ import { sesionDeRequest } from "../../lib/session";
 import { reclamar } from "../../lib/passStore";
 import * as kv from "../../lib/kv";
 
-export const runtime = "edge";
+// Runtime Node (el default): ver la nota de /api/answer sobre por qué no va
+// `runtime = "edge"`. `maxDuration` explícito para no quedar atado al default
+// del plan; los timeouts que de verdad mandan son los internos de cada llamada.
+export const maxDuration = 30;
 /**
  * Nunca cacheado. Es un endpoint de diagnóstico y de canje: si el navegador o
  * el CDN guardan la respuesta, se termina mirando el estado de un deploy viejo

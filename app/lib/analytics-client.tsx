@@ -21,7 +21,13 @@ export function AnalyticsClient() {
       autocapture: false,
       capture_pageview: true,
       capture_pageleave: true,
-      capture_exceptions: true,
+      // Apagado: no captura casi nada (los errores recurrentes por diseño ya
+      // están tragados antes de llegar a window.onerror — el ws.onerror vacío
+      // del simulador, el console.error del copiloto, el abort del TTS, el
+      // AbortError de las respuestas) y en cambio hace lazy-load del módulo
+      // exception-autocapture, que al ir por /ingest se proxea por Vercel: un
+      // request y ~20 KB por pageview para capturar cero errores.
+      capture_exceptions: false,
       persistence: "localStorage",
       // No usamos feature flags en ningún lado, y sin esto posthog-js pide
       // /ingest/flags en cada init y en cada identify(). Sobre el tráfico de

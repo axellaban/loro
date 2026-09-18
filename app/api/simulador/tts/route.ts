@@ -1,4 +1,6 @@
-export const runtime = "edge";
+// Runtime Node (el default): ver la nota de /api/answer sobre por qué no va
+// `runtime = "edge"`. Tope alto porque este route espera a un modelo.
+export const maxDuration = 60;
 // Nunca cacheado: el GET es un diagnóstico y el POST devuelve audio distinto en
 // cada llamada. Sin esto se termina mirando la respuesta de un deploy viejo.
 export const dynamic = "force-dynamic";

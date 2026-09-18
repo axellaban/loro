@@ -1,4 +1,12 @@
-export const runtime = "edge";
+// Runtime Node (el default). NO poner `runtime = "edge"`: la concurrencia
+// in-function de Fluid —compartir una instancia entre requests simultáneos— solo
+// existe en Node/Python, y Next 16.3 deja de soportar el runtime edge.
+//
+// `maxDuration` va explícito porque edge tenía un techo fijo de 25s y el default
+// de Node depende del plan (10s en Hobby, 15s en Pro): sin esto, este route se
+// cortaría ANTES que antes. Es un techo, no una reserva — no se factura por
+// declararlo alto.
+export const maxDuration = 60;
 
 import { capacityClosed, rateLimit, sameOriginStrict } from "../../lib/ratelimit";
 import { passFromRequest } from "../../lib/pass";
