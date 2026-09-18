@@ -2285,7 +2285,7 @@ export default function Page() {
       // Abre (o reabre) el WebSocket contra Deepgram reusando el mismo
       // stream/worklet: en una reconexión NO se vuelve a pedir permiso de
       // micrófono ni de pestaña, solo se reconstruye el socket.
-      const connectWs = async () => {
+      const abrirWs = async () => {
         const tokRes = await fetch("/api/deepgram-token", {
           method: "POST",
           headers: passHeader(),
@@ -2348,6 +2348,25 @@ export default function Page() {
             setStatus((s) => (s === "error" ? s : "idle"));
           }
         };
+      };
+
+      /**
+       * Una sola conexión en vuelo por vez. `resumeRef` (visibilitychange) y el
+       * backoff de `scheduleReconnect` pueden dispararse casi a la vez; sin este
+       * guard, un alt-tab en medio del `await` del token abría un segundo
+       * WebSocket contra Deepgram — un /api/deepgram-token de más y
+       * transcripción duplicada. Apenas el socket existe, el chequeo de
+       * `socketDead` de `resumeRef` ya alcanza: esto cubre justo el hueco.
+       */
+      let conectando = false;
+      const connectWs = async () => {
+        if (conectando) return;
+        conectando = true;
+        try {
+          await abrirWs();
+        } finally {
+          conectando = false;
+        }
       };
 
       // Caída inesperada en medio de la sesión: reintenta hasta 3 veces con

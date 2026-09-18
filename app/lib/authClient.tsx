@@ -47,6 +47,41 @@ function cargarGoogle(): Promise<boolean> {
   return cargando;
 }
 
+/**
+ * Pregunta por la sesión UNA sola vez por carga de página, aunque `useAuth()` lo
+ * pidan varios componentes o el mismo se desmonte y vuelva a montar. La promesa
+ * se comparte, igual que en `cargarGoogle()` de acá arriba.
+ *
+ * Por qué importa: `useAuth()` está montado dos veces en /app (la página y el
+ * PanelDesbloqueo de CallSessions), y CallSessions se monta y desmonta cada vez
+ * que se cambia de vista. Cada GET /api/auth verifica la firma del ID token de
+ * Google y después va a buscar el pase a Upstash: repetirlo por montaje era
+ * trabajo del servidor puro de más, sin ninguna diferencia en pantalla.
+ */
+type SesionResp = { sesion?: Cuenta; pase?: ActivePass & { token: string } } | null;
+let sesionPedida: Promise<SesionResp> | null = null;
+
+function pedirSesion(): Promise<SesionResp> {
+  if (sesionPedida) return sesionPedida;
+  sesionPedida = (async () => {
+    try {
+      const r = await fetch("/api/auth", { cache: "no-store" });
+      return (await r.json().catch(() => null)) as SesionResp;
+    } catch {
+      // Sin conexión no hay sesión que mostrar; no es un error para la persona.
+      // Un fallo de red NO se cachea: el próximo montaje vuelve a intentar.
+      sesionPedida = null;
+      return null;
+    }
+  })();
+  return sesionPedida;
+}
+
+/** Entrar o salir cambia la sesión: el que pregunte después va al servidor. */
+function olvidarSesion() {
+  sesionPedida = null;
+}
+
 export type Auth = ReturnType<typeof useAuth>;
 
 /**
@@ -85,19 +120,13 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
     if (!clientId) return;
     let vivo = true;
     (async () => {
-      try {
-        const r = await fetch("/api/auth", { cache: "no-store" });
-        const j = await r.json().catch(() => null);
-        if (!vivo) return;
-        if (j?.sesion) {
-          setCuenta(j.sesion);
-          if (j.pase?.token) alEntrarRef.current?.(j.pase);
-        }
-      } catch {
-        // Sin conexión no hay sesión que mostrar; no es un error para la persona.
-      } finally {
-        if (vivo) setChecking(false);
+      const j = await pedirSesion();
+      if (!vivo) return;
+      if (j?.sesion) {
+        setCuenta(j.sesion);
+        if (j.pase?.token) alEntrarRef.current?.(j.pase);
       }
+      setChecking(false);
     })();
     return () => {
       vivo = false;
@@ -115,6 +144,7 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
+        olvidarSesion();
         setCuenta(j.sesion);
         setEntradaNueva(true);
         if (j.pase?.token) alEntrarRef.current?.(j.pase);
@@ -161,6 +191,7 @@ export function useAuth(alEntrar?: (pase: ActivePass & { token: string }) => voi
     try {
       await fetch("/api/auth", { method: "DELETE" });
     } catch {}
+    olvidarSesion();
     setCuenta(null);
     setEntradaNueva(false);
     setError("");

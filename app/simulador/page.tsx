@@ -650,6 +650,8 @@ export default function SimuladorPage() {
   const intentionalCloseRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** ¿Ya hay una conexión a Deepgram en curso? Ver `connectWs` más abajo. */
+  const conectandoRef = useRef(false);
   const stabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -952,7 +954,7 @@ export default function SimuladorPage() {
   };
   scheduleReconnectRef.current = scheduleReconnect;
 
-  const connectWs = async (first: boolean) => {
+  const abrirWs = async (first: boolean) => {
     const dgUrl = buildDgUrl(STT_LANG[sessionLangRef.current]);
     const tokRes = await fetch("/api/deepgram-token", { method: "POST" });
     if (!tokRes.ok) throw new Error("Error al obtener token de Deepgram.");
@@ -987,6 +989,22 @@ export default function SimuladorPage() {
       }
       if (wsRef.current === ws) scheduleReconnectRef.current();
     };
+  };
+  /**
+   * Una sola conexión en vuelo por vez. El backoff de `scheduleReconnect` y el
+   * `onclose` del socket pueden pedir reconectar casi a la vez; sin este guard,
+   * el segundo pedido entra mientras el primero está esperando el token y se
+   * abren dos WebSockets contra Deepgram — un /api/deepgram-token de más y
+   * transcripción duplicada.
+   */
+  const connectWs = async (first: boolean) => {
+    if (conectandoRef.current) return;
+    conectandoRef.current = true;
+    try {
+      await abrirWs(first);
+    } finally {
+      conectandoRef.current = false;
+    }
   };
   connectWsRef.current = connectWs;
 

@@ -23,6 +23,11 @@ export function AnalyticsClient() {
       capture_pageleave: true,
       capture_exceptions: true,
       persistence: "localStorage",
+      // No usamos feature flags en ningún lado, y sin esto posthog-js pide
+      // /ingest/flags en cada init y en cada identify(). Sobre el tráfico de
+      // Ads son 1-2 requests por pageview que no sirven para nada. Si algún día
+      // se usan flags, esto se saca.
+      advanced_disable_decide: true,
     });
   }, []);
   return null;

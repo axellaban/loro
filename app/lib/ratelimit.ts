@@ -10,8 +10,18 @@ type Bucket = { count: number; reset: number };
 const store = new Map<string, Bucket>();
 
 // Poda oportunista para que el Map no crezca sin límite.
+//
+// El guard tiene que ser por TIEMPO además de por tamaño: con solo el tamaño,
+// un isolate caliente que pasa las 5000 claves recorre el Map entero en CADA
+// request de los 11 routes — y si las entradas siguen dentro de su ventana no
+// se borra ninguna, así que el tamaño no baja y el barrido se repite para
+// siempre.
+let ultimaPoda = 0;
+const PODA_CADA_MS = 30_000;
 function prune(now: number) {
   if (store.size < 5000) return;
+  if (now - ultimaPoda < PODA_CADA_MS) return;
+  ultimaPoda = now;
   store.forEach((b, k) => {
     if (now > b.reset) store.delete(k);
   });

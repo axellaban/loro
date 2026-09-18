@@ -8,7 +8,8 @@ export const runtime = "edge";
 // Existe porque hasta ahora, cuando un modelo fallaba, no había forma de ver
 // por qué: el error se tapaba con un fallback silencioso y no se logueaba nada.
 
-import { rateLimit, sameOriginStrict } from "../../../lib/ratelimit";
+import { rateLimit } from "../../../lib/ratelimit";
+import { timingSafeEqual } from "../../../lib/pass";
 import { MODELS, type ModelSpec } from "../../../lib/models";
 import {
   ANTHROPIC_HEADERS,
@@ -83,26 +84,51 @@ async function checkAnthropic(spec: ModelSpec, apiKey: string): Promise<Partial<
 }
 
 /**
- * El guard de los otros endpoints exige el header `Origin`, que el navegador NO
- * manda al abrir una URL en la barra de direcciones — con ese criterio este
- * endpoint sería inusable justo cuando hace falta. Se acepta también la
- * navegación directa del navegador, que es el caso de uso real. Ambas señales
- * son spoofeables, igual que el `Origin` del resto de la app; el rate-limit de
- * abajo es lo que evita que se queme presupuesto.
+ * Caché en memoria del isolate. Una corrida son 9 completions reales en
+ * paralelo contra tres proveedores: repetirla dos veces en el mismo minuto no
+ * dice nada nuevo y gasta tokens y CPU de la función. Mismo criterio que el de
+ * /api/stats.
  */
-function allowDiagnostics(req: Request): boolean {
-  if (sameOriginStrict(req)) return true;
-  return req.headers.get("sec-fetch-dest") === "document";
-}
+let cache: { cuerpo: string; hasta: number } | null = null;
+const TTL_MS = 60_000;
+
+const SIN_CACHE = {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+} as const;
 
 export async function GET(req: Request) {
-  if (!allowDiagnostics(req)) {
-    return new Response("Origen no permitido.", { status: 403 });
+  // Antes alcanzaba con ser mismo-origen o abrirlo desde la barra de
+  // direcciones, o sea: cualquiera que supiera la URL podía quemar 9 llamadas
+  // a los tres proveedores, 6 veces por minuto. Ahora pide el mismo token de
+  // admin que /api/admin/generate-pass, y por la misma razón se deja de mirar
+  // el origen: esto se abre desde curl o desde la barra, no desde la app.
+  //   GET /api/models/health?token=$ADMIN_PASS_TOKEN
+  const adminToken = process.env.ADMIN_PASS_TOKEN;
+  if (!adminToken) {
+    return Response.json(
+      {
+        ok: false,
+        error:
+          "Falta ADMIN_PASS_TOKEN en este deploy. Cargalo en Vercel y REDEPLOYÁ: las variables nuevas no entran en un deploy ya hecho.",
+      },
+      { status: 503, headers: SIN_CACHE }
+    );
   }
+  const token = new URL(req.url).searchParams.get("token") || "";
+  if (!timingSafeEqual(token, adminToken)) {
+    return new Response("Token inválido.", { status: 403, headers: SIN_CACHE });
+  }
+
   // Cada corrida gasta tokens en los tres proveedores: se limita fuerte.
   const limit = rateLimit(req, "models-health", 6, 60_000);
   if (!limit.ok) {
     return new Response(`Demasiadas corridas. Probá en ${limit.retryAfter}s.`, { status: 429 });
+  }
+
+  const ahora = Date.now();
+  if (cache && ahora < cache.hasta) {
+    return new Response(cache.cuerpo, { headers: SIN_CACHE });
   }
 
   const keys = {
@@ -146,13 +172,12 @@ export async function GET(req: Request) {
     console.error(`[health] ${c.provider}/${c.model} → ${c.status ?? "-"} ${c.error || ""}`);
   }
 
-  return Response.json(
-    {
-      ok: failing.length === 0,
-      total: checks.length,
-      failing: failing.length,
-      checks,
-    },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  const cuerpo = JSON.stringify({
+    ok: failing.length === 0,
+    total: checks.length,
+    failing: failing.length,
+    checks,
+  });
+  cache = { cuerpo, hasta: Date.now() + TTL_MS };
+  return new Response(cuerpo, { headers: SIN_CACHE });
 }

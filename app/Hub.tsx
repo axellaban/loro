@@ -325,9 +325,11 @@ const STAT_BASE = 4467;
 // se lo ve moverse y pierde todo el efecto de "contador vivo".
 const STAT_MS_PER_TICK = 2_200;
 const STAT_CATCHUP_CAP = 300;
-/** Cada cuánto se vuelve a preguntar el total real mientras la pestaña está
-    abierta. El endpoint está cacheado en el CDN, así que sale barato. */
-const STAT_POLL_MS = 60_000;
+/** Cada cuánto se vuelve a preguntar el total real. Igualado al `s-maxage=300`
+    de /api/stats: sondear más seguido devuelve el MISMO número (lo sirve el CDN)
+    y solo suma invocaciones. Además el poll se pausa con la pestaña oculta y se
+    refresca al volver, así el número está al día cuando alguien lo mira. */
+const STAT_POLL_MS = 300_000;
 /** Diferencia a partir de la cual no se anima de a uno: si el número real está
     MUY por encima (primera carga, o alguien que vuelve después de meses),
     animar 3.000 pasos tardaría una eternidad. Se salta casi todo y se deja
@@ -381,8 +383,19 @@ function StatsCounter() {
         // Sin datos reales se sigue en modo cosmético, sin romper nada.
       }
     };
+    // Un 60s no lo frena el throttling de pestañas ocultas de Chrome, así que
+    // una pestaña olvidada le pegaba a /api/stats para siempre. Con la pestaña
+    // oculta no se sondea; al volver se refresca enseguida.
+    const visible = () => document.visibilityState === "visible";
+    const onVisible = () => {
+      if (visible()) pedirTotal();
+    };
+
     pedirTotal();
-    const poll = setInterval(pedirTotal, STAT_POLL_MS);
+    const poll = setInterval(() => {
+      if (visible()) pedirTotal();
+    }, STAT_POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
 
     // Espera hasta el próximo "evento" con distribución exponencial (la
     // misma que describe llegadas independientes al azar, tipo "cada tanto
@@ -426,6 +439,7 @@ function StatsCounter() {
       cancelled = true;
       clearTimeout(timer);
       clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 

@@ -1,6 +1,5 @@
 import { ogImage, ogSize, ogContentType } from "../lib/og";
 
-export const runtime = "edge";
 export const alt = "Loreado.IA — Desbloqueá el 'Modo Dios' en tu próxima entrevista";
 export const size = ogSize;
 export const contentType = ogContentType;
