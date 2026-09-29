@@ -41,10 +41,15 @@ export function esLicenciaLemon(s: string): boolean {
  * así, de modo que en producción no se aceptan. En preview y local sí, para
  * poder probar el circuito completo sin cobrarse.
  *
+ * LEMON_ACEPTAR_PRUEBAS=1 las acepta también en producción, para probar ahí
+ * antes de activar la tienda. Mientras esté prendida, cualquiera con el link
+ * de checkout saca un pase gratis: se apaga apenas termina la prueba.
+ *
  * Se decide por la positiva (solo entornos conocidos de prueba) para que, si
  * falta VERCEL_ENV, el resultado sea rechazar y no abrir la puerta.
  */
 function aceptaLicenciasDePrueba(): boolean {
+  if (process.env.LEMON_ACEPTAR_PRUEBAS === "1") return true;
   const env = process.env.VERCEL_ENV;
   return env === "preview" || env === "development" || process.env.NODE_ENV === "development";
 }

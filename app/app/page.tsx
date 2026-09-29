@@ -1046,6 +1046,12 @@ const SESSION_MAX_MIN = Math.round(SESSION_MAX_MS / 60000);
 const WA_NUMBER = "5491164090022";
 const PASS_WEEK_PRICE = "$19.99 USD";
 const PASS_YEAR_PRICE = "$89 USD";
+/**
+ * El pase de 12 meses queda oculto hasta que tenga su producto en Lemon
+ * Squeezy: por ahora se vende solo el de 7 días. Volver a mostrarlo es poner
+ * esto en true (y sumar su checkout en PLANES y su producto en lib/lemon.ts).
+ */
+const MOSTRAR_PASE_ANUAL = false;
 
 type PassPlan = "week" | "year";
 
@@ -3487,22 +3493,24 @@ export default function Page() {
                   </p>
                 </div>
 
-                <div className="stype-card">
-                  <div className="stype-head">
-                    <span className="stype-name">
-                      <CalendarIcon /> Pase de 12 meses
-                    </span>
-                    <span className="stype-badge">{PASS_YEAR_PRICE}</span>
+                {MOSTRAR_PASE_ANUAL && (
+                  <div className="stype-card">
+                    <div className="stype-head">
+                      <span className="stype-name">
+                        <CalendarIcon /> Pase de 12 meses
+                      </span>
+                      <span className="stype-badge">{PASS_YEAR_PRICE}</span>
+                    </div>
+                    <p className="paywall-text">
+                      🦜 ¿Búsqueda larga? Está a ese precio porque Loreado recién arranca y los
+                      primeros que pagan son los que me van a decir qué arreglar. Cuando salga de
+                      beta, los precios to the 🌙.
+                    </p>
+                    <button className="btn-action btn-outline" onClick={() => requestPass("year")}>
+                      Internaron al Loro, Internaron al Loro, Internaron al Loro
+                    </button>
                   </div>
-                  <p className="paywall-text">
-                    🦜 ¿Búsqueda larga? Está a ese precio porque Loreado recién arranca y los
-                    primeros que pagan son los que me van a decir qué arreglar. Cuando salga de
-                    beta, los precios to the 🌙.
-                  </p>
-                  <button className="btn-action btn-outline" onClick={() => requestPass("year")}>
-                    Internaron al Loro, Internaron al Loro, Internaron al Loro
-                  </button>
-                </div>
+                )}
               </>
             )}
           </div>

@@ -73,6 +73,7 @@ Ver `.env.example` para la lista completa y comentarios. Resumen:
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | No | Providers alternativos, soportados en backend, sin UI hoy |
 | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | No | Override de modelo por provider |
 | `PASS_SECRET` | Sí (para cobrar) | Firma los pases. Sin ella no se activa ningún pase, ni manual ni de Lemon Squeezy |
+| `LEMON_ACEPTAR_PRUEBAS` | No | `"1"` = producción acepta licencias de compras de prueba de Lemon Squeezy. Solo para probar; prendida regala pases |
 | `CAPACITY_CLOSED` | No | `"1"` = kill switch: 503 en endpoints pagos, la waitlist sigue abierta. Requiere redeploy |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | Sin ella, `track()` es no-op hacia PostHog (Vercel Analytics igual descarta eventos custom en Hobby) |
 | `GFORM_ACTION` / `GFORM_EMAIL_ENTRY` | No | Override del Google Form de waitlist |
