@@ -61,11 +61,10 @@ export type Canje =
 /**
  * Valida una licencia y devuelve los datos del pase que le corresponde.
  *
- * El vencimiento sale de Lemon Squeezy ("License length" del producto), así
- * que es el mismo cada vez que se canjea la misma licencia: el pase LORO que
- * resulta es idéntico y el atado a la cuenta de Google lo reconoce como uno
- * solo. Si el producto quedó sin vencimiento, se cuenta desde la compra con
- * los días del plan.
+ * El vencimiento es el de Lemon Squeezy ("License length" del producto), con
+ * los días del plan desde la compra como máximo. Las dos fechas son fijas, así
+ * que cada canje de la misma licencia da el mismo pase LORO y el atado a la
+ * cuenta de Google lo reconoce como uno solo.
  */
 export async function canjearLicencia(licencia: string): Promise<Canje> {
   const ctrl = new AbortController();
@@ -127,12 +126,13 @@ export async function canjearLicencia(licencia: string): Promise<Canje> {
     };
   }
 
+  // El plan pone el techo: un pase de 7 días dura 7 días desde la compra
+  // aunque el producto en Lemon Squeezy tenga otra "License length". Pasó: una
+  // licencia configurada en años abría la app hasta 2033.
   const creada = Date.parse(lic.created_at || "");
-  const vence = lic.expires_at
-    ? Date.parse(lic.expires_at)
-    : Number.isFinite(creada)
-      ? creada + PLAN_DAYS[plan] * 24 * 60 * 60 * 1000
-      : NaN;
+  const tope = Number.isFinite(creada) ? creada + PLAN_DAYS[plan] * 24 * 60 * 60 * 1000 : Infinity;
+  const deLemon = lic.expires_at ? Date.parse(lic.expires_at) : Infinity;
+  const vence = Math.min(deLemon, tope);
   if (!Number.isFinite(vence)) {
     return { ok: false, status: 502, error: "No pudimos leer el vencimiento de tu licencia. Escribime." };
   }
