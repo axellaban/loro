@@ -36,6 +36,11 @@ si no vas a ver ruido de módulos faltantes que no tiene que ver con tu cambio).
   (`gemini` | `anthropic` | `openai`) aunque la UI hoy solo expone modelos Gemini.
 - `app/api/waitlist/route.ts` — reenvía el email al Google Form desde el servidor
   (reporta éxito/fallo real, a diferencia de un submit `no-cors` opaco).
+- `app/api/pass/route.ts` + `app/lib/pass.ts` — pases ilimitados firmados con HMAC
+  (`LORO.…`), sin base de datos. También canjea licencias de Lemon Squeezy
+  (`app/lib/lemon.ts`): valida la licencia contra la License API (tienda y producto
+  hardcodeados ahí) y devuelve el pase LORO equivalente, que es lo que guarda el navegador.
+  El checkout de cada plan está en `PLANES` de `app/app/page.tsx`.
 - `app/lib/ratelimit.ts` — rate limiting in-memory, guard de same-origin estricto, y
   `capacityClosed()` (kill switch global).
 - `app/lib/track.ts` — wrapper de analytics (`track()`, `identify()`), fail-safe (nunca
@@ -67,6 +72,7 @@ Ver `.env.example` para la lista completa y comentarios. Resumen:
 | `GEMINI_API_KEY` | Sí | Generación de respuestas (provider default) |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | No | Providers alternativos, soportados en backend, sin UI hoy |
 | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | No | Override de modelo por provider |
+| `PASS_SECRET` | Sí (para cobrar) | Firma los pases. Sin ella no se activa ningún pase, ni manual ni de Lemon Squeezy |
 | `CAPACITY_CLOSED` | No | `"1"` = kill switch: 503 en endpoints pagos, la waitlist sigue abierta. Requiere redeploy |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | Sin ella, `track()` es no-op hacia PostHog (Vercel Analytics igual descarta eventos custom en Hobby) |
 | `GFORM_ACTION` / `GFORM_EMAIL_ENTRY` | No | Override del Google Form de waitlist |

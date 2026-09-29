@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PASS_QUERY, normalizePassInput, type PassPlan } from "./pass";
+import { track } from "./track";
 
 const PASS_KEY = "loreado:pass:v1";
 
@@ -44,7 +45,13 @@ export function storedPassToken(): string {
   }
 }
 
-async function redeem(token: string): Promise<{ pass?: ActivePass; error?: string }> {
+/**
+ * `token` es el pase que hay que guardar, que no siempre es el que se mandó: una
+ * licencia de Lemon Squeezy vuelve canjeada por su pase LORO.
+ */
+type Redeemed = { pass?: ActivePass; token?: string; error?: string };
+
+async function redeem(token: string): Promise<Redeemed> {
   // Con tope: mientras esta llamada no termina, el botón de arrancar está
   // deshabilitado. Sin timeout, una red que se cuelga (y no falla) dejaría la
   // app trabada justo para la gente que pagó.
@@ -59,7 +66,10 @@ async function redeem(token: string): Promise<{ pass?: ActivePass; error?: strin
     });
     const j = await r.json().catch(() => null);
     if (r.ok && j?.ok) {
-      return { pass: { email: j.email, expiresAt: j.expiresAt, plan: j.plan } };
+      return {
+        pass: { email: j.email, expiresAt: j.expiresAt, plan: j.plan },
+        token: typeof j.token === "string" ? j.token : undefined,
+      };
     }
     // El código HTTP va en el mensaje a propósito. Sin él, "falta la variable
     // en el server", "el endpoint no existe en este deploy" y "el pase está
@@ -89,7 +99,7 @@ export function usePass() {
   const apply = useCallback(
     (
       token: string,
-      res: { pass?: ActivePass; error?: string },
+      res: Redeemed,
       festejar = false,
       origen: "local" | "cuenta" = "local"
     ) => {
@@ -98,7 +108,7 @@ export function usePass() {
         setError("");
         if (festejar) setCelebrate(true);
         try {
-          localStorage.setItem(PASS_KEY, token);
+          localStorage.setItem(PASS_KEY, res.token || token);
           localStorage.setItem(ORIGEN_KEY, origen);
         } catch {}
         return true;
@@ -180,7 +190,11 @@ export function usePass() {
       }
       // Se festeja solo si el pase vino del link en esta carga: entrar por
       // primera vez es el momento, recargar la página no.
-      apply(token, res, token === tokenDelLink);
+      const delLink = token === tokenDelLink;
+      apply(token, res, delLink);
+      // Con Lemon Squeezy lo normal es volver de la compra por el link, no
+      // pegar el código, así que el canje por link también cuenta.
+      if (res.pass && delLink) track("pass_activated", { via: "link" });
       setChecking(false);
     })();
     return () => {

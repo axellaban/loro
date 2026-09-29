@@ -79,7 +79,7 @@ export default function Terms() {
 
       <h2>Pases y pagos</h2>
       <p>
-        Los pases se compran por MercadoPago o Binance y habilitan uso ilimitado
+        Los pases se compran por Lemon Squeezy y habilitan uso ilimitado
         durante el plazo contratado (7 días o 12 meses). Cada pase vale{" "}
         <strong>para una sola persona y una sola cuenta</strong>: al activarlo
         estando dentro de tu cuenta de Google, queda atado a ella. Compartirlo
