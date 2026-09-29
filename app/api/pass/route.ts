@@ -1,5 +1,12 @@
 import { rateLimit, sameOriginStrict } from "../../lib/ratelimit";
-import { fmtPassExpiry, normalizePassInput, verifyPass } from "../../lib/pass";
+import {
+  createPass,
+  fmtPassExpiry,
+  normalizePassInput,
+  verifyPass,
+  type PassClaims,
+} from "../../lib/pass";
+import { canjearLicencia, esLicenciaLemon } from "../../lib/lemon";
 import { sesionDeRequest } from "../../lib/session";
 import { reclamar } from "../../lib/passStore";
 import * as kv from "../../lib/kv";
@@ -110,40 +117,60 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "Pase inválido." }, { status: 400 });
   }
 
-  const r = await verifyPass(token, secret);
-  if (r.ok) {
-    // Si quien canjea entró con Google, el pase queda atado a esa cuenta: a
-    // partir de acá le sigue a cualquier dispositivo donde entre, y deja de
-    // servirle a quien reenvíe el código.
-    //
-    // Sin sesión no se ata nada y todo funciona como siempre. Es deliberado:
-    // el login es opcional, y quien ya tenía su pase andando no se puede
-    // quedar afuera por un cambio que no pidió.
-    const sesion = await sesionDeRequest(req);
-    if (sesion) {
-      const rec = await reclamar(sesion.sub, token, r.claims.expiresAt);
-      if (!rec.ok) {
-        return Response.json(
-          { ok: false, error: rec.motivo, reason: "claimed" },
-          { status: 403, headers: SIN_CACHE }
-        );
-      }
+  let claims: PassClaims;
+  if (esLicenciaLemon(token)) {
+    // Licencia de Lemon Squeezy: se valida una vez y se canjea por un pase
+    // LORO, que es lo que se devuelve y lo que el navegador guarda.
+    const c = await canjearLicencia(token);
+    if (!c.ok) {
+      return Response.json(
+        { ok: false, error: c.error, reason: "license" },
+        { status: c.status, headers: SIN_CACHE }
+      );
     }
-    return Response.json({
-      ok: true,
-      email: r.claims.email,
-      expiresAt: r.claims.expiresAt,
-      plan: r.claims.plan,
-      // Para que la UI pueda decir "te va a seguir en tus otros dispositivos".
-      atadoACuenta: Boolean(sesion),
-    });
+    claims = c.claims;
+    token = await createPass(claims, secret);
+  } else {
+    const r = await verifyPass(token, secret);
+    if (!r.ok) {
+      // Mensajes distintos por causa: "venció" y "está mal escrito" se
+      // resuelven de maneras muy distintas y la persona ya pagó, así que
+      // merece saber cuál es.
+      const error =
+        r.reason === "expired"
+          ? `Tu pase venció el ${fmtPassExpiry(r.expiredAt || 0)}. Escribime y lo renovamos.`
+          : "Ese pase no es válido. Revisá que lo hayas copiado entero.";
+      return Response.json({ ok: false, error, reason: r.reason }, { status: 400 });
+    }
+    claims = r.claims;
   }
 
-  // Mensajes distintos por causa: "venció" y "está mal escrito" se resuelven
-  // de maneras muy distintas y la persona ya pagó, así que merece saber cuál es.
-  const error =
-    r.reason === "expired"
-      ? `Tu pase venció el ${fmtPassExpiry(r.expiredAt || 0)}. Escribime y lo renovamos.`
-      : "Ese pase no es válido. Revisá que lo hayas copiado entero.";
-  return Response.json({ ok: false, error, reason: r.reason }, { status: 400 });
+  // Si quien canjea entró con Google, el pase queda atado a esa cuenta: a
+  // partir de acá le sigue a cualquier dispositivo donde entre, y deja de
+  // servirle a quien reenvíe el código.
+  //
+  // Sin sesión no se ata nada y todo funciona como siempre. Es deliberado:
+  // el login es opcional, y quien ya tenía su pase andando no se puede
+  // quedar afuera por un cambio que no pidió.
+  const sesion = await sesionDeRequest(req);
+  if (sesion) {
+    const rec = await reclamar(sesion.sub, token, claims.expiresAt);
+    if (!rec.ok) {
+      return Response.json(
+        { ok: false, error: rec.motivo, reason: "claimed" },
+        { status: 403, headers: SIN_CACHE }
+      );
+    }
+  }
+  return Response.json({
+    ok: true,
+    // El pase a guardar. Si entró una licencia, es el pase LORO que le
+    // corresponde; la licencia no se vuelve a mandar nunca más.
+    token,
+    email: claims.email,
+    expiresAt: claims.expiresAt,
+    plan: claims.plan,
+    // Para que la UI pueda decir "te va a seguir en tus otros dispositivos".
+    atadoACuenta: Boolean(sesion),
+  });
 }

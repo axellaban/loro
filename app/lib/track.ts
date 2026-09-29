@@ -56,12 +56,12 @@ export type FunnelEvent =
   | "login_google"
   | "logout"
   | "pass_from_account"
-  // Paso de pago: qué medio elige cada quien y quién vuelve con comprobante.
-  | "pay_mp_week"
-  | "pay_mp_year"
-  | "pay_binance_week"
-  | "pay_binance_year"
-  | "pay_receipt_click"
+  // Paso de pago: abrió el checkout de Lemon Squeezy, pidió un pase sin
+  // checkout por WhatsApp, o pagó y pide ayuda porque no se le activó.
+  | "pay_lemon_week"
+  | "pay_lemon_year"
+  | "pay_whatsapp"
+  | "pay_help_click"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"
@@ -103,18 +103,17 @@ export type FunnelEvent =
  */
 const CONVERSIONES: Partial<Record<FunnelEvent, string>> = {
   // "Compra" en Ads. OJO con el nombre: esto se dispara cuando alguien TOCA
-  // "Pagar", no cuando paga. Entre una cosa y la otra hay un pago afuera y un
-  // WhatsApp, así que el número va a ser más alto que las ventas reales.
+  // "Pagar", no cuando paga. Entre una cosa y la otra hay un checkout afuera,
+  // así que el número va a ser más alto que las ventas reales.
   //
   // Se hace igual a propósito: al arrancar hay muy pocas ventas por mes y
   // Google necesita volumen para optimizar. Cuando haya ventas suficientes,
   // conviene mover esta etiqueta a `pass_activated` —el canje del código, que
   // sí ocurre en el sitio y sí es una compra— y dejar los clicks como una
   // acción aparte de "inicio de pago".
-  pay_mp_week: "I-b6CNiZqN8cEOHJlL1E",
-  pay_mp_year: "I-b6CNiZqN8cEOHJlL1E",
-  pay_binance_week: "I-b6CNiZqN8cEOHJlL1E",
-  pay_binance_year: "I-b6CNiZqN8cEOHJlL1E",
+  pay_lemon_week: "I-b6CNiZqN8cEOHJlL1E",
+  pay_lemon_year: "I-b6CNiZqN8cEOHJlL1E",
+  pay_whatsapp: "I-b6CNiZqN8cEOHJlL1E",
   // El lead: dejó su email para desbloquear el informe del simulador.
   //
   // En Ads la acción quedó configurada como "carga de página", pero eso no
@@ -135,7 +134,7 @@ const ADS_ID = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18381874401").trim(
 /**
  * Identificador que Google usa para no contar dos veces la misma conversión.
  *
- * El problema es concreto: alguien toca "Pagar", se abre MercadoPago, vuelve,
+ * El problema es concreto: alguien toca "Pagar", se abre el checkout, vuelve,
  * duda, toca de nuevo. Sin este id eso son tres compras en el reporte y la
  * campaña optimiza para un número inventado.
  *

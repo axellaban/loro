@@ -158,9 +158,10 @@ export default function Privacidad() {
 
       <h2>Pagos</h2>
       <p>
-        Los pagos se hacen en MercadoPago o Binance. Nunca vemos ni guardamos
-        los datos de tu tarjeta ni de tu billetera: esa información va directo
-        al procesador de pago y no pasa por nosotros.
+        Los pagos se hacen en Lemon Squeezy. Nunca vemos ni guardamos los datos
+        de tu tarjeta: esa información va directo al procesador de pago y no
+        pasa por nosotros. De tu compra solo usamos tu email y la licencia,
+        para activar tu pase.
       </p>
 
       <h2>Tus derechos</h2>

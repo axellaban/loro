@@ -256,25 +256,6 @@ function CalendarIcon() {
   );
 }
 
-/** Mundo, para "resto del mundo". Hay otro GlobeIcon más chico para el menú. */
-function WorldIcon() {
-  return (
-    <svg {...stypeIconProps}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18" />
-    </svg>
-  );
-}
-
-/** Banderita, para la opción de Argentina. */
-function BannerIcon() {
-  return (
-    <svg {...stypeIconProps}>
-      <path d="M5 21V4M5 5h12l-2 3.5L17 12H5" />
-    </svg>
-  );
-}
-
 function DotsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -866,118 +847,88 @@ function PassParty({ pass, onDone }: { pass: ActivePass; onDone: () => void }) {
 }
 
 /**
- * Paso de pago: se elige el pase y acá se elige CÓMO pagarlo.
+ * Paso de pago: se elige el pase y acá se paga, en el checkout de Lemon
+ * Squeezy (tarjeta de cualquier país). La compra genera una licencia y el
+ * botón del checkout y del email del recibo vuelven a la app con ella en el
+ * link, así que el pase se activa solo: sin comprobante ni alta a mano. Se
+ * dice de entrada para que nadie pague y se quede esperando un WhatsApp.
  *
- * Argentina va por Mercado Pago con link directo; el resto del mundo por
- * Binance Pay, cuyo QR todavía se manda a mano. En los dos casos el alta la
- * hace una persona con el comprobante, así que el cierre siempre es WhatsApp —
- * y eso se dice de entrada para que nadie pague esperando un alta automática.
+ * Un pase que todavía no tiene checkout se pide por WhatsApp.
  */
 function PagoPaso({
   plan,
+  email,
   onClose,
   onWhatsApp,
 }: {
   plan: PassPlan;
+  /** Email de la cuenta de Google, si entró: se precarga en el checkout. */
+  email?: string;
   onClose: () => void;
   onWhatsApp: (msg: string) => void;
 }) {
   const p = PLANES[plan];
+  const href = p.checkout ? checkoutUrl(p.checkout, email) : "";
   return (
     <div className="paywall-overlay" onClick={onClose}>
       <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="paywall-close" onClick={onClose} aria-label="Cerrar">
           ✕
         </button>
-        <div className="paywall-title">Elegí cómo pagar</div>
+        <div className="paywall-title">{p.titulo}</div>
         <p className="paywall-text">
-          {p.titulo} — <strong>{p.precio}</strong>
+          <strong>{p.precio}</strong>
         </p>
 
-        {/* El nombre del método está en el badge, así que el botón solo dice
-            "Pagar": repetirlo era ruido en una tarjeta que ya se entiende. */}
         <div className="stype-card">
           <div className="stype-head">
             <span className="stype-name">
-              <BannerIcon /> Argentina
+              <CardIcon /> {href ? "Tarjeta, desde cualquier país" : "Te paso el link de pago"}
             </span>
-            <span className="stype-badge">Mercado Pago</span>
+            <span className="stype-badge">{href ? "Lemon Squeezy" : "WhatsApp"}</span>
           </div>
-          <a
-            className="btn-action btn-primary"
-            href={p.mercadoPago}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() =>
-              track(plan === "week" ? "pay_mp_week" : "pay_mp_year", { value: p.valor })
-            }
-          >
-            Pagar
-          </a>
-        </div>
-
-        <div className="stype-card">
-          <div className="stype-head">
-            <span className="stype-name">
-              <WorldIcon /> Resto del mundo
-            </span>
-            <span className="stype-badge">Binance Pay</span>
-          </div>
-          {p.binance ? (
-            <>
-              <a
-                className="btn-action btn-primary"
-                href={p.binance.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() =>
-                  track(plan === "week" ? "pay_binance_week" : "pay_binance_year", {
-                    value: p.valor,
-                  })
-                }
-              >
-                Pagar
-              </a>
-              {/* Imagen normal y no next/image: es un QR chico y estático, y así
-                  se puede tocar y guardar para escanearlo desde la galería.
-                  Sirve para quien está en la compu; en el celular el botón de
-                  arriba abre la app directo. */}
-              <img
-                className="pago-qr"
-                src={p.binance.qr}
-                alt="QR de Binance Pay para pagar el pase"
-              />
-              <p className="paywall-fineprint pago-qr-nota">o escaneá el QR</p>
-            </>
+          {href ? (
+            <a
+              className="btn-action btn-primary"
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                track(plan === "week" ? "pay_lemon_week" : "pay_lemon_year", { value: p.valor })
+              }
+            >
+              Pagar
+            </a>
           ) : (
             <button
-              className="btn-action btn-outline"
+              className="btn-action btn-primary"
               onClick={() => {
-                track(plan === "week" ? "pay_binance_week" : "pay_binance_year", {
-                  value: p.valor,
-                });
-                onWhatsApp(`${p.wa} Pago desde afuera de Argentina, ¿me pasás el QR de Binance?`);
+                track("pay_whatsapp", { plan, value: p.valor });
+                onWhatsApp(p.wa);
               }}
             >
-              Pedime el QR por WhatsApp
+              Pedímelo por WhatsApp
             </button>
           )}
         </div>
 
-        <p className="paywall-fineprint pago-nota">
-          Cuando pagues, mandame el comprobante por{" "}
-          <a
-            href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
-              `${p.wa} Ya pagué, te mando el comprobante.`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => track("pay_receipt_click")}
-          >
-            WhatsApp
-          </a>{" "}
-          y te activo en minutos.
-        </p>
+        {href && (
+          <p className="paywall-fineprint pago-nota">
+            Al pagar te llega tu licencia por email. Tocá el botón de la confirmación o del email y
+            el pase se activa solo. ¿Algún problema? Escribime por{" "}
+            <a
+              href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
+                `${p.wa} Ya pagué pero no se me activó.`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track("pay_help_click")}
+            >
+              WhatsApp
+            </a>
+            .
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1095,14 +1046,19 @@ const SESSION_MAX_MIN = Math.round(SESSION_MAX_MS / 60000);
 const WA_NUMBER = "5491164090022";
 const PASS_WEEK_PRICE = "$19.99 USD";
 const PASS_YEAR_PRICE = "$89 USD";
+/**
+ * El pase de 12 meses queda oculto hasta que tenga su producto en Lemon
+ * Squeezy: por ahora se vende solo el de 7 días. Volver a mostrarlo es poner
+ * esto en true (y sumar su checkout en PLANES y su producto en lib/lemon.ts).
+ */
+const MOSTRAR_PASE_ANUAL = false;
 
 type PassPlan = "week" | "year";
 
 /**
- * Cómo se cobra cada pase. Argentina va por Mercado Pago (link directo); el
- * resto del mundo por Binance Pay, cuyo QR todavía mando a mano por WhatsApp.
- * En los dos casos el alta la hago yo con el comprobante, así que el último
- * paso siempre es el chat.
+ * Cómo se cobra cada pase: un checkout de Lemon Squeezy por plan. La licencia
+ * que genera la compra la canjea /api/pass por un pase LORO (ver
+ * app/lib/lemon.ts, donde también está qué producto es cada plan).
  */
 type Plan = {
   titulo: string;
@@ -1114,14 +1070,8 @@ type Plan = {
    * pase de 7 días que al de 12 meses, que valen muy distinto.
    */
   valor: number;
-  mercadoPago: string;
-  /**
-   * Binance Pay. `url` es lo que codifica el QR: en el celular abre la app
-   * directo, que es mejor que pedirle a alguien que escanee su propia
-   * pantalla. `qr` queda para quien está en la compu y escanea con el teléfono.
-   * Sin esto todavía, se pide por WhatsApp.
-   */
-  binance?: { url: string; qr: string };
+  /** Link de compra de Lemon Squeezy. Sin esto todavía, se pide por WhatsApp. */
+  checkout?: string;
   wa: string;
 };
 
@@ -1130,18 +1080,31 @@ const PLANES: Record<PassPlan, Plan> = {
     titulo: "Pase Rey Loro Ilimitado (7 días)",
     precio: PASS_WEEK_PRICE,
     valor: 19.99,
-    mercadoPago: "https://mpago.la/1MWT5P9",
-    binance: { url: "https://app.binance.com/uni-qr/XARJMtuK", qr: "/binance-qr-semanal.png" },
+    checkout: "https://ia-lab.lemonsqueezy.com/checkout/buy/63f21da5-cf9b-4327-9980-922f2bc86bc5",
     wa: `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`,
   },
   year: {
     titulo: "Pase de 12 meses",
     precio: PASS_YEAR_PRICE,
     valor: 89,
-    mercadoPago: "https://mpago.la/2zYVxoM",
     wa: `Hey Loro creador! Quiero el pase de 12 meses (${PASS_YEAR_PRICE}), estoy super tranqui que voy a conseguir el mejor trabajo. ¿Cómo avanzo Loro?`,
   },
 };
+
+/**
+ * Con la cuenta de Google adentro, el checkout ya viene con su email: la
+ * licencia (y el pase) quedan a nombre del mismo email que la cuenta.
+ */
+function checkoutUrl(base: string, email?: string): string {
+  if (!email) return base;
+  try {
+    const u = new URL(base);
+    u.searchParams.set("checkout[email]", email);
+    return u.toString();
+  } catch {
+    return base;
+  }
+}
 
 /**
  * Achica una imagen a 1280px de ancho y la codifica en JPEG, devolviendo el
@@ -1883,8 +1846,7 @@ export default function Page() {
     return false;
   }, [company, role]);
 
-  // Elegir un pase abre el paso de pago (Mercado Pago / Binance). El alta la
-  // hago yo a mano con el comprobante, así que el último paso es WhatsApp.
+  // Elegir un pase abre el paso de pago (checkout de Lemon Squeezy).
   const requestPass = useCallback((plan: PassPlan) => {
     track(plan === "week" ? "pass_week_click" : "pass_year_click");
     setPayPlan(plan);
@@ -3420,8 +3382,8 @@ export default function Page() {
               className="form-input"
               value={passInput}
               onChange={(e) => setPassInput(e.target.value)}
-              placeholder="Pegá tu código o el link del pase"
-              aria-label="Código o link de tu pase"
+              placeholder="Pegá tu licencia, tu código o el link del pase"
+              aria-label="Licencia, código o link de tu pase"
               autoFocus
             />
             <button
@@ -3446,7 +3408,12 @@ export default function Page() {
           se llega tanto desde el paywall como desde el selector de tipo de
           sesión, y metido adentro de uno solo no aparecía desde el otro. */}
       {payPlan && (
-        <PagoPaso plan={payPlan} onClose={() => setPayPlan(null)} onWhatsApp={openWhatsApp} />
+        <PagoPaso
+          plan={payPlan}
+          email={auth.cuenta?.email}
+          onClose={() => setPayPlan(null)}
+          onWhatsApp={openWhatsApp}
+        />
       )}
 
       {showPaywall && !payPlan && (
@@ -3526,22 +3493,24 @@ export default function Page() {
                   </p>
                 </div>
 
-                <div className="stype-card">
-                  <div className="stype-head">
-                    <span className="stype-name">
-                      <CalendarIcon /> Pase de 12 meses
-                    </span>
-                    <span className="stype-badge">{PASS_YEAR_PRICE}</span>
+                {MOSTRAR_PASE_ANUAL && (
+                  <div className="stype-card">
+                    <div className="stype-head">
+                      <span className="stype-name">
+                        <CalendarIcon /> Pase de 12 meses
+                      </span>
+                      <span className="stype-badge">{PASS_YEAR_PRICE}</span>
+                    </div>
+                    <p className="paywall-text">
+                      🦜 ¿Búsqueda larga? Está a ese precio porque Loreado recién arranca y los
+                      primeros que pagan son los que me van a decir qué arreglar. Cuando salga de
+                      beta, los precios to the 🌙.
+                    </p>
+                    <button className="btn-action btn-outline" onClick={() => requestPass("year")}>
+                      Internaron al Loro, Internaron al Loro, Internaron al Loro
+                    </button>
                   </div>
-                  <p className="paywall-text">
-                    🦜 ¿Búsqueda larga? Está a ese precio porque Loreado recién arranca y los
-                    primeros que pagan son los que me van a decir qué arreglar. Cuando salga de
-                    beta, los precios to the 🌙.
-                  </p>
-                  <button className="btn-action btn-outline" onClick={() => requestPass("year")}>
-                    Internaron al Loro, Internaron al Loro, Internaron al Loro
-                  </button>
-                </div>
+                )}
               </>
             )}
           </div>
