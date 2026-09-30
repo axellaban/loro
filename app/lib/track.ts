@@ -79,7 +79,7 @@ export type FunnelEvent =
   | "sim_email_submit"
   // Informe desbloqueado entrando con Google en vez de tipear el email.
   | "sim_google_unlock"
-  // Pedido de semillita (aporte) que congela la entrevista al arrancar.
+  // Pedido de semillita (aporte) antes de arrancar la entrevista del simulador.
   | "sim_donation_shown"
   | "sim_donation_click"
   | "sim_donation_skip"

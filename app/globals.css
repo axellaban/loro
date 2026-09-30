@@ -2974,7 +2974,16 @@ a.btn-action {
   box-sizing: border-box;
 }
 
-/* Semillita del simulador: el aporte arriba, seguir sin aportar abajo. */
+/* Semillita del simulador: el aporte arriba, seguir sin aportar abajo. La
+   tarjeta es la referencia de la ✕, que si no se va a la esquina de la pantalla. */
+.paywall.semilla {
+  position: relative;
+}
+.paywall.semilla .paywall-close {
+  top: 12px;
+  right: 12px;
+}
+
 .semilla-botones {
   display: flex;
   flex-direction: column;
@@ -3066,6 +3075,12 @@ a.btn-action {
     font-size: 11px;
     padding: 5px 10px;
     gap: 6px;
+  }
+  /* Aun achicada no entra al lado del logo en 390px (iPhone 12 a 15): baja a
+     su propia línea en vez de ensanchar la página, que dejaba scroll de costado
+     y descentraba los carteles que se abren encima. */
+  .brand-header:has(.sim-social-pill) {
+    flex-wrap: wrap;
   }
 }
 .sim-social-dot {

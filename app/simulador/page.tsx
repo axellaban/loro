@@ -495,12 +495,11 @@ function buildDgUrl(sttLang: string): string {
 const LS_KEY_CONTEXT = "simulador:context:v1";
 
 /**
- * Pedido de aporte: a los pocos segundos de que la Lora arranca la primera
- * pregunta, la entrevista se congela y aparece la semillita. Tiene que ser con
- * la Lora ya hablando —cuando la persona vio que funciona—, no antes.
+ * Pedido de aporte (semillita) al tocar "Soltar el Loro", antes de que arranque
+ * la entrevista. Es opcional: "Continuar sin donar" arranca igual. Va antes y no
+ * durante a propósito, para no tocar el audio ni la transcripción en vivo.
  */
 const SEMILLA_URL = "https://ia-lab.lemonsqueezy.com/checkout/buy/43592995-9957-4a8d-9bf6-33b9e372b5e9?discount=0";
-const SEMILLA_MS = 2500;
 /** Quien ya aportó no lo vuelve a ver en este navegador. */
 const LS_KEY_SEMILLA = "simulador:semilla:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";
@@ -601,14 +600,6 @@ export default function SimuladorPage() {
   const [spokenQuestion, setSpokenQuestion] = useState("");
   const spokenBaseRef = useRef("");
   const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Lo que falta revelar de la oración en curso. Vive aparte del timer para
-  // poder pausarlo mientras la entrevista está congelada y seguir donde quedó.
-  const revealRef = useRef<{ base: string; words: string[]; i: number; stepMs: number } | null>(null);
-  // Semillita: "abierta" congela la entrevista; "gracias" es después de aportar.
-  const [semilla, setSemilla] = useState<"cerrada" | "abierta" | "gracias">("cerrada");
-  const congeladoRef = useRef(false);
-  const semillaVistaRef = useRef(false);
-  const semillaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const currentAnswerRef = useRef("");
@@ -754,31 +745,10 @@ export default function SimuladorPage() {
 
   // ---------- Timers del turno ----------
 
-  const pauseRevealTimer = () => {
+  const clearRevealTimer = () => {
     if (revealTimerRef.current) {
       clearInterval(revealTimerRef.current);
       revealTimerRef.current = null;
-    }
-  };
-
-  const clearRevealTimer = () => {
-    pauseRevealTimer();
-    revealRef.current = null;
-  };
-
-  const tickReveal = () => {
-    const r = revealRef.current;
-    if (!r) return;
-    r.i += 1;
-    const partial = r.words.slice(0, r.i).join(" ");
-    setSpokenQuestion(r.base ? `${r.base} ${partial}` : partial);
-    if (r.i >= r.words.length) clearRevealTimer();
-  };
-
-  const resumeRevealTimer = () => {
-    const r = revealRef.current;
-    if (r && !revealTimerRef.current && r.i < r.words.length) {
-      revealTimerRef.current = setInterval(tickReveal, r.stepMs);
     }
   };
 
@@ -791,8 +761,13 @@ export default function SimuladorPage() {
     if (!words.length) return;
     setSpokenQuestion(base);
     const stepMs = Math.max(40, (durationSec * 1000) / (words.length + 1));
-    revealRef.current = { base, words, i: 0, stepMs };
-    if (!congeladoRef.current) resumeRevealTimer();
+    let i = 0;
+    revealTimerRef.current = setInterval(() => {
+      i += 1;
+      const partial = words.slice(0, i).join(" ");
+      setSpokenQuestion(base ? `${base} ${partial}` : partial);
+      if (i >= words.length) clearRevealTimer();
+    }, stepMs);
   };
 
   const clearTurnTimers = () => {
@@ -1085,11 +1060,6 @@ export default function SimuladorPage() {
       if (speakFailsafeRef.current) clearTimeout(speakFailsafeRef.current);
       speakFailsafeRef.current = setTimeout(() => {
         speakFailsafeRef.current = null;
-        // Con la entrevista congelada el audio no avanza: no es que se colgó.
-        if (congeladoRef.current) {
-          armSpeakFailsafe(ms);
-          return;
-        }
         if (phaseRef.current === "asking" || phaseRef.current === "speaking") {
           queue.stop();
           clearRevealTimer();
@@ -1283,12 +1253,6 @@ export default function SimuladorPage() {
     intentionalCloseRef.current = true;
     clearTurnTimers();
     clearRevealTimer();
-    if (semillaTimerRef.current) {
-      clearTimeout(semillaTimerRef.current);
-      semillaTimerRef.current = null;
-    }
-    congeladoRef.current = false;
-    setSemilla("cerrada");
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -1451,6 +1415,44 @@ export default function SimuladorPage() {
     return false;
   };
 
+  // ---------- Semillita ----------
+
+  const [semilla, setSemilla] = useState<"cerrada" | "abierta" | "gracias">("cerrada");
+
+  useEffect(() => {
+    // Cargado de antemano: así el primer "Donar" ya abre el checkout acá mismo.
+    precargarCheckout();
+    return alComprar(() => {
+      track("sim_donation_success");
+      try {
+        localStorage.setItem(LS_KEY_SEMILLA, String(Date.now()));
+      } catch {}
+      setSemilla((s) => (s === "abierta" ? "gracias" : s));
+    });
+  }, []);
+
+  const pedirArranque = () => {
+    // Primero lo obligatorio: sin empresa y puesto no tiene sentido pedir nada.
+    if (!marcarFaltantes()) return;
+    let yaAporto = false;
+    try {
+      yaAporto = Boolean(localStorage.getItem(LS_KEY_SEMILLA));
+    } catch {}
+    if (yaAporto) {
+      void startSimulation();
+      return;
+    }
+    setSemilla("abierta");
+    track("sim_donation_shown");
+  };
+
+  // Lo llama un click (seguir o empezar), así que el pedido de micrófono y el
+  // audio arrancan con el mismo permiso del navegador que con el botón original.
+  const arrancarDesdeSemilla = () => {
+    setSemilla("cerrada");
+    void startSimulation();
+  };
+
   const startSimulation = async () => {
     // Empresa y puesto son obligatorios: sin eso las preguntas salen genéricas
     // y la simulación no sirve.
@@ -1475,8 +1477,6 @@ export default function SimuladorPage() {
     // Arranca una entrevista nueva: el informe que salga de acá es nuevo, así
     // que vuelve a regir el gate (esto solo se saltea al reabrir uno guardado).
     setViewingSavedReport(false);
-    semillaVistaRef.current = false;
-    precargarCheckout();
     sessionLangRef.current = lang;
     intentionalCloseRef.current = false;
     reconnectAttemptsRef.current = 0;
@@ -1566,53 +1566,6 @@ export default function SimuladorPage() {
     }
   };
 
-  // ---------- Semillita ----------
-
-  const congelar = () => {
-    congeladoRef.current = true;
-    // Suspender el contexto de audio frena la voz de la Lora donde está, y al
-    // reanudar sigue desde ahí. El mic igual no transmite mientras ella habla.
-    audioCtxRef.current?.suspend().catch(() => {});
-    pauseRevealTimer();
-    setSemilla("abierta");
-    track("sim_donation_shown");
-  };
-
-  const descongelar = () => {
-    congeladoRef.current = false;
-    setSemilla("cerrada");
-    audioCtxRef.current?.resume().catch(() => {});
-    resumeRevealTimer();
-  };
-
-  // Una vez por entrevista, a los SEMILLA_MS de que la Lora empieza a hablar.
-  useEffect(() => {
-    if (phase !== "speaking" || semillaVistaRef.current || history.length > 0) return;
-    semillaVistaRef.current = true;
-    try {
-      if (localStorage.getItem(LS_KEY_SEMILLA)) return;
-    } catch {}
-    semillaTimerRef.current = setTimeout(() => {
-      semillaTimerRef.current = null;
-      // Si ya terminó de hablar no se congela: con el mic abierto cortaría la
-      // respuesta de la persona.
-      const ph = phaseRef.current;
-      if (ph === "asking" || ph === "speaking") congelar();
-    }, SEMILLA_MS);
-  }, [phase, history.length]);
-
-  useEffect(
-    () =>
-      alComprar(() => {
-        track("sim_donation_success");
-        try {
-          localStorage.setItem(LS_KEY_SEMILLA, String(Date.now()));
-        } catch {}
-        setSemilla((s) => (s === "abierta" ? "gracias" : s));
-      }),
-    []
-  );
-
   // Re-adquirir wake lock al volver de background durante la entrevista.
   useEffect(() => {
     const onVis = () => {
@@ -1626,7 +1579,7 @@ export default function SimuladorPage() {
           .catch(() => {});
         // En mobile el AudioContext queda suspended al bloquear/cambiar de app;
         // sin resume, al volver el Loro no habla ni escucha (mismo ctx para TTS y STT).
-        if (audioCtxRef.current?.state === "suspended" && !congeladoRef.current) {
+        if (audioCtxRef.current?.state === "suspended") {
           audioCtxRef.current.resume().catch(() => {});
         }
       }
@@ -1951,7 +1904,7 @@ export default function SimuladorPage() {
           </div>
 
           <footer className="sim-setup-footer">
-            <button onClick={() => void startSimulation()} className="btn-action btn-primary">
+            <button onClick={pedirArranque} className="btn-action btn-primary">
               ▶ Soltar el Loro (Crear Sesión)
             </button>
             {savedReport && (
@@ -1968,6 +1921,74 @@ export default function SimuladorPage() {
               </button>
             )}
           </footer>
+
+          {semilla !== "cerrada" && (
+            <div className="paywall-overlay" onClick={() => setSemilla("cerrada")}>
+              <div
+                className="paywall semilla"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="semilla-titulo"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="paywall-close"
+                  onClick={() => setSemilla("cerrada")}
+                  aria-label="Cerrar"
+                >
+                  ✕
+                </button>
+                {semilla === "gracias" ? (
+                  <>
+                    <div className="paywall-title" id="semilla-titulo">
+                      ¡Gracias por la semillita! 🦜
+                    </div>
+                    <p className="paywall-text">La Lora te lo agradece. Vamos con tu entrevista.</p>
+                    <div className="semilla-botones">
+                      <button className="btn-action btn-primary" onClick={arrancarDesdeSemilla}>
+                        Empezar la entrevista
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="paywall-title" id="semilla-titulo">
+                      Este simulador es gratuito
+                    </div>
+                    <p className="paywall-text">Pero… la Lora vive de semillitas</p>
+                    <p className="paywall-text">
+                      Con tu aporte podés ayudar a pagar sus cuentas (LLM, API transcript, API Voice,
+                      Hosting)
+                    </p>
+                    <div className="semilla-botones">
+                      <a
+                        className="btn-action btn-primary"
+                        href={SEMILLA_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          track("sim_donation_click");
+                          if (abrirCheckoutEnSitio(SEMILLA_URL)) e.preventDefault();
+                        }}
+                      >
+                        Donar Semilla para Loro 🦜
+                      </a>
+                      <button
+                        className="btn-action btn-outline"
+                        onClick={() => {
+                          track("sim_donation_skip");
+                          arrancarDesdeSemilla();
+                        }}
+                      >
+                        Continuar sin donar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -2031,69 +2052,10 @@ export default function SimuladorPage() {
             </div>
           )}
 
-          {semilla !== "cerrada" && (
-            <div className="paywall-overlay">
-              <div className="paywall semilla" role="dialog" aria-modal="true" aria-labelledby="semilla-titulo">
-                {semilla === "gracias" ? (
-                  <>
-                    <div className="paywall-title" id="semilla-titulo">
-                      ¡Gracias por la semillita! 🦜
-                    </div>
-                    <p className="paywall-text">La Lora te lo agradece. Sigamos con tu entrevista.</p>
-                    <div className="semilla-botones">
-                      <button className="btn-action btn-primary" onClick={descongelar}>
-                        Seguir con la entrevista
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="paywall-title" id="semilla-titulo">
-                      Este simulador es gratuito
-                    </div>
-                    <p className="paywall-text">Pero… la Lora vive de semillitas</p>
-                    <p className="paywall-text">
-                      Con tu aporte podés ayudar a pagar sus cuentas (LLM, API transcript, API Voice,
-                      Hosting)
-                    </p>
-                    <div className="semilla-botones">
-                      <a
-                        className="btn-action btn-primary"
-                        href={SEMILLA_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => {
-                          track("sim_donation_click");
-                          if (abrirCheckoutEnSitio(SEMILLA_URL)) e.preventDefault();
-                        }}
-                      >
-                        Donar Semilla para Loro 🦜
-                      </a>
-                      <button
-                        className="btn-action btn-outline"
-                        onClick={() => {
-                          track("sim_donation_skip");
-                          descongelar();
-                        }}
-                      >
-                        Continuar sin donar
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="sim-room-grid">
             <section className="sim-room-left">
               <div className="sim-stage">
-                <Avatar
-                  state={avatarState}
-                  analyser={analyser}
-                  micAnalyser={micAnalyser}
-                  congelado={semilla !== "cerrada"}
-                />
+                <Avatar state={avatarState} analyser={analyser} micAnalyser={micAnalyser} />
                 <DiagnosticoSesion
                   phase={phase}
                   wsRef={wsRef}
