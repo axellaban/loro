@@ -41,6 +41,9 @@ si no vas a ver ruido de módulos faltantes que no tiene que ver con tu cambio).
   (`app/lib/lemon.ts`): valida la licencia contra la License API (tienda y producto
   hardcodeados ahí) y devuelve el pase LORO equivalente, que es lo que guarda el navegador.
   El checkout de cada plan está en `PLANES` de `app/app/page.tsx`.
+- `app/lib/lemonCheckout.ts` — abre el checkout de Lemon Squeezy en overlay (lemon.js), sin
+  salir del sitio. Lo usan el pase del copiloto y la semillita (aporte) del simulador; si
+  lemon.js no carga, el link abre el checkout en otra pestaña.
 - `app/lib/ratelimit.ts` — rate limiting in-memory, guard de same-origin estricto, y
   `capacityClosed()` (kill switch global).
 - `app/lib/track.ts` — wrapper de analytics (`track()`, `identify()`), fail-safe (nunca

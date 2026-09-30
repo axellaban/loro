@@ -14,6 +14,7 @@ import { usePass, storedPassToken, type ActivePass } from "../lib/passClient";
 import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import { PASS_HEADER, fmtPassExpiry } from "../lib/pass";
 import { Markdown } from "../lib/Markdown";
+import { abrirCheckoutEnSitio, alComprar, precargarCheckout } from "../lib/lemonCheckout";
 
 // Recorta el buffer acumulado a lo que se MUESTRA en la tarjeta "Pregunta":
 // las últimas 1-2 oraciones. Si la última ya es una pregunta cerrada (termina
@@ -869,6 +870,9 @@ function PagoPaso({
 }) {
   const p = PLANES[plan];
   const href = p.checkout ? checkoutUrl(p.checkout, email) : "";
+  useEffect(() => {
+    precargarCheckout();
+  }, []);
   return (
     <div className="paywall-overlay" onClick={onClose}>
       <div className="paywall paywall-wide" onClick={(e) => e.stopPropagation()}>
@@ -893,9 +897,12 @@ function PagoPaso({
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() =>
-                track(plan === "week" ? "pay_lemon_week" : "pay_lemon_year", { value: p.valor })
-              }
+              onClick={(e) => {
+                track(plan === "week" ? "pay_lemon_week" : "pay_lemon_year", { value: p.valor });
+                // Checkout adentro de Loreado. Si lemon.js no cargó, el link
+                // sigue su curso y abre otra pestaña.
+                if (abrirCheckoutEnSitio(href)) e.preventDefault();
+              }}
             >
               Pagar
             </a>
@@ -1092,14 +1099,15 @@ const PLANES: Record<PassPlan, Plan> = {
 };
 
 /**
- * Con la cuenta de Google adentro, el checkout ya viene con su email: la
- * licencia (y el pase) quedan a nombre del mismo email que la cuenta.
+ * Link del checkout, sin el campo de cupón (no hay cupones y distrae). Con la
+ * cuenta de Google adentro ya viene con su email: la licencia (y el pase)
+ * quedan a nombre del mismo email que la cuenta.
  */
 function checkoutUrl(base: string, email?: string): string {
-  if (!email) return base;
   try {
     const u = new URL(base);
-    u.searchParams.set("checkout[email]", email);
+    u.searchParams.set("discount", "0");
+    if (email) u.searchParams.set("checkout[email]", email);
     return u.toString();
   } catch {
     return base;
@@ -1849,8 +1857,29 @@ export default function Page() {
   // Elegir un pase abre el paso de pago (checkout de Lemon Squeezy).
   const requestPass = useCallback((plan: PassPlan) => {
     track(plan === "week" ? "pass_week_click" : "pass_year_click");
+    precargarCheckout();
     setPayPlan(plan);
   }, []);
+
+  /**
+   * Compra completada en el overlay. La licencia la genera Lemon Squeezy unos
+   * segundos después y llega por email, así que no se puede activar acá mismo:
+   * se cierra el paso de pago y se deja abierto el campo para pegarla, con el
+   * aviso de dónde buscarla.
+   */
+  const [pagoHecho, setPagoHecho] = useState(false);
+  useEffect(
+    () =>
+      alComprar(() => {
+        track("pay_lemon_success");
+        setPayPlan(null);
+        setShowPaywall(false);
+        setShowSessionType(false);
+        setPagoHecho(true);
+        setPassOpen(true);
+      }),
+    []
+  );
 
   const openWhatsApp = useCallback((msg: string) => {
     try {
@@ -3363,6 +3392,12 @@ export default function Page() {
         {/* El canje manual sale de la fila: necesita ancho completo y solo
             aparece cuando alguien lo pide. Lo normal es entrar por el link, que
             lo canjea solo; esto es la red por si copió únicamente el código. */}
+        {showSetup && !pass && pagoHecho && (
+          <p className="pass-pago-ok">
+            ¡Pago confirmado! 🦜 Tu licencia te llega por email en un minuto: tocá{" "}
+            <strong>Activar mi pase</strong> en el email o pegala acá abajo.
+          </p>
+        )}
         {showSetup && !pass && passOpen && (
           <form
             className="pass-form"

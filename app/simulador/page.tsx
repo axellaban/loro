@@ -8,6 +8,7 @@ import { BrandLogo } from "../lib/BrandLogo";
 import { rememberEmail, savedEmail } from "../lib/email";
 import { useAuth, EntrarConGoogle } from "../lib/authClient";
 import { MODELS, VISIBLE_MODELS, DEFAULT_MODEL_ID, isSelectable, type Provider } from "../lib/models";
+import { abrirCheckoutEnSitio, alComprar, precargarCheckout } from "../lib/lemonCheckout";
 
 type Line = { id: number; text: string; final: boolean };
 type Lang = "es" | "en";
@@ -492,6 +493,15 @@ function buildDgUrl(sttLang: string): string {
 }
 
 const LS_KEY_CONTEXT = "simulador:context:v1";
+
+/**
+ * Pedido de aporte (semillita) al tocar "Soltar el Loro", antes de que arranque
+ * la entrevista. Es opcional: "Continuar sin donar" arranca igual. Va antes y no
+ * durante a propósito, para no tocar el audio ni la transcripción en vivo.
+ */
+const SEMILLA_URL = "https://ia-lab.lemonsqueezy.com/checkout/buy/43592995-9957-4a8d-9bf6-33b9e372b5e9?discount=0";
+/** Quien ya aportó no lo vuelve a ver en este navegador. */
+const LS_KEY_SEMILLA = "simulador:semilla:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";
 
 
@@ -1405,6 +1415,44 @@ export default function SimuladorPage() {
     return false;
   };
 
+  // ---------- Semillita ----------
+
+  const [semilla, setSemilla] = useState<"cerrada" | "abierta" | "gracias">("cerrada");
+
+  useEffect(() => {
+    // Cargado de antemano: así el primer "Donar" ya abre el checkout acá mismo.
+    precargarCheckout();
+    return alComprar(() => {
+      track("sim_donation_success");
+      try {
+        localStorage.setItem(LS_KEY_SEMILLA, String(Date.now()));
+      } catch {}
+      setSemilla((s) => (s === "abierta" ? "gracias" : s));
+    });
+  }, []);
+
+  const pedirArranque = () => {
+    // Primero lo obligatorio: sin empresa y puesto no tiene sentido pedir nada.
+    if (!marcarFaltantes()) return;
+    let yaAporto = false;
+    try {
+      yaAporto = Boolean(localStorage.getItem(LS_KEY_SEMILLA));
+    } catch {}
+    if (yaAporto) {
+      void startSimulation();
+      return;
+    }
+    setSemilla("abierta");
+    track("sim_donation_shown");
+  };
+
+  // Lo llama un click (seguir o empezar), así que el pedido de micrófono y el
+  // audio arrancan con el mismo permiso del navegador que con el botón original.
+  const arrancarDesdeSemilla = () => {
+    setSemilla("cerrada");
+    void startSimulation();
+  };
+
   const startSimulation = async () => {
     // Empresa y puesto son obligatorios: sin eso las preguntas salen genéricas
     // y la simulación no sirve.
@@ -1856,7 +1904,7 @@ export default function SimuladorPage() {
           </div>
 
           <footer className="sim-setup-footer">
-            <button onClick={() => void startSimulation()} className="btn-action btn-primary">
+            <button onClick={pedirArranque} className="btn-action btn-primary">
               ▶ Soltar el Loro (Crear Sesión)
             </button>
             {savedReport && (
@@ -1873,6 +1921,74 @@ export default function SimuladorPage() {
               </button>
             )}
           </footer>
+
+          {semilla !== "cerrada" && (
+            <div className="paywall-overlay" onClick={() => setSemilla("cerrada")}>
+              <div
+                className="paywall semilla"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="semilla-titulo"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="paywall-close"
+                  onClick={() => setSemilla("cerrada")}
+                  aria-label="Cerrar"
+                >
+                  ✕
+                </button>
+                {semilla === "gracias" ? (
+                  <>
+                    <div className="paywall-title" id="semilla-titulo">
+                      ¡Gracias por la semillita! 🦜
+                    </div>
+                    <p className="paywall-text">La Lora te lo agradece. Vamos con tu entrevista.</p>
+                    <div className="semilla-botones">
+                      <button className="btn-action btn-primary" onClick={arrancarDesdeSemilla}>
+                        Empezar la entrevista
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="paywall-title" id="semilla-titulo">
+                      Este simulador es gratuito
+                    </div>
+                    <p className="paywall-text">Pero… la Lora vive de semillitas</p>
+                    <p className="paywall-text">
+                      Con tu aporte podés ayudar a pagar sus cuentas (LLM, API transcript, API Voice,
+                      Hosting)
+                    </p>
+                    <div className="semilla-botones">
+                      <a
+                        className="btn-action btn-primary"
+                        href={SEMILLA_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          track("sim_donation_click");
+                          if (abrirCheckoutEnSitio(SEMILLA_URL)) e.preventDefault();
+                        }}
+                      >
+                        Donar Semilla para Loro 🦜
+                      </a>
+                      <button
+                        className="btn-action btn-outline"
+                        onClick={() => {
+                          track("sim_donation_skip");
+                          arrancarDesdeSemilla();
+                        }}
+                      >
+                        Continuar sin donar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
