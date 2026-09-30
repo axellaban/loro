@@ -62,6 +62,8 @@ export type FunnelEvent =
   | "pay_lemon_year"
   | "pay_whatsapp"
   | "pay_help_click"
+  // Compra completada en el checkout embebido (overlay de Lemon Squeezy).
+  | "pay_lemon_success"
   | "sim_session_start"
   | "sim_question_asked"
   | "sim_answer_closed"
@@ -77,6 +79,11 @@ export type FunnelEvent =
   | "sim_email_submit"
   // Informe desbloqueado entrando con Google en vez de tipear el email.
   | "sim_google_unlock"
+  // Pedido de semillita (aporte) que congela la entrevista al arrancar.
+  | "sim_donation_shown"
+  | "sim_donation_click"
+  | "sim_donation_skip"
+  | "sim_donation_success"
   | "hub_practice_click"
   | "hub_copilot_click";
 

@@ -55,11 +55,14 @@ export default function Avatar({
   state,
   analyser,
   micAnalyser = null,
+  congelado = false,
 }: {
   state: AvatarState;
   analyser: AnalyserNode | null;
   /** Nivel del micrófono del usuario: hace latir el anillo mientras responde. */
   micAnalyser?: AnalyserNode | null;
+  /** Entrevista en pausa (pedido de semillita): los clips se quedan quietos. */
+  congelado?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const talkRef = useRef<HTMLVideoElement | null>(null);
@@ -137,6 +140,11 @@ export default function Avatar({
     if (videoFailed) return;
     const talk = talkRef.current;
     const idle = idleRef.current;
+    if (congelado) {
+      talk?.pause();
+      idle?.pause();
+      return;
+    }
     idle?.play().catch(() => {});
     if (speaking) {
       talk?.play().catch(() => {
@@ -146,7 +154,7 @@ export default function Avatar({
     }
     const timer = setTimeout(() => talk?.pause(), FADE_MS + 150);
     return () => clearTimeout(timer);
-  }, [speaking, videoFailed, talkSrc, idleSrc]);
+  }, [speaking, videoFailed, talkSrc, idleSrc, congelado]);
 
 
   // El anillo late con la voz real del usuario. Solo en `listening`: así no

@@ -1637,6 +1637,15 @@ input {
   gap: 8px;
 }
 
+/* Aviso después de pagar en el checkout embebido: dónde está la licencia. */
+.pass-pago-ok {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  text-align: center;
+}
+
 /* ---- Entrar con Google: el pase deja de estar atado al navegador ---- */
 /* Entrar con Google: se ve solo la G. El botón real de Google va invisible
    justo encima, así el click y el teclado siguen yendo a él. */
@@ -2963,6 +2972,14 @@ a.btn-action {
   justify-content: center;
   text-decoration: none;
   box-sizing: border-box;
+}
+
+/* Semillita del simulador: el aporte arriba, seguir sin aportar abajo. */
+.semilla-botones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 /* Nota de cómo se activa el pase: separada del botón, con el link marcado. */
