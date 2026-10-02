@@ -499,7 +499,8 @@ const LS_KEY_CONTEXT = "simulador:context:v1";
  * la entrevista. Es opcional: "Continuar sin donar" arranca igual. Va antes y no
  * durante a propósito, para no tocar el audio ni la transcripción en vivo.
  */
-const SEMILLA_URL = "https://ia-lab.lemonsqueezy.com/checkout/buy/43592995-9957-4a8d-9bf6-33b9e372b5e9?discount=0";
+const SEMILLA_URL =
+  "https://ia-lab.lemonsqueezy.com/checkout/buy/67f85c3d-a29e-4197-ae88-b98876df47fd?media=0&logo=0&discount=0";
 /** Quien ya aportó no lo vuelve a ver en este navegador. */
 const LS_KEY_SEMILLA = "simulador:semilla:v1";
 const LS_KEY_REPORT = "simulador:lastReport:v1";

@@ -1087,7 +1087,7 @@ const PLANES: Record<PassPlan, Plan> = {
     titulo: "Pase Rey Loro Ilimitado (7 días)",
     precio: PASS_WEEK_PRICE,
     valor: 19.99,
-    checkout: "https://ia-lab.lemonsqueezy.com/checkout/buy/63f21da5-cf9b-4327-9980-922f2bc86bc5",
+    checkout: "https://ia-lab.lemonsqueezy.com/checkout/buy/6f6fc7c0-35f3-4ce5-9d06-1a678b8d1bd9?logo=0",
     wa: `Hey Loro creador! Quiero el Pase Rey Loro Ilimitado de 7 días (${PASS_WEEK_PRICE}) para mi próxima entrevista. ¿Cómo avanzo Loro?`,
   },
   year: {
