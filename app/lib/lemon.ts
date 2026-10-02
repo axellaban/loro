@@ -25,7 +25,7 @@ const STORE_ID = 486442;
  * Para sumar el pase de 12 meses, agregar acá su product_id con "year".
  */
 const PRODUCTOS: Record<number, PassPlan> = {
-  1398443: "week", // Pase Rey Loro Ilimitado (7 días)
+  1407311: "week", // Pase Rey Loro Ilimitado (7 días), modo real
 };
 
 const API = "https://api.lemonsqueezy.com/v1/licenses/validate";
